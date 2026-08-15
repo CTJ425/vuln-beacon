@@ -106,6 +106,16 @@
     - [x] Edge function persisted all 5 RHSA rows (RHSA-2023:5453, 5454, 5455, 5476, RHSA-2024:0033) correctly linked to CVE-2023-4911 with 12 impact rows each.
     - [x] One-CVE-to-many-RHSA relationship verified end-to-end in production.
     - [x] Final State: npm test 26 test files / 83 tests all passing; npm run build clean.
+  - [x] **Phase D: CSAF Advisory-First Ingestion Rework** (Completed 2026-08-16)
+    - [x] New `src/adapters/redhat-csaf.ts` (RedHatCsafAdapter) parses CSAF 2.0 documents advisory-first with one NormalizedAdvisoryItem per errata carrying every CVE it fixes. Advisory metadata from document.tracking/aggregate_severity/notes; per-CVE score, vector, severity with fallback chain (threats→baseSeverity→advisory), description from vulnerabilities[]. Product impacts resolved from product_tree via recursive branch walk with raw-id fallback; package NVRs reduced to base components; composite ids split on FIRST colon only. product_status keys mapped to display states. rawPayload stores only csaf_document_id and cve_ids (not full 1 MB+ documents).
+    - [x] `src/adapters/index.ts`: RedHatCsafAdapter now registered as getAdapterByCode('redhat'); RedHatAdapter still exported.
+    - [x] `src/services/syncService.ts`: fetchAndIngestQuery rewritten to CSAF endpoints (errata id → detail endpoint; CVE → csaf.json?cve= then parallel detail fetches). Old /securitydata/cve.json and /cve/<id>.json calls removed. syncVendors() unchanged.
+    - [x] Readability: Build artifacts (-debuginfo/-debugsource) dropped; per-locale packages collapsed. Verified on glibc: 214 rows → 19 with all 16 meaningful packages preserved.
+    - [x] Review PASS: first-colon splitting, NVR truncation, recursive product-tree walk, state mappings, debug filtering, severity fallback, rawPayload exclusion verified. One RISK (non-array product_status) FIXED with Array.isArray guard.
+    - [x] Obsolete tests adjudicated: 4 failures (CVE-first shape) expected and fixed. Three E2E suites now run on new CSAF fixture (csaf-e2e-sample.json) with original assertions intact; component expectations updated.
+    - [x] New tests: redhatCsaf.test.ts (8), redhatCsafCollapse.test.ts (5), csafQuery.test.ts (5).
+    - [x] Live database re-ingestion: User-authorised purge of advisory_cve_map/advisories/cves. Ran advisory-first pipeline against live Red Hat API and Edge Function. Result: 50 advisories, 142 CVEs, 238 mappings. Average CVEs/advisory 1.00 → 4.76. Maximum 1 → 25. Cross-mapped advisories 0 → 55. Sample: RHSA-2026:54622 (Apache Camel, 25 CVEs), RHSA-2026:54757 (OpenStack, 24), RHSA-2026:54572 (webkit2gtk3, 23).
+    - [x] Verification: npm test 29 files / 101 tests passing; npm run build clean.
 
 
 

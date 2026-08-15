@@ -1,3 +1,14 @@
+## 2026-08-16 00:22:15 CST - RHSA-Centric Data Layer (Phase C1+C2) — N:M Advisory-to-CVE Mapping
+- Completed **Task 10 Phase C1+C2: RHSA-Centric Data Layer** (spec: `docs/agent/specs/rhsa-centric-data-layer.md`).
+- Root problem: data layer was CVE-first and discarded N:M relationship between RHSA advisories and CVEs in three places: (1) `src/adapters/redhat.ts` kept only advisoriesList[0], demoting rest to decorative rawPayload.all_advisories; (2) `src/services/cveService.ts` read only advisory_cve_map[0]; (3) nothing queried FROM advisories.
+- Solution: `src/adapters/redhat.ts` parse() now emits one NormalizedAdvisoryItem per RHSA in advisoriesList, each with its own errata URL and fixed versions tied to that advisory. New `src/services/advisoryService.ts` with AdvisoryService.fetchAdvisories() queries FROM advisories joining advisory_cve_map → cves, returning every CVE each advisory fixes with aggregated/deduped product_impacts and unioned fixed_versions. Refactored `src/services/cveService.ts` to iterate ALL mappings, merging product_impacts and unioning fixed_versions across all.
+- Deduplication added: advisoriesList wrapped in Array.from(new Set(...)) to prevent duplicate errata IDs from upstream.
+- TDD red→green: 3 new unit tests (`redhatMultiAdvisory.test.ts`), 3 new unit tests (`advisoryCentric.test.ts`).
+- Review: route:reviewer PASS with 2 RISK findings. RISK 1 (duplicate advisories from upstream) fixed inline via deduplication. RISK 2 (affected_products fallback hardcodes 'Enterprise System') accepted as open low-priority risk, recorded in BUG_FIX.md (revisit if/when multi-vendor dataset expands).
+- Also discovered and recorded OPEN BUG: webhook alerting has never worked in production (WebhookService only dispatches to manually registered configs, registerWebhook() is never called in production code, only in E2E test).
+- Verification: npm test 64/64 passed, npm run build clean. Phase C3a (dashboard) in progress; Phase C3b (detail views) planned.
+
+
 # Progress Log Archive
 
 ## 2026-08-16 00:04:13 CST - Security Refactor: Vendor Sync Behind Edge Function with RLS Write Restrictions
