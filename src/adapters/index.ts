@@ -1,10 +1,11 @@
 import { VendorAdapter } from '@/types';
 import { RedHatAdapter } from './redhat';
+import { RedHatCsafAdapter } from './redhat-csaf';
 
-export { RedHatAdapter };
+export { RedHatAdapter, RedHatCsafAdapter };
 
 export const ALL_ADAPTERS: VendorAdapter[] = [
-  new RedHatAdapter(),
+  new RedHatCsafAdapter(),
 ];
 
 export function getAdapterByCode(code: string): VendorAdapter | undefined {

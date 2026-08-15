@@ -108,35 +108,45 @@ export class SyncService {
 
   async fetchAndIngestQuery(query: string): Promise<boolean> {
     const q = query.trim().toUpperCase();
-    let targetCve = q;
 
     try {
-      if (q.startsWith('RHSA-') || q.startsWith('RHBA-') || q.startsWith('RHEA-') || !q.startsWith('CVE-')) {
-        const cveListRes = await fetch(`https://access.redhat.com/hydra/rest/securitydata/cve.json?per_page=500`);
-        if (cveListRes.ok) {
-          const list = await cveListRes.json();
-          const match = list.find((c: any) =>
-            (c.advisories && c.advisories.some((a: string) => a.includes(q))) ||
-            (c.CVE && c.CVE.includes(q))
-          );
-          if (match && match.CVE) {
-            targetCve = match.CVE;
-          }
-        }
+      const detailDocuments: unknown[] = [];
+
+      if (q.startsWith('RHSA-') || q.startsWith('RHBA-') || q.startsWith('RHEA-')) {
+        const res = await fetch(`https://access.redhat.com/hydra/rest/securitydata/csaf/${q}.json`);
+        if (!res.ok) return false;
+        detailDocuments.push(await res.json());
+      } else {
+        const listRes = await fetch(`https://access.redhat.com/hydra/rest/securitydata/csaf.json?cve=${q}`);
+        if (!listRes.ok) return false;
+        const list = (await listRes.json()) as { RHSA?: string }[];
+        if (!Array.isArray(list) || list.length === 0) return false;
+
+        const fetched = await Promise.all(
+          list.map(async (entry) => {
+            if (!entry.RHSA) return null;
+            try {
+              const detailRes = await fetch(`https://access.redhat.com/hydra/rest/securitydata/csaf/${entry.RHSA}.json`);
+              if (detailRes.ok) {
+                return await detailRes.json();
+              }
+            } catch {
+              // Skip this advisory rather than failing the whole batch.
+            }
+            return null;
+          })
+        );
+        detailDocuments.push(...fetched.filter((doc) => doc !== null));
       }
 
-      if (!targetCve.startsWith('CVE-')) {
+      if (detailDocuments.length === 0) {
         return false;
       }
 
-      const res = await fetch(`https://access.redhat.com/hydra/rest/securitydata/cve/${targetCve}.json`);
-      if (!res.ok) return false;
-      const detail = await res.json();
-
-      const engine = new IngestionEngine({ webhookService: this.webhookService });
+      const engine = new IngestionEngine();
       const startTime = Date.now();
       const startedAt = new Date(startTime).toISOString();
-      await engine.ingestVendor('redhat', [detail]);
+      await engine.ingestVendor('redhat', detailDocuments);
       const durationMs = Date.now() - startTime;
 
       // Nothing could be normalised out of the response — reporting success
