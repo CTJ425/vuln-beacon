@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { IngestionEngine } from '@/engine/ingestion';
-import redhatFixture from '../fixtures/redhat/cve-sample.json';
+import redhatFixture from '../fixtures/redhat/csaf-e2e-sample.json';
 
 describe('E2E: Ingestion and Normalization Flow', () => {
   it('should run full ingestion for Red Hat security feed, deduplicate CVEs, and record execution logs', async () => {

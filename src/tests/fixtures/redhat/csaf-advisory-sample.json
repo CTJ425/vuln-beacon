@@ -1,0 +1,250 @@
+{
+  "document": {
+    "aggregate_severity": {
+      "namespace": "https://access.redhat.com/security/updates/classification/",
+      "text": "Important"
+    },
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "lang": "en",
+    "notes": [
+      {
+        "category": "summary",
+        "text": "An update for glibc is now available for Red Hat Enterprise Linux 8.",
+        "title": "Topic"
+      },
+      {
+        "category": "general",
+        "text": "The glibc packages provide the standard C libraries. Security Fix(es): buffer overflow in ld.so.",
+        "title": "Details"
+      },
+      {
+        "category": "legal_disclaimer",
+        "text": "This content is licensed under the Creative Commons Attribution 4.0 International License.",
+        "title": "Terms of Use"
+      }
+    ],
+    "publisher": {
+      "category": "vendor",
+      "name": "Red Hat Product Security",
+      "namespace": "https://www.redhat.com"
+    },
+    "references": [
+      { "category": "self", "summary": "https://access.redhat.com/errata/RHSA-2023:5455", "url": "https://access.redhat.com/errata/RHSA-2023:5455" }
+    ],
+    "title": "Red Hat Security Advisory: glibc security update",
+    "tracking": {
+      "current_release_date": "2026-07-14T13:23:09+00:00",
+      "id": "RHSA-2023:5455",
+      "initial_release_date": "2023-10-05T14:14:13+00:00",
+      "status": "final",
+      "version": "8"
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "branches": [
+          {
+            "branches": [
+              {
+                "category": "product_name",
+                "name": "Red Hat Enterprise Linux BaseOS (v. 8)",
+                "product": {
+                  "product_id": "BaseOS-8.8.0.Z.MAIN.EUS",
+                  "name": "Red Hat Enterprise Linux BaseOS (v. 8)"
+                }
+              },
+              {
+                "category": "product_name",
+                "name": "Red Hat Enterprise Linux AppStream (v. 8)",
+                "product": {
+                  "product_id": "AppStream-8.8.0.Z.MAIN.EUS",
+                  "name": "Red Hat Enterprise Linux AppStream (v. 8)"
+                }
+              }
+            ],
+            "category": "product_family",
+            "name": "Red Hat Enterprise Linux"
+          },
+          {
+            "branches": [
+              {
+                "category": "product_version",
+                "name": "glibc-0:2.28-225.el8_8.6.x86_64",
+                "product": {
+                  "product_id": "glibc-0:2.28-225.el8_8.6.x86_64",
+                  "name": "glibc-0:2.28-225.el8_8.6.x86_64"
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "glibc-common-0:2.28-225.el8_8.6.x86_64",
+                "product": {
+                  "product_id": "glibc-common-0:2.28-225.el8_8.6.x86_64",
+                  "name": "glibc-common-0:2.28-225.el8_8.6.x86_64"
+                }
+              },
+              {
+                "category": "product_version",
+                "name": "glibc-debuginfo-0:2.28-225.el8_8.6.x86_64",
+                "product": {
+                  "product_id": "glibc-debuginfo-0:2.28-225.el8_8.6.x86_64",
+                  "name": "glibc-debuginfo-0:2.28-225.el8_8.6.x86_64"
+                }
+              }
+            ],
+            "category": "architecture",
+            "name": "x86_64"
+          }
+        ],
+        "category": "vendor",
+        "name": "Red Hat"
+      }
+    ],
+    "relationships": [
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "glibc-0:2.28-225.el8_8.6.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 8)",
+          "product_id": "BaseOS-8.8.0.Z.MAIN.EUS:glibc-0:2.28-225.el8_8.6.x86_64"
+        },
+        "product_reference": "glibc-0:2.28-225.el8_8.6.x86_64",
+        "relates_to_product_reference": "BaseOS-8.8.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "glibc-common-0:2.28-225.el8_8.6.x86_64 as a component of Red Hat Enterprise Linux BaseOS (v. 8)",
+          "product_id": "BaseOS-8.8.0.Z.MAIN.EUS:glibc-common-0:2.28-225.el8_8.6.x86_64"
+        },
+        "product_reference": "glibc-common-0:2.28-225.el8_8.6.x86_64",
+        "relates_to_product_reference": "BaseOS-8.8.0.Z.MAIN.EUS"
+      },
+      {
+        "category": "default_component_of",
+        "full_product_name": {
+          "name": "glibc-debuginfo-0:2.28-225.el8_8.6.x86_64 as a component of Red Hat Enterprise Linux AppStream (v. 8)",
+          "product_id": "AppStream-8.8.0.Z.MAIN.EUS:glibc-debuginfo-0:2.28-225.el8_8.6.x86_64"
+        },
+        "product_reference": "glibc-debuginfo-0:2.28-225.el8_8.6.x86_64",
+        "relates_to_product_reference": "AppStream-8.8.0.Z.MAIN.EUS"
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2023-4527",
+      "cwe": { "id": "CWE-125", "name": "Out-of-bounds Read" },
+      "discovery_date": "2023-09-12T00:00:00+00:00",
+      "notes": [
+        {
+          "category": "description",
+          "text": "A flaw was found in glibc. When the getaddrinfo function is called with the AF_UNSPEC address family, a stack buffer overflow may occur.",
+          "title": "Vulnerability description"
+        },
+        {
+          "category": "summary",
+          "text": "glibc: Stack read overflow in getaddrinfo in no-aaaa mode",
+          "title": "Vulnerability summary"
+        },
+        {
+          "category": "other",
+          "text": "This issue did not affect the versions of glibc shipped with Red Hat Enterprise Linux 6 and 7.",
+          "title": "Statement"
+        }
+      ],
+      "product_status": {
+        "fixed": [
+          "BaseOS-8.8.0.Z.MAIN.EUS:glibc-0:2.28-225.el8_8.6.x86_64",
+          "BaseOS-8.8.0.Z.MAIN.EUS:glibc-common-0:2.28-225.el8_8.6.x86_64",
+          "AppStream-8.8.0.Z.MAIN.EUS:glibc-debuginfo-0:2.28-225.el8_8.6.x86_64"
+        ]
+      },
+      "references": [
+        { "category": "self", "summary": "CVE-2023-4527", "url": "https://www.redhat.com/security/data/cve/CVE-2023-4527.html" }
+      ],
+      "release_date": "2023-09-12T00:00:00+00:00",
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "date": "2023-10-05T14:14:13+00:00",
+          "details": "For details on how to apply this update, refer to: https://access.redhat.com/articles/11258",
+          "product_ids": ["BaseOS-8.8.0.Z.MAIN.EUS:glibc-0:2.28-225.el8_8.6.x86_64"],
+          "url": "https://access.redhat.com/errata/RHSA-2023:5455"
+        },
+        {
+          "category": "workaround",
+          "details": "Removing the no-aaaa diagnostic option from /etc/resolv.conf will mitigate this flaw.",
+          "product_ids": ["BaseOS-8.8.0.Z.MAIN.EUS:glibc-0:2.28-225.el8_8.6.x86_64"]
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "attackComplexity": "HIGH",
+            "attackVector": "NETWORK",
+            "baseScore": 6.5,
+            "baseSeverity": "MEDIUM",
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:H",
+            "version": "3.1"
+          },
+          "products": ["BaseOS-8.8.0.Z.MAIN.EUS:glibc-0:2.28-225.el8_8.6.x86_64"]
+        }
+      ],
+      "threats": [{ "category": "impact", "details": "Moderate" }],
+      "title": "glibc: Stack read overflow in getaddrinfo in no-aaaa mode"
+    },
+    {
+      "cve": "CVE-2023-4911",
+      "cwe": { "id": "CWE-787", "name": "Out-of-bounds Write" },
+      "discovery_date": "2023-09-19T00:00:00+00:00",
+      "notes": [
+        {
+          "category": "description",
+          "text": "A buffer overflow was discovered in the GNU C Library's dynamic loader ld.so while processing the GLIBC_TUNABLES environment variable.",
+          "title": "Vulnerability description"
+        },
+        {
+          "category": "summary",
+          "text": "glibc: buffer overflow in ld.so leading to privilege escalation",
+          "title": "Vulnerability summary"
+        }
+      ],
+      "product_status": {
+        "fixed": [
+          "BaseOS-8.8.0.Z.MAIN.EUS:glibc-0:2.28-225.el8_8.6.x86_64",
+          "BaseOS-8.8.0.Z.MAIN.EUS:glibc-common-0:2.28-225.el8_8.6.x86_64"
+        ]
+      },
+      "references": [
+        { "category": "self", "summary": "CVE-2023-4911", "url": "https://www.redhat.com/security/data/cve/CVE-2023-4911.html" }
+      ],
+      "release_date": "2023-10-03T00:00:00+00:00",
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "date": "2023-10-05T14:14:13+00:00",
+          "details": "For details on how to apply this update, refer to: https://access.redhat.com/articles/11258",
+          "product_ids": ["BaseOS-8.8.0.Z.MAIN.EUS:glibc-0:2.28-225.el8_8.6.x86_64"],
+          "url": "https://access.redhat.com/errata/RHSA-2023:5455"
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "attackComplexity": "LOW",
+            "attackVector": "LOCAL",
+            "baseScore": 7.8,
+            "baseSeverity": "HIGH",
+            "vectorString": "CVSS:3.1/AV:L/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+            "version": "3.1"
+          },
+          "products": ["BaseOS-8.8.0.Z.MAIN.EUS:glibc-0:2.28-225.el8_8.6.x86_64"]
+        }
+      ],
+      "threats": [{ "category": "impact", "details": "Important" }],
+      "title": "glibc: buffer overflow in ld.so leading to privilege escalation"
+    }
+  ]
+}

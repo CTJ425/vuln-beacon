@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { IngestionEngine } from '@/engine/ingestion';
-import redhatFixture from '../fixtures/redhat/cve-sample.json';
+import redhatFixture from '../fixtures/redhat/csaf-e2e-sample.json';
 
 describe('E2E: Product & Component Impact Matrix Flow', () => {
   it('should ingest CVE and extract structured products and component packages with impact states', async () => {
@@ -23,7 +23,10 @@ describe('E2E: Product & Component Impact Matrix Flow', () => {
 
     expect(map.product_impacts).toBeDefined();
     expect(map.product_impacts!.length).toBeGreaterThan(0);
-    expect(map.product_impacts![0].component).toContain('spring-framework-0:5.3.39-1.el9');
+    // the package NVR is reduced to a base component name, and the composite
+    // product id is resolved to its human-readable product name
+    expect(map.product_impacts!.map((p) => p.component)).toContain('spring-framework');
+    expect(map.product_impacts![0].product_name).toBe('Red Hat Enterprise Linux AppStream (v. 9)');
     expect(map.product_impacts![0].state).toBe('Fixed');
   });
 });

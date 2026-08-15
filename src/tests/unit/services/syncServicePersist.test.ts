@@ -32,6 +32,17 @@ import { SyncService } from '@/services/syncService';
 
 const PROTECTED_TABLES = ['advisories', 'cves', 'advisory_cve_map', 'vendor_sync_logs'];
 
+/** Answers the CSAF reverse-index and detail endpoints the query flow uses. */
+const mockCsafFetch = () =>
+  vi.fn(async (url: any) => {
+    const u = String(url);
+    if (u.includes('csaf.json?cve=')) {
+      return { ok: true, json: async () => [{ RHSA: 'RHSA-2026:1001', CVEs: ['CVE-2026-1'] }] };
+    }
+    return { ok: true, json: async () => ({ document: { tracking: { id: 'RHSA-2026:1001' } } }) };
+  });
+
+
 describe('SyncService persists via the sync-cve edge function, not direct table writes', () => {
   beforeEach(() => {
     mockInvoke.mockReset().mockResolvedValue({
@@ -108,10 +119,7 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
   });
 
   it('fetchAndIngestQuery() calls the sync-cve edge function instead of writing directly', async () => {
-    global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ CVE: 'CVE-2026-1' }),
-    }) as any;
+    global.fetch = mockCsafFetch() as any;
 
     const service = new SyncService();
     const ok = await service.fetchAndIngestQuery('CVE-2026-1');
@@ -132,12 +140,9 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
   });
 
   it('fetchAndIngestQuery() reports failure when the payload parsed to nothing', async () => {
-    // The Red Hat detail endpoint answered, but nothing could be normalised out
-    // of it — reporting success here makes the UI claim it saved data it did not.
-    global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ name: 'CVE-2026-1' }),
-    }) as any;
+    // The CSAF endpoints answered, but nothing could be normalised out of the
+    // documents — reporting success here makes the UI claim it saved data it did not.
+    global.fetch = mockCsafFetch() as any;
     mockGetAdvisories.mockReturnValue([]);
     mockGetCves.mockReturnValue([]);
     mockGetMappings.mockReturnValue([]);
@@ -149,10 +154,7 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
   });
 
   it('fetchAndIngestQuery() returns false when the edge function call errors', async () => {
-    global.fetch = vi.fn().mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ CVE: 'CVE-2026-1' }),
-    }) as any;
+    global.fetch = mockCsafFetch() as any;
     mockInvoke.mockResolvedValueOnce({ data: null, error: { message: 'boom' } });
 
     const service = new SyncService();

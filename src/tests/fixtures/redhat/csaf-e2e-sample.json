@@ -1,0 +1,155 @@
+[
+  {
+    "document": {
+      "aggregate_severity": { "text": "Critical" },
+      "category": "csaf_security_advisory",
+      "title": "Red Hat Security Advisory: spring-framework security update",
+      "notes": [
+        { "category": "summary", "text": "An update for spring-framework is now available.", "title": "Topic" },
+        { "category": "general", "text": "Spring Framework packages provide the core application framework.", "title": "Details" }
+      ],
+      "tracking": {
+        "id": "RHSA-2024:6821",
+        "initial_release_date": "2024-09-17T12:00:00+00:00",
+        "current_release_date": "2024-09-18T12:00:00+00:00",
+        "status": "final"
+      }
+    },
+    "product_tree": {
+      "branches": [
+        {
+          "category": "vendor",
+          "name": "Red Hat",
+          "branches": [
+            {
+              "category": "product_family",
+              "name": "Red Hat Enterprise Linux",
+              "branches": [
+                {
+                  "category": "product_name",
+                  "name": "Red Hat Enterprise Linux AppStream (v. 9)",
+                  "product": {
+                    "product_id": "AppStream-9.4.0.Z.MAIN",
+                    "name": "Red Hat Enterprise Linux AppStream (v. 9)"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "relationships": []
+    },
+    "vulnerabilities": [
+      {
+        "cve": "CVE-2024-38812",
+        "notes": [
+          {
+            "category": "description",
+            "text": "A remote code execution vulnerability was found in vCenter Server due to a heap overflow in the DCERPC protocol implementation.",
+            "title": "Vulnerability description"
+          },
+          {
+            "category": "summary",
+            "text": "vCenter Server Remote Code Execution Vulnerability",
+            "title": "Vulnerability summary"
+          }
+        ],
+        "product_status": {
+          "fixed": [
+            "AppStream-9.4.0.Z.MAIN:spring-framework-0:5.3.39-1.el9.noarch",
+            "AppStream-9.4.0.Z.MAIN:spring-beans-0:5.3.39-1.el9.noarch"
+          ]
+        },
+        "remediations": [
+          {
+            "category": "vendor_fix",
+            "details": "For details on how to apply this update, refer to: https://access.redhat.com/articles/11258",
+            "product_ids": ["AppStream-9.4.0.Z.MAIN:spring-framework-0:5.3.39-1.el9.noarch"]
+          }
+        ],
+        "scores": [
+          {
+            "cvss_v3": {
+              "baseScore": 9.8,
+              "baseSeverity": "CRITICAL",
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+              "version": "3.1"
+            }
+          }
+        ],
+        "threats": [{ "category": "impact", "details": "Critical" }],
+        "title": "vCenter Server Remote Code Execution Vulnerability"
+      }
+    ]
+  },
+  {
+    "document": {
+      "aggregate_severity": { "text": "Important" },
+      "category": "csaf_security_advisory",
+      "title": "Red Hat Security Advisory: runc security update",
+      "notes": [
+        { "category": "summary", "text": "An update for runc is now available.", "title": "Topic" }
+      ],
+      "tracking": {
+        "id": "RHSA-2024:0532",
+        "initial_release_date": "2024-01-31T18:00:00+00:00",
+        "current_release_date": "2024-02-01T18:00:00+00:00",
+        "status": "final"
+      }
+    },
+    "product_tree": {
+      "branches": [
+        {
+          "category": "vendor",
+          "name": "Red Hat",
+          "branches": [
+            {
+              "category": "product_name",
+              "name": "Red Hat Enterprise Linux BaseOS (v. 9)",
+              "product": {
+                "product_id": "BaseOS-9.3.0.Z.MAIN",
+                "name": "Red Hat Enterprise Linux BaseOS (v. 9)"
+              }
+            }
+          ]
+        }
+      ],
+      "relationships": []
+    },
+    "vulnerabilities": [
+      {
+        "cve": "CVE-2024-21626",
+        "notes": [
+          {
+            "category": "description",
+            "text": "A file descriptor leak in runc allows a container to escape to the host filesystem.",
+            "title": "Vulnerability description"
+          }
+        ],
+        "product_status": {
+          "fixed": ["BaseOS-9.3.0.Z.MAIN:runc-4:1.1.12-1.el9.x86_64"]
+        },
+        "remediations": [
+          {
+            "category": "vendor_fix",
+            "details": "For details on how to apply this update, refer to: https://access.redhat.com/articles/11258",
+            "product_ids": ["BaseOS-9.3.0.Z.MAIN:runc-4:1.1.12-1.el9.x86_64"]
+          }
+        ],
+        "scores": [
+          {
+            "cvss_v3": {
+              "baseScore": 8.6,
+              "baseSeverity": "HIGH",
+              "vectorString": "CVSS:3.1/AV:L/AC:L/PR:N/UI:R/S:C/C:H/I:H/A:H",
+              "version": "3.1"
+            }
+          }
+        ],
+        "threats": [{ "category": "impact", "details": "Important" }],
+        "title": "runc: file descriptor leak leading to container breakout"
+      }
+    ]
+  }
+]

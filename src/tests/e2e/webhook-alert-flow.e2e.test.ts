@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { IngestionEngine } from '@/engine/ingestion';
 import { WebhookService } from '@/services/webhook';
-import redhatFixture from '../fixtures/redhat/cve-sample.json';
+import redhatFixture from '../fixtures/redhat/csaf-e2e-sample.json';
 
 describe('E2E: Webhook Alert Dispatch Flow', () => {
   it('should detect CRITICAL severity CVEs and dispatch alerts to active webhooks', async () => {
