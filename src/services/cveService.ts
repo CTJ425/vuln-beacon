@@ -1,40 +1,44 @@
 import { supabase } from '@/lib/supabase';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 import { CveTableRowItem } from '@/components/explorer/CveTable';
-import { ProductImpactItem, AdvisoryDetailData } from '@/types';
+import { ProductImpactItem } from '@/types';
 
 export class CveService {
   async fetchCves(): Promise<CveTableRowItem[]> {
     try {
-      const { data, error } = await supabase
-        .from('cves')
-        .select(`
-          id,
-          cve_id,
-          description,
-          cvss_v3_score,
-          cvss_v3_vector,
-          severity,
-          is_known_exploited,
-          published_date,
-          last_modified_date,
-          created_at,
-          advisory_cve_map (
-            affected_products,
-            fixed_versions,
-            advisories (
-              advisory_id,
-              title,
-              url,
-              summary,
-              raw_payload,
-              vendors (
-                code,
-                name
+      const { data, error } = await fetchAllRows((from, to) =>
+        supabase
+          .from('cves')
+          .select(`
+            id,
+            cve_id,
+            description,
+            cvss_v3_score,
+            cvss_v3_vector,
+            severity,
+            is_known_exploited,
+            published_date,
+            last_modified_date,
+            created_at,
+            advisory_cve_map (
+              affected_products,
+              fixed_versions,
+              advisories (
+                advisory_id,
+                title,
+                url,
+                summary,
+                vendors (
+                  code,
+                  name
+                )
               )
             )
-          )
-        `)
-        .order('published_date', { ascending: false });
+          `)
+          .order('published_date', { ascending: false })
+          .order('id', { ascending: true })
+          .range(from, to)
+      );
 
       if (error) {
         console.warn('Error fetching CVEs from Supabase:', error.message);
@@ -44,11 +48,10 @@ export class CveService {
       if (!data) return [];
 
       return data.map((row: any): CveTableRowItem => {
-        const mappings = Array.isArray(row.advisory_cve_map) ? row.advisory_cve_map : [];
+        const mappings: any[] = Array.isArray(row.advisory_cve_map) ? row.advisory_cve_map : [];
         const firstMap = mappings[0];
         const advisory = firstMap?.advisories;
         const vendor = advisory?.vendors;
-        const rawPayload = advisory?.raw_payload || {};
 
         // Parse structured product_impacts across every mapping (not just the first).
         const productImpacts: ProductImpactItem[] = [];
@@ -148,51 +151,15 @@ export class CveService {
           solution = '原廠目前正在積極調查分析該漏洞，請持續監控官方安全性更新公告，並留意後續發布之 Errata / Hotfix。';
         }
 
-        // Build Errata Advisory Report Object
-        const advisoryDetail: AdvisoryDetailData = {
-          advisory_id: advisory?.advisory_id || row.cve_id,
-          synopsis: `${row.severity}: ${productImpacts[0]?.component || 'system components'} security update`,
-          type_severity: `Security Advisory: ${row.severity}`,
-          topic: `An update for ${productImpacts[0]?.component || 'system components'} is now available for enterprise ecosystem products. Product Security has rated this update as having a security impact of ${row.severity}.`,
-          description: row.description || advisory?.summary || '',
-          solution,
-          mitigation: rawPayload.mitigation?.value || rawPayload.mitigation || undefined,
-          statement: rawPayload.statement || undefined,
-          affected_products: affectedProducts,
-          cves: [row.cve_id],
-          security_fixes: [
-            {
-              cve_id: row.cve_id,
-              component: productImpacts[0]?.component,
-              summary: row.description,
-              bugzilla_id: rawPayload.bugzilla,
-              bugzilla_url: rawPayload.bugzilla ? `https://bugzilla.redhat.com/show_bug.cgi?id=${rawPayload.bugzilla}` : undefined,
-            },
-          ],
-          updated_packages: (rawPayload.affected_release || []).map((ar: any) => ({
-            package_name: ar.package || 'package-release',
-            product: ar.product_name,
-            advisory: ar.advisory || advisory?.advisory_id,
-            release_date: ar.release_date,
-          })),
-          url: advisory?.url,
-          issued_date: row.published_date || row.created_at,
-          updated_date: row.last_modified_date,
-        };
-
         const mappedAdvisoryIds = Array.from(
           new Set(
             mappings
               .map((map: any) => map?.advisories?.advisory_id)
-              .filter((id: string | undefined) => Boolean(id) && id !== 'N/A')
+              .filter((id: string | undefined): id is string => Boolean(id) && id !== 'N/A')
           )
         );
 
-        const allAdvisories: string[] = mappedAdvisoryIds.length > 0
-          ? mappedAdvisoryIds
-          : (rawPayload.all_advisories && Array.isArray(rawPayload.all_advisories)
-              ? rawPayload.all_advisories
-              : []);
+        const allAdvisories: string[] = mappedAdvisoryIds;
 
         return {
           id: row.id,
@@ -214,7 +181,6 @@ export class CveService {
           product_impacts: productImpacts,
           fixed_versions: fixedVersions,
           solution,
-          advisory_detail: advisoryDetail,
         };
 
       });

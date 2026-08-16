@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { ChevronRight, Flame } from 'lucide-react';
 
-import { CveRecord, ProductImpactItem, AdvisoryDetailData } from '@/types';
+import { CveRecord, ProductImpactItem } from '@/types';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
 import { formatDate } from '@/utils/date';
 
@@ -29,7 +29,6 @@ export interface CveTableRowItem extends CveRecord {
   product_impacts: ProductImpactItem[];
   fixed_versions?: string[];
   solution?: string;
-  advisory_detail?: AdvisoryDetailData;
 }
 
 interface CveTableProps {

@@ -9,10 +9,16 @@ vi.mock('@/lib/supabase', () => ({
 import { AdvisoryService } from '@/services/advisoryService';
 import { CveService } from '@/services/cveService';
 
-/** Build the `.select().order()` chain the services use. */
-const resolveWith = (rows: any[]) => ({
-  select: () => ({ order: () => Promise.resolve({ data: rows, error: null }) }),
-});
+/** Build the `.select().order().order().range()` chain the services use. */
+const resolveWith = (rows: any[]) => {
+  const result = { data: rows, error: null };
+  const chain: any = {
+    order: () => chain,
+    range: () => Promise.resolve(result),
+    then: (...args: any[]) => Promise.resolve(result).then(...args),
+  };
+  return { select: () => chain };
+};
 
 describe('AdvisoryService — one RHSA lists every CVE it fixes', () => {
   beforeEach(() => mockFrom.mockReset());
