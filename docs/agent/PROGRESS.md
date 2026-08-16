@@ -1,5 +1,16 @@
 # Progress Log
 
+## 2026-08-16 12:20:44 CST - Vendor/Product Taxonomy Navigation + Global Overview (Lane 2)
+- Completed **Vendor/Product Taxonomy Navigation + Global Overview** (spec: `docs/agent/specs/product-taxonomy-nav.md`, Lane 2: elevated risk — cross-module nav state, service contract, multiple pages).
+- NEW services & pages: `src/services/productTaxonomy.ts` (normalizeProductFamily, slugify, deriveTaxonomy, matchesProductFamily); `src/pages/ProductPage.tsx`.
+- Core integration: AdvisoryService.fetchAdvisories now populates vendor_id (selected from Supabase). VendorIcon exports VENDOR_NAMES/VENDOR_COLORS. Sidebar replaces NavTab with NavState (dashboard/vendor/product) and renders vendor→product tree from derived taxonomy. App.tsx wires NavState state via useMemo(deriveTaxonomy), dispatches vendor/product render branches.
+- Explorer & filters: ExplorerPage gains initialProductFamilyId prop; CveFilterBar product dropdown driven by productOptions prop (replacing hardcoded 6 entries); matchesProductFamily replaces inline substring matching.
+- Dashboard reworked: Renamed to "Security Intelligence Overview"; vendor-card row and product-distribution chart now driven by derived taxonomy (replacing hardcoded 5-bucket keyword map). VendorDistributionChart takes items[] ({vendorId, productId, name, count}) plus onSelectProduct callback; DashboardPage flattens taxonomy correctly and wires navigation callbacks.
+- Tests: NEW `src/tests/unit/services/productTaxonomy.test.ts` (15 tests); `src/tests/unit/components/ProductPage.test.tsx` (2 tests). Updated App.test.tsx (vendor-group nav test, title regex "Security Intelligence Overview"), advisoryDashboard.test.tsx (vendor-card tests, onSelectProduct click, back-compat-without-taxonomy), advisoryDetail.test.tsx (vendor_id fixture field added), advisoryCentric.test.ts (vendor_id assertion added).
+- Review: route:reviewer PASS on second pass (scoped re-review). First pass: BLOCKER — DashboardPage declared onSelectProduct callback but never wired to VendorDistributionChart click handler; flattened productDistribution map discarded vendorId/productId pairing needed to route navigation. RISK — VERSION_NUMBER_RE `/\s+\d(\.\d+)*$/` (single digit only) would not normalize "Red Hat Enterprise Linux 10" into same family as "... 9"/"... 8"; spec requires `/\s+\d+(\.\d+)*$/`. Fixes: VendorDistributionChart.tsx reworked to take items[{vendorId, productId, name, count}] and onSelectProduct; DashboardPage.tsx flattens taxonomy into correct shape and wires callback through. Regex corrected to `\d+`. Fixture names in productTaxonomy.test.ts renamed "Family 01"→"Family01" to avoid collision with corrected regex (fixture rename only, test intent unchanged).
+- Accepted design decisions (record for future): No router — navigation extended via existing useState(NavState); Product pages not deep-linkable; reload returns to Overview. No alias map ("RHEL" abbreviation normalizes separately from "Red Hat Enterprise Linux"; out of scope). Product taxonomy derived entirely from ingested advisory data (no hand-maintained product list, no vendors table, no DB migration). Sidebar shows top 10 product families per vendor by advisory count; remainder folded into "Other products" node.
+- Verification: npm run test:unit 108/108 pass (25 test files); npm run test:smoke 11/11 pass; npm run test:e2e 3/3 pass; npm run build (tsc + vite) succeeds, no errors.
+
 ## 2026-08-16 01:11:54 CST - Phase D: CSAF Advisory-First Ingestion Rework
 - Completed **PHASE D: CSAF Advisory-First Ingestion Rework** (spec: `docs/agent/specs/csaf-advisory-first-ingestion.md`, commits: c6fdbf9 feat, 770ee84 test).
 - Root problem resolved: Ingestion was CVE-driven (pulled /securitydata/cve.json, fanned each CVE to RHSAs fixing it). An advisory accumulated only the CVEs that fell in the fetch window. RHSA-2023:5455 fixes 4 CVEs; database held 1. Average per advisory was 1.00 CVE.
@@ -12,31 +23,4 @@
 - Live database re-ingestion: User authorised purge of all rows from advisory_cve_map, advisories, cves (old CVE-driven data). Ran real advisory-first pipeline against live Red Hat API and deployed sync-cve Edge Function. Result: 50 advisories, 142 CVEs, 238 mappings. Average CVEs per advisory 1.00 → 4.76. Maximum CVEs in one advisory 1 → 25. CVEs fixed by more than one advisory 0 → 55. Sample: RHSA-2026:54622 (Apache Camel) 25 CVEs, RHSA-2026:54757 (OpenStack) 24, RHSA-2026:54572 (webkit2gtk3) 23.
 - Verification: npm test 29 files / 101 tests all passing; npm run build clean.
 - Still open (unchanged): BUG-001 webhook alerting never dispatches in production; Task 11 webhook_configs Edge Function + RLS lockdown; BUG-002 low-severity accepted risk in advisoryService.ts.
-
-## 2026-08-16 00:40:28 CST - Phase C3a/C3b Complete: Dashboard & Detail Views; Bug Fixes in Redhat Adapter & SyncService
-- Completed **Task 1 Phase C3a: RHSA-Centric Dashboard** (spec: `docs/agent/specs/rhsa-centric-dashboard.md`).
-  - New AdvisoryTable component renders one row per RHSA advisory with errata id, CVEs fixed, severity, synopsis, affected products, date.
-  - MetricCards gained optional `labels` prop (byte-identical to hardcoded strings; test passes unchanged).
-  - DashboardPage now advisory-first: metrics count advisories (Critical RHSA / Tracked Advisories), urgent list renders AdvisoryTable over CRITICAL/HIGH advisories, product distribution chart computed from advisories.
-  - App.tsx loads advisories via AdvisoryService and holds selectedAdvisory state.
-  - Verification: npm test 69/69 passed, npm run build clean.
-- Completed **Task 2 Phase C3b: Advisory Detail Drawer & Explorer Grouping** (spec: `docs/agent/specs/rhsa-advisory-detail-and-explorer.md`).
-  - New AdvisoryDetailDrawer shows for one RHSA: header with errata link, impact synopsis, FULL LIST OF EVERY CVE THE ADVISORY FIXES (previously missing capability), affected products/components matrix, remediation text with copyable dnf command.
-  - ExplorerPage advisory view now groups by RHSA via filteredAdvisories memo instead of re-labelling CVE rows. All three filters + search apply to advisories; searching a CVE id surfaces the RHSA that fixes it.
-  - App.tsx wires drawer and passes advisories to ExplorerPage.
-  - Verification: npm test 76/76 passed, npm run build clean.
-- Fixed **Task 3 (BUG FIX): Red Hat CVE Detail Payload Silently Discarded** (file: `src/adapters/redhat.ts`).
-  - Root cause: Detail endpoint (/cve/<id>.json) uses different shape from list endpoint (/cve.json) — id in `name` not `CVE`, severity in `threat_severity`, score nested in `cvss3.cvss3_base_score`, `bugzilla` is object not string. RedHatAdapter.parse() began with `if (!raw.CVE) continue`, dropping every detail record. SyncService.fetchAndIngestQuery() feeds detail payload straight to parse(), so on-demand lookups returned zero items with nothing persisted. Bulk sync unaffected (fetchAdvisories() spreads detail over list item).
-  - Fix: parse() now normalises detail shape onto list-shape fields at top of per-record loop. New test `src/tests/unit/adapters/redhatDetailShape.test.ts` (6 tests, regression guard, fixture from real API).
-- Fixed **Task 4 (BUG FIX): On-Demand Lookup Reported Success After Writing Nothing** (file: `src/services/syncService.ts`).
-  - fetchAndIngestQuery() returned true whenever edge function did not error, even when engine.getCves() was empty; UI showed success while nothing persisted.
-  - Now returns false when engine.getCves() empty. Covered by new case in `src/tests/unit/services/syncServicePersist.test.ts`.
-- Completed **Task 5: Adapter Advisory-ID Deduplication** (file: `src/adapters/redhat.ts`, adjudicated RISK from C1/C2 review).
-  - advisoriesList now wrapped in Array.from(new Set(...)) to prevent duplicate errata IDs from upstream emitting duplicate advisory rows.
-- **LIVE END-TO-END VERIFICATION**: Ran full pipeline against real Red Hat Security Data API and live Supabase (xgrtyjazyqajqinwzlbl) using CVE-2023-4911 (glibc ld.so, 5 distinct RHSAs).
-  - Adapter emitted 5 advisory items (before fixes: 0 from this payload shape), correctly reading CVSS 7.8 / severity HIGH from nested cvss3, 12 product impact rows.
-  - IngestionEngine produced 5 advisories, 1 CVE, 5 mappings.
-  - Edge function persisted all 5 RHSA rows (RHSA-2023:5453, 5454, 5455, 5476, RHSA-2024:0033) correctly linked to CVE-2023-4911 with 12 impact rows each.
-  - One-CVE-to-many-RHSA relationship verified end-to-end in production.
-- **Final State**: npm test 26 test files / 83 tests all passing; npm run build clean.
 
