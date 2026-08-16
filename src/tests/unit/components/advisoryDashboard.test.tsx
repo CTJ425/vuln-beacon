@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { AdvisoryTable } from '@/components/explorer/AdvisoryTable';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { AdvisoryRowItem } from '@/services/advisoryService';
+import { VendorNode } from '@/services/productTaxonomy';
 
 const advisory = (over: Partial<AdvisoryRowItem> = {}): AdvisoryRowItem => ({
   id: 'a1',
@@ -14,6 +15,7 @@ const advisory = (over: Partial<AdvisoryRowItem> = {}): AdvisoryRowItem => ({
   published_at: '2026-08-02T00:00:00Z',
   url: 'https://access.redhat.com/errata/RHSA-2026:2000',
   summary: 'kernel security update',
+  vendor_id: 'redhat',
   cves: [
     { cve_id: 'CVE-2026-2001', description: 'kernel: flaw one', severity: 'CRITICAL', cvss_v3_score: 9.1, is_known_exploited: false },
     { cve_id: 'CVE-2026-2002', description: 'kernel: flaw two', severity: 'CRITICAL', cvss_v3_score: 9.0, is_known_exploited: false },
@@ -94,5 +96,70 @@ describe('DashboardPage — organised around RHSA advisories', () => {
     await userEvent.click(screen.getByText('RHSA-2026:2000'));
 
     expect(onSelectAdvisory).toHaveBeenCalledWith(item);
+  });
+});
+
+describe('DashboardPage — global vendor summary', () => {
+  const taxonomy: VendorNode[] = [
+    {
+      vendorId: 'redhat',
+      vendorName: 'Red Hat',
+      advisoryCount: 3,
+      criticalCount: 1,
+      products: [
+        { id: 'red-hat-enterprise-linux', name: 'Red Hat Enterprise Linux', advisoryCount: 3 },
+      ],
+    },
+  ];
+
+  it('renders one vendor card per VendorNode and calls onSelectVendor when clicked', async () => {
+    const onSelectVendor = vi.fn();
+    render(
+      <DashboardPage
+        advisories={[advisory()]}
+        cves={[]}
+        onSelectAdvisory={() => {}}
+        onSelectCve={() => {}}
+        onNavigateToExplorer={() => {}}
+        taxonomy={taxonomy}
+        onSelectVendor={onSelectVendor}
+      />
+    );
+
+    const vendorCard = screen.getByText('Red Hat');
+    expect(vendorCard).toBeInTheDocument();
+    await userEvent.click(vendorCard);
+    expect(onSelectVendor).toHaveBeenCalledWith('redhat');
+  });
+
+  it('calls onSelectProduct with the vendor and product ids when a distribution row is clicked', async () => {
+    const onSelectProduct = vi.fn();
+    render(
+      <DashboardPage
+        advisories={[advisory()]}
+        cves={[]}
+        onSelectAdvisory={() => {}}
+        onSelectCve={() => {}}
+        onNavigateToExplorer={() => {}}
+        taxonomy={taxonomy}
+        onSelectProduct={onSelectProduct}
+      />
+    );
+
+    await userEvent.click(screen.getByText('Red Hat Enterprise Linux'));
+    expect(onSelectProduct).toHaveBeenCalledWith('redhat', 'red-hat-enterprise-linux');
+  });
+
+  it('renders without a taxonomy prop (back-compat with existing call sites)', () => {
+    render(
+      <DashboardPage
+        advisories={[advisory()]}
+        cves={[]}
+        onSelectAdvisory={() => {}}
+        onSelectCve={() => {}}
+        onNavigateToExplorer={() => {}}
+      />
+    );
+    expect(screen.getByText('Tracked Advisories')).toBeInTheDocument();
   });
 });

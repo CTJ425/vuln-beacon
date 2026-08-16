@@ -4,9 +4,26 @@ import { App } from '@/App';
 import { CveService } from '@/services/cveService';
 import { SyncService } from '@/services/syncService';
 import { WebhookConfigService } from '@/services/webhookConfigService';
+import { AdvisoryService } from '@/services/advisoryService';
 
 describe('App Root Component', () => {
   beforeEach(() => {
+    vi.spyOn(AdvisoryService.prototype, 'fetchAdvisories').mockResolvedValue([
+      {
+        id: 'a1',
+        advisory_id: 'RHSA-2026:6821',
+        title: 'Test RHSA',
+        severity: 'CRITICAL',
+        published_at: '2026-08-15T00:00:00Z',
+        url: 'https://access.redhat.com/errata/RHSA-2026:6821',
+        summary: 'kernel security update',
+        vendor_id: 'redhat',
+        cves: [],
+        product_impacts: [],
+        affected_products: ['Red Hat Enterprise Linux 9'],
+        fixed_versions: [],
+      } as any,
+    ]);
     vi.spyOn(CveService.prototype, 'fetchCves').mockResolvedValue([
       {
         id: '1',
@@ -40,14 +57,14 @@ describe('App Root Component', () => {
     render(<App />);
 
     expect(screen.getByText('VulnBeacon')).toBeInTheDocument();
-    expect(await screen.findByText(/Security Intelligence Dashboard/i, {}, { timeout: 4000 })).toBeInTheDocument();
+    expect(await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 })).toBeInTheDocument();
   });
 
   it('should switch navigation tabs when sidebar links are clicked', async () => {
     render(<App />);
 
     // Wait for initial load
-    await screen.findByText(/Security Intelligence Dashboard/i, {}, { timeout: 4000 });
+    await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
     // Click CVE Explorer tab
     const explorerTab = screen.getByText('CVE Explorer');
@@ -63,5 +80,21 @@ describe('App Root Component', () => {
     const settingsTab = screen.getByText('Webhooks & Config');
     fireEvent.click(settingsTab);
     expect(await screen.findByText('Integrations & Notification Settings', {}, { timeout: 4000 })).toBeInTheDocument();
+  });
+
+  it('should render a vendor group in the sidebar derived from advisory data, with the static nav items unchanged', async () => {
+    render(<App />);
+    await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
+
+    // vendor group derived from the mocked advisory (vendor_id: 'redhat'); the
+    // vendor name also appears in the Overview's vendor-card row, so allow
+    // more than one match — only presence is asserted here.
+    expect((await screen.findAllByText('Red Hat', {}, { timeout: 4000 })).length).toBeGreaterThan(0);
+    expect(await screen.findByText('Red Hat Enterprise Linux', {}, { timeout: 4000 })).toBeInTheDocument();
+
+    // static nav items must still exist, unchanged
+    expect(screen.getByText('CVE Explorer')).toBeInTheDocument();
+    expect(screen.getByText('Sync Monitor')).toBeInTheDocument();
+    expect(screen.getByText('Webhooks & Config')).toBeInTheDocument();
   });
 });
