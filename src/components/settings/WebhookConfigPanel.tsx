@@ -43,10 +43,26 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({
   const [minSeverity, setMinSeverity] = useState<SeverityLevel>('HIGH');
   const [isActive] = useState(true);
   const [testResult, setTestResult] = useState<{ id: string; success: boolean } | null>(null);
+  const [urlError, setUrlError] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  const isValidDestinationUrl = (value: string): boolean => {
+    try {
+      return new URL(value).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !webhookUrl) return;
+
+    if (!isValidDestinationUrl(webhookUrl)) {
+      setUrlError('Destination URL must be a valid https:// URL.');
+      return;
+    }
+    setUrlError(null);
 
     onAddWebhook({
       name,
@@ -58,6 +74,27 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({
 
     setName('');
     setWebhookUrl('');
+  };
+
+  const handleDeleteClick = (id: string) => {
+    if (pendingDeleteId === id) {
+      setPendingDeleteId(null);
+      onDeleteWebhook(id);
+    } else {
+      setPendingDeleteId(id);
+    }
+  };
+
+  const maskWebhookUrl = (url: string): string => {
+    try {
+      const parsed = new URL(url);
+      // The secret can live anywhere after the origin (e.g. ntfy-style
+      // topics as the first path segment), so mask the whole path, query,
+      // and fragment rather than revealing any part of it.
+      return `${parsed.origin}/••••••••`;
+    } catch {
+      return '••••••••';
+    }
   };
 
   const handleTest = async (hook: WebhookConfig) => {
@@ -139,8 +176,13 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({
                 label="Webhook Destination URL"
                 placeholder="https://discord.com/api/webhooks/... or https://hooks.slack.com/services/..."
                 value={webhookUrl}
-                onChange={(e) => setWebhookUrl(e.target.value)}
+                onChange={(e) => {
+                  setWebhookUrl(e.target.value);
+                  if (urlError) setUrlError(null);
+                }}
                 required
+                error={Boolean(urlError)}
+                helperText={urlError}
                 sx={{ bgcolor: 'background.default' }}
               />
             </Box>
@@ -191,7 +233,7 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({
                       />
                     </TableCell>
                     <TableCell sx={{ color: 'text.secondary', maxWidth: 250, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {hook.webhook_url}
+                      {maskWebhookUrl(hook.webhook_url)}
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -217,9 +259,11 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({
                       <Button
                         size="small"
                         color="error"
-                        onClick={() => onDeleteWebhook(hook.id)}
+                        data-testid={`delete-webhook-${hook.id}`}
+                        onClick={() => handleDeleteClick(hook.id)}
+                        sx={pendingDeleteId === hook.id ? { fontWeight: 700 } : undefined}
                       >
-                        <Trash2 size={16} />
+                        {pendingDeleteId === hook.id ? 'Confirm?' : <Trash2 size={16} />}
                       </Button>
                     </TableCell>
                   </TableRow>

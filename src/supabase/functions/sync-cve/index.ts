@@ -6,6 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const ADVISORY_BUCKET = 'advisory-documents';
+
+// BUG-008: keeps the storage key byte-identical to what the ~50 already-stored
+// objects use (`advisory_id.replace(/:/g, '_')`) for every id made only of
+// [A-Za-z0-9._:-]. Only adds handling for characters current data never has:
+// path separators and '..' traversal. This helper is duplicated (not shared)
+// with src/scripts/backfillAdvisoryStorage.mjs because that is a separate
+// Node runtime — keep both copies in sync.
+function sanitiseAdvisoryKey(advisoryId: unknown): string {
+  return String(advisoryId)
+    .replace(/:/g, '_')
+    .replace(/\.\./g, '_')
+    .replace(/[\\/]/g, '_');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -78,6 +93,22 @@ serve(async (req) => {
 
     // Upsert advisories, then their mappings to CVEs.
     for (const adv of (advisories || [])) {
+      let rawPayloadPath: string | null = null;
+      const hasPayload = adv.raw_payload && Object.keys(adv.raw_payload).length > 0;
+
+      if (hasPayload) {
+        const path = `${vendorCode}/${sanitiseAdvisoryKey(adv.advisory_id)}.json`;
+        const { error: uploadError } = await supabaseClient.storage
+          .from(ADVISORY_BUCKET)
+          .upload(path, JSON.stringify(adv.raw_payload), {
+            contentType: 'application/json',
+            upsert: true,
+          });
+
+        if (uploadError) throw uploadError;
+        rawPayloadPath = path;
+      }
+
       const { data: insertedAdv, error: advError } = await supabaseClient
         .from('advisories')
         .upsert(
@@ -89,14 +120,27 @@ serve(async (req) => {
             published_at: adv.published_at,
             url: adv.url,
             summary: adv.summary,
-            raw_payload: adv.raw_payload || {},
+            raw_payload: {},
+            raw_payload_path: rawPayloadPath,
           },
           { onConflict: 'vendor_id, advisory_id' }
         )
         .select('id')
         .single();
 
-      if (advError) throw advError;
+      if (advError) {
+        // BUG-009: the upsert failed after a successful upload, so the
+        // object is now orphaned. Best-effort remove it; never let a
+        // cleanup failure mask or replace the original error.
+        if (rawPayloadPath) {
+          try {
+            await supabaseClient.storage.from(ADVISORY_BUCKET).remove([rawPayloadPath]);
+          } catch {
+            // best-effort only
+          }
+        }
+        throw advError;
+      }
 
       if (!insertedAdv) continue;
 

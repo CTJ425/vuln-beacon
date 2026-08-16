@@ -88,15 +88,19 @@ export class WebhookConfigService {
   }
 
   async testWebhook(webhook: WebhookConfig): Promise<boolean> {
-    return this.webhookDispatcher.dispatch(webhook, {
-      vendorName: 'VulnBeacon Live Dispatcher',
-      advisoryId: 'TEST-ALERT-001',
-      advisoryTitle: 'Live Supabase Webhook Integration Test',
-      advisoryUrl: 'https://github.com/cve-collector/vuln-beacon',
-      cveId: 'CVE-2026-LIVE-TEST',
-      cvssScore: 9.8,
-      severity: 'CRITICAL',
-      summary: 'Verified live delivery from VulnBeacon connected to Supabase backend.',
-    });
+    return this.webhookDispatcher.dispatch(
+      webhook,
+      {
+        vendorName: 'VulnBeacon Live Dispatcher',
+        advisoryId: 'TEST-ALERT-001',
+        advisoryTitle: 'Live Supabase Webhook Integration Test',
+        advisoryUrl: 'https://github.com/cve-collector/vuln-beacon',
+        cveId: 'CVE-2026-LIVE-TEST',
+        cvssScore: 9.8,
+        severity: 'CRITICAL',
+        summary: 'Verified live delivery from VulnBeacon connected to Supabase backend.',
+      },
+      { ignoreActiveState: true }
+    );
   }
 }

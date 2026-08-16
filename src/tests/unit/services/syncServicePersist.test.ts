@@ -31,6 +31,16 @@ vi.mock('@/services/webhook', () => ({
 import { SyncService } from '@/services/syncService';
 
 const PROTECTED_TABLES = ['advisories', 'cves', 'advisory_cve_map', 'vendor_sync_logs'];
+const WRITE_METHODS = ['insert', 'update', 'upsert', 'delete'];
+
+/**
+ * Records mutating calls per table. The boundary under test is that the browser
+ * client (anon key) never WRITES to these tables — writes must go through the
+ * sync-cve edge function under the service-role key. Reads are permitted: the
+ * app already reads `cves` to render the explorer, and syncVendors() reads
+ * `cve_id` to de-duplicate webhook alerts (BUG-003).
+ */
+const protectedOps: { table: string; method: string }[] = [];
 
 /** Answers the CSAF reverse-index and detail endpoints the query flow uses. */
 const mockCsafFetch = () =>
@@ -49,8 +59,23 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
       data: { success: true, log: { id: 'log-1', vendor_code: 'redhat', status: 'SUCCESS' } },
       error: null,
     });
-    mockFrom.mockReset().mockReturnValue({
-      select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }),
+    protectedOps.length = 0;
+    mockFrom.mockReset().mockImplementation((table: string) => {
+      const recordWrite = (method: string) => (..._args: any[]) => {
+        protectedOps.push({ table, method });
+        return Promise.resolve({ data: [], error: null });
+      };
+      return {
+        // Awaitable and chainable, so a plain `.select()` read resolves.
+        select: () =>
+          Object.assign(Promise.resolve({ data: [], error: null }), {
+            eq: () => Promise.resolve({ data: [], error: null }),
+          }),
+        insert: recordWrite('insert'),
+        update: recordWrite('update'),
+        upsert: recordWrite('upsert'),
+        delete: recordWrite('delete'),
+      };
     });
     mockIngestVendor.mockReset().mockResolvedValue({
       status: 'SUCCESS',
@@ -114,7 +139,9 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
     const service = new SyncService();
     await service.syncVendors();
 
-    const protectedWrites = mockFrom.mock.calls.filter(([table]) => PROTECTED_TABLES.includes(table));
+    const protectedWrites = protectedOps.filter(
+      (op) => PROTECTED_TABLES.includes(op.table) && WRITE_METHODS.includes(op.method)
+    );
     expect(protectedWrites).toHaveLength(0);
   });
 
@@ -135,7 +162,9 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
       })
     );
 
-    const protectedWrites = mockFrom.mock.calls.filter(([table]) => PROTECTED_TABLES.includes(table));
+    const protectedWrites = protectedOps.filter(
+      (op) => PROTECTED_TABLES.includes(op.table) && WRITE_METHODS.includes(op.method)
+    );
     expect(protectedWrites).toHaveLength(0);
   });
 

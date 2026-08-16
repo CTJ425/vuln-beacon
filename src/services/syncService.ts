@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { VendorSyncLog } from '@/types';
 import { IngestionEngine } from '@/engine/ingestion';
 import { WebhookService } from '@/services/webhook';
+import { fetchAllRows } from '@/lib/fetchAllRows';
 
 export class SyncService {
   private webhookService = new WebhookService();
@@ -38,9 +39,27 @@ export class SyncService {
   }
 
   async syncVendors(): Promise<{ success: boolean; newLogs: VendorSyncLog[] }> {
-    const engine = new IngestionEngine({ webhookService: this.webhookService });
+    // Already-persisted CVE ids, so the engine can suppress webhook alerts for
+    // CVEs seen in a previous run (BUG-003). A query failure must not abort
+    // the sync — fall back to an empty set instead.
+    let knownCveIds: string[] = [];
+    try {
+      const { data, error } = await fetchAllRows<{ cve_id: string }>((from, to) =>
+        supabase.from('cves').select('cve_id').range(from, to)
+      );
+      if (error) {
+        console.warn('Failed to fetch known CVE ids for de-duplication:', error.message);
+      } else {
+        knownCveIds = (data || []).map((row) => row.cve_id);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch known CVE ids for de-duplication:', err);
+    }
+
+    const engine = new IngestionEngine({ webhookService: this.webhookService, knownCveIds });
     const vendorCodes = ['redhat'];
     const newLogs: VendorSyncLog[] = [];
+    let allSucceeded = true;
 
     for (const code of vendorCodes) {
       const startTime = Date.now();
@@ -69,10 +88,15 @@ export class SyncService {
 
         if (error) throw error;
 
+        if (result.status === 'FAILED') {
+          allSucceeded = false;
+        }
+
         if (data?.log) {
           newLogs.push(data.log as VendorSyncLog);
         }
       } catch (err: any) {
+        allSucceeded = false;
         const duration = Date.now() - startTime;
         const { data: errData, error: errDataError } = await supabase.functions.invoke('sync-cve', {
           body: {
@@ -101,7 +125,7 @@ export class SyncService {
     }
 
     return {
-      success: true,
+      success: allSucceeded,
       newLogs,
     };
   }

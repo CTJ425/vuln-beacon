@@ -12,7 +12,8 @@
     "test:unit": "vitest run tests/unit",
     "test:smoke": "vitest run tests/smoke",
     "test:e2e": "vitest run tests/e2e",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "backfill:advisory-storage": "node scripts/backfillAdvisoryStorage.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

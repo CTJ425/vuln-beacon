@@ -48,6 +48,10 @@ interface RedHatRawItem {
   cvss3?: { cvss3_base_score?: string | number; cvss3_scoring_vector?: string };
 }
 
+// NOTE: this adapter is intentionally absent from ALL_ADAPTERS (src/adapters/index.ts).
+// It shares vendorCode 'redhat' with RedHatCsafAdapter, which is the adapter that must
+// resolve for 'redhat' (SyncService.fetchAndIngestQuery feeds it CSAF documents). This
+// class stays exported for callers that construct it explicitly (see BUG-015).
 export class RedHatAdapter implements VendorAdapter {
   readonly vendorCode = 'redhat';
   readonly vendorName = 'Red Hat';

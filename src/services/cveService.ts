@@ -48,7 +48,15 @@ export class CveService {
       if (!data) return [];
 
       return data.map((row: any): CveTableRowItem => {
+        // Supabase does not order embedded resources, so sort mappings by
+        // advisory_id ascending here to make the canonical advisory (mappings[0])
+        // deterministic across identical fetches.
         const mappings: any[] = Array.isArray(row.advisory_cve_map) ? row.advisory_cve_map : [];
+        mappings.sort((a: any, b: any) => {
+          const idA = a?.advisories?.advisory_id ?? '';
+          const idB = b?.advisories?.advisory_id ?? '';
+          return idA < idB ? -1 : idA > idB ? 1 : 0;
+        });
         const firstMap = mappings[0];
         const advisory = firstMap?.advisories;
         const vendor = advisory?.vendors;

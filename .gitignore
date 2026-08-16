@@ -37,3 +37,6 @@ coverage/
 
 # Claude Code route plugin runtime state
 .claude/routing/
+
+# Supabase CLI link metadata (holds project ref / pooler URL)
+supabase/.temp/

@@ -63,6 +63,12 @@ export const AppContent: React.FC = () => {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    // A drawer opened from one page must not persist over an unrelated page.
+    setSelectedCve(null);
+    setSelectedAdvisory(null);
+  }, [currentNav]);
+
   const handleManualSync = async () => {
     setIsSyncing(true);
     setSyncMessage(null);
@@ -71,6 +77,8 @@ export const AppContent: React.FC = () => {
       const result = await syncService.syncVendors();
       if (result.success) {
         setSyncMessage('Ingestion complete! Fetched and updated feeds in Supabase.');
+      } else {
+        setSyncMessage('Sync failed: one or more vendor feeds could not be ingested.');
       }
       // Refresh live records from Supabase
       const [updatedCves, updatedLogs, updatedAdvisories] = await Promise.all([
@@ -93,12 +101,27 @@ export const AppContent: React.FC = () => {
     const created = await webhookConfigService.createWebhook(hook);
     if (created) {
       setWebhooks((prev) => [created, ...prev]);
+    } else {
+      setSyncMessage('Failed to add webhook. Please try again.');
+      setTimeout(() => setSyncMessage(null), 5000);
     }
   };
 
   const handleDeleteWebhook = async (id: string) => {
+    const previousWebhooks = webhooks;
     setWebhooks((prev) => prev.filter((h) => h.id !== id));
-    await webhookConfigService.deleteWebhook(id);
+    try {
+      const deleted = await webhookConfigService.deleteWebhook(id);
+      if (!deleted) {
+        setWebhooks(previousWebhooks);
+        setSyncMessage('Failed to delete webhook. Please try again.');
+        setTimeout(() => setSyncMessage(null), 5000);
+      }
+    } catch {
+      setWebhooks(previousWebhooks);
+      setSyncMessage('Failed to delete webhook. Please try again.');
+      setTimeout(() => setSyncMessage(null), 5000);
+    }
   };
 
   const handleTestWebhook = async (hook: WebhookConfig): Promise<boolean> => {

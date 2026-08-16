@@ -5,13 +5,16 @@ import {
   VendorSyncLog,
   NormalizedAdvisoryItem,
   SyncStatus,
+  WebhookAlertPayload,
 } from '@/types';
 import { getAdapterByCode } from '@/adapters';
 import { WebhookService } from '@/services/webhook';
 
 export interface IngestionEngineOptions {
   webhookService?: WebhookService;
+  knownCveIds?: Iterable<string>;
 }
+
 
 export interface IngestionResult {
   vendorCode: string;
@@ -29,9 +32,11 @@ export class IngestionEngine {
   private mappings: AdvisoryCveMap[] = [];
   private syncLogs: VendorSyncLog[] = [];
   private webhookService?: WebhookService;
+  private knownCveIds: Set<string>;
 
   constructor(options?: IngestionEngineOptions) {
     this.webhookService = options?.webhookService;
+    this.knownCveIds = new Set(options?.knownCveIds ?? []);
   }
 
   async ingestVendor(vendorCode: string, rawPayload?: unknown): Promise<IngestionResult> {
@@ -70,6 +75,7 @@ export class IngestionEngine {
 
       let newCvesCount = 0;
       let totalCves = 0;
+      const pendingAlerts: WebhookAlertPayload[] = [];
 
       for (const item of items) {
         const advKey = `${vendorCode}:${item.advisoryId}`;
@@ -118,9 +124,12 @@ export class IngestionEngine {
           });
 
 
-          // Dispatch webhook if critical or high
-          if (this.webhookService && (cveRecord.severity === 'CRITICAL' || cveRecord.severity === 'HIGH')) {
-            await this.webhookService.notifyAll({
+          // Queue webhook alert if critical or high, but only for CVEs that are
+          // both new to this run AND not already persisted in the DB — otherwise
+          // every re-sync re-alerts on the same CVEs (BUG-003).
+          const isTrulyNew = isNew && !this.knownCveIds.has(cveKey);
+          if (this.webhookService && isTrulyNew && (cveRecord.severity === 'CRITICAL' || cveRecord.severity === 'HIGH')) {
+            pendingAlerts.push({
               vendorName: adapter.vendorName,
               advisoryId: item.advisoryId,
               advisoryTitle: item.title,
@@ -134,6 +143,12 @@ export class IngestionEngine {
             });
           }
         }
+      }
+
+      // Dispatch all queued alerts concurrently so one slow hook cannot
+      // serialise the whole ingestion (BUG-003).
+      if (this.webhookService && pendingAlerts.length > 0) {
+        await Promise.allSettled(pendingAlerts.map((alert) => this.webhookService!.notifyAll(alert)));
       }
 
       const durationMs = Date.now() - startTime;
