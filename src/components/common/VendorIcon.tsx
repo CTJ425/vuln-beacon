@@ -7,7 +7,7 @@ interface VendorIconProps {
   size?: number;
 }
 
-const VENDOR_COLORS: Record<string, string> = {
+export const VENDOR_COLORS: Record<string, string> = {
   redhat: '#ee0000',
   vmware: '#0095d9',
   nutanix: '#7b1fa2',
@@ -18,7 +18,7 @@ const VENDOR_COLORS: Record<string, string> = {
   cohesity: '#ff5722',
 };
 
-const VENDOR_NAMES: Record<string, string> = {
+export const VENDOR_NAMES: Record<string, string> = {
   redhat: 'Red Hat',
   vmware: 'VMware',
   nutanix: 'Nutanix',

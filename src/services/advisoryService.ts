@@ -9,6 +9,7 @@ export interface AdvisoryRowItem {
   published_at: string;
   url?: string;
   summary?: string;
+  vendor_id: string;
   cves: {
     cve_id: string;
     description: string;
@@ -28,7 +29,7 @@ export class AdvisoryService {
       const { data, error } = await supabase
         .from('advisories')
         .select(`
-          id, advisory_id, title, severity, published_at, url, summary,
+          id, advisory_id, title, severity, published_at, url, summary, vendor_id,
           advisory_cve_map (
             affected_products,
             fixed_versions,
@@ -135,6 +136,7 @@ export class AdvisoryService {
           published_at: row.published_at,
           url: row.url || undefined,
           summary: row.summary || undefined,
+          vendor_id: row.vendor_id,
           cves,
           product_impacts: dedupedImpacts,
           affected_products: affectedProducts,

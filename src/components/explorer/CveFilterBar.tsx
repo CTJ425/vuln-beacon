@@ -25,6 +25,7 @@ interface CveFilterBarProps {
   viewMode?: 'cve' | 'advisory';
   onViewModeChange?: (mode: 'cve' | 'advisory') => void;
   onReset: () => void;
+  productOptions: { value: string; label: string }[];
 }
 
 export const CveFilterBar: React.FC<CveFilterBarProps> = ({
@@ -39,6 +40,7 @@ export const CveFilterBar: React.FC<CveFilterBarProps> = ({
   viewMode = 'cve',
   onViewModeChange,
   onReset,
+  productOptions,
 }) => {
   return (
     <Box
@@ -107,12 +109,11 @@ export const CveFilterBar: React.FC<CveFilterBarProps> = ({
             sx={{ bgcolor: 'background.default' }}
           >
             <MenuItem value="ALL">All Red Hat Ecosystem</MenuItem>
-            <MenuItem value="rhel">Red Hat Enterprise Linux</MenuItem>
-            <MenuItem value="openshift">OpenShift / Cloud Platform</MenuItem>
-            <MenuItem value="rhoai">OpenShift AI (RHOAI)</MenuItem>
-            <MenuItem value="ansible">Ansible Automation</MenuItem>
-            <MenuItem value="middleware">JBoss / Middleware</MenuItem>
-            <MenuItem value="storage">Ceph / Data Foundation</MenuItem>
+            {productOptions.map((option) => (
+              <MenuItem key={option.value} value={option.value}>
+                {option.label}
+              </MenuItem>
+            ))}
           </Select>
         </FormControl>
 

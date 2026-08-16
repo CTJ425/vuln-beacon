@@ -1,11 +1,13 @@
 import React from 'react';
-import { Box, Typography, Grid, Button, Stack } from '@mui/material';
+import { Box, Typography, Grid, Button, Stack, Card, CardActionArea, CardContent } from '@mui/material';
 import { ArrowRight } from 'lucide-react';
 import { MetricCards } from '@/components/dashboard/MetricCards';
 import { VendorDistributionChart } from '@/components/dashboard/VendorDistributionChart';
 import { AdvisoryTable } from '@/components/explorer/AdvisoryTable';
 import { CveTableRowItem } from '@/components/explorer/CveTable';
 import { AdvisoryRowItem } from '@/services/advisoryService';
+import { VendorIcon } from '@/components/common/VendorIcon';
+import { VendorNode } from '@/services/productTaxonomy';
 
 interface DashboardPageProps {
   advisories: AdvisoryRowItem[];
@@ -13,12 +15,18 @@ interface DashboardPageProps {
   onSelectAdvisory: (item: AdvisoryRowItem) => void;
   onSelectCve: (item: CveTableRowItem) => void;
   onNavigateToExplorer: () => void;
+  taxonomy?: VendorNode[];
+  onSelectVendor?: (vendorId: string) => void;
+  onSelectProduct?: (vendorId: string, productId: string) => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
   advisories,
   onSelectAdvisory,
   onNavigateToExplorer,
+  taxonomy = [],
+  onSelectVendor,
+  onSelectProduct,
 }) => {
   const criticalCount = advisories.filter((a) => a.severity === 'CRITICAL').length;
   const highCount = advisories.filter((a) => a.severity === 'HIGH').length;
@@ -28,32 +36,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     totalImpactedComponents += a.product_impacts ? a.product_impacts.length : 0;
   });
 
-  const productDistribution: Record<string, number> = {
-    'Red Hat Enterprise Linux': 0,
-    'OpenShift & Cloud Native': 0,
-    'OpenShift AI (RHOAI)': 0,
-    'Ansible Automation Platform': 0,
-    'JBoss / Application Middleware': 0,
-  };
-
-  for (const advisory of advisories) {
-    const products = advisory.affected_products.join(' ').toLowerCase();
-    if (products.includes('enterprise linux') || products.includes('rhel')) {
-      productDistribution['Red Hat Enterprise Linux']++;
-    }
-    if (products.includes('openshift') || products.includes('cluster') || products.includes('container')) {
-      productDistribution['OpenShift & Cloud Native']++;
-    }
-    if (products.includes('rhoai') || products.includes('ai') || products.includes('odh')) {
-      productDistribution['OpenShift AI (RHOAI)']++;
-    }
-    if (products.includes('ansible')) {
-      productDistribution['Ansible Automation Platform']++;
-    }
-    if (products.includes('jboss') || products.includes('spring') || products.includes('keycloak') || products.includes('mta')) {
-      productDistribution['JBoss / Application Middleware']++;
-    }
-  }
+  // Flatten each vendor's product families into a single list for the chart,
+  // carrying the vendor/product ids so a bar click can navigate.
+  const productDistribution = taxonomy
+    .flatMap((vendor) =>
+      vendor.products.map((product) => ({
+        vendorId: vendor.vendorId,
+        productId: product.id,
+        name: product.name,
+        count: product.advisoryCount,
+      }))
+    )
+    .sort((a, b) => b.count - a.count);
 
   const recentCriticalOrHigh = advisories
     .filter((a) => a.severity === 'CRITICAL' || a.severity === 'HIGH')
@@ -64,10 +58,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.02em' }}>
-            Red Hat Security Intelligence Dashboard
+            Security Intelligence Overview
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-            Automated Red Hat Security Advisory (RHSA) feeds, Errata updates, and component impact matrix.
+            Automated multi-vendor security advisory feeds, Errata updates, and component impact matrix.
           </Typography>
         </Box>
       </Box>
@@ -84,6 +78,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           total: 'Tracked Advisories',
         }}
       />
+
+      {taxonomy.length > 0 && (
+        <Grid container spacing={2}>
+          {taxonomy.map((vendor) => (
+            <Grid item xs={12} sm={6} md={4} lg={3} key={vendor.vendorId}>
+              <Card sx={{ bgcolor: 'background.paper', borderRadius: 2.5, border: 1, borderColor: 'divider' }}>
+                <CardActionArea
+                  onClick={() => onSelectVendor && onSelectVendor(vendor.vendorId)}
+                  sx={{ p: 2 }}
+                >
+                  <CardContent sx={{ p: 0 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <VendorIcon vendorCode={vendor.vendorId} size={18} />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        Advisories: {vendor.advisoryCount}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700 }}>
+                        Critical: {vendor.criticalCount}
+                      </Typography>
+                    </Box>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
 
       <Grid container spacing={3}>
         <Grid item xs={12} lg={8}>
@@ -112,7 +135,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         </Grid>
 
         <Grid item xs={12} lg={4}>
-          <VendorDistributionChart distributionCounts={productDistribution} total={advisories.length} />
+          <VendorDistributionChart
+            items={productDistribution}
+            total={advisories.length}
+            onSelectProduct={onSelectProduct}
+          />
         </Grid>
       </Grid>
     </Stack>

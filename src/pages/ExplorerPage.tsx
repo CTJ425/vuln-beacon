@@ -6,6 +6,7 @@ import { CveTable, CveTableRowItem } from '@/components/explorer/CveTable';
 import { AdvisoryTable } from '@/components/explorer/AdvisoryTable';
 import { AdvisoryRowItem } from '@/services/advisoryService';
 import { SyncService } from '@/services/syncService';
+import { VendorNode, matchesProductFamily } from '@/services/productTaxonomy';
 
 
 interface ExplorerPageProps {
@@ -14,11 +15,21 @@ interface ExplorerPageProps {
   onSelectCve: (cve: CveTableRowItem) => void;
   onSelectAdvisory: (item: AdvisoryRowItem) => void;
   onRefreshCves?: () => Promise<void>;
+  taxonomy?: VendorNode[];
+  initialProductFamilyId?: string;
 }
 
-export const ExplorerPage: React.FC<ExplorerPageProps> = ({ cves, advisories, onSelectCve, onSelectAdvisory, onRefreshCves }) => {
+export const ExplorerPage: React.FC<ExplorerPageProps> = ({
+  cves,
+  advisories,
+  onSelectCve,
+  onSelectAdvisory,
+  onRefreshCves,
+  taxonomy = [],
+  initialProductFamilyId,
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProductFamily, setSelectedProductFamily] = useState('ALL');
+  const [selectedProductFamily, setSelectedProductFamily] = useState(initialProductFamilyId ?? 'ALL');
   const [selectedSeverity, setSelectedSeverity] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [viewMode, setViewMode] = useState<'advisory' | 'cve'>('advisory');
@@ -32,29 +43,8 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({ cves, advisories, on
     return cves.filter((item) => {
       // Product Family filter
       if (selectedProductFamily !== 'ALL') {
-        const prodMatch = item.affected_products.some((p) => {
-          const pLower = p.toLowerCase();
-          if (selectedProductFamily === 'rhel') return pLower.includes('enterprise linux') || pLower.includes('rhel');
-          if (selectedProductFamily === 'openshift') return pLower.includes('openshift') || pLower.includes('ocp') || pLower.includes('cluster');
-          if (selectedProductFamily === 'rhoai') return pLower.includes('rhoai') || pLower.includes('ai') || pLower.includes('odh');
-          if (selectedProductFamily === 'ansible') return pLower.includes('ansible') || pLower.includes('tower');
-          if (selectedProductFamily === 'middleware') return pLower.includes('jboss') || pLower.includes('keycloak') || pLower.includes('quarkus') || pLower.includes('mta');
-          if (selectedProductFamily === 'storage') return pLower.includes('ceph') || pLower.includes('gluster') || pLower.includes('storage');
-          return pLower.includes(selectedProductFamily);
-        });
-
-        const compMatch = (item.product_impacts || []).some((imp) => {
-          const compLower = (imp.component + ' ' + imp.product_name).toLowerCase();
-          if (selectedProductFamily === 'rhel') return compLower.includes('rhel') || compLower.includes('enterprise linux');
-          if (selectedProductFamily === 'openshift') return compLower.includes('openshift') || compLower.includes('ocp') || compLower.includes('cluster');
-          if (selectedProductFamily === 'rhoai') return compLower.includes('rhoai') || compLower.includes('odh') || compLower.includes('torch');
-          if (selectedProductFamily === 'ansible') return compLower.includes('ansible');
-          if (selectedProductFamily === 'middleware') return compLower.includes('jboss') || compLower.includes('spring') || compLower.includes('mta');
-          if (selectedProductFamily === 'storage') return compLower.includes('ceph') || compLower.includes('storage');
-          return false;
-        });
-
-        if (!prodMatch && !compMatch) {
+        const asAdvisory = { ...item, vendor_id: item.vendor_code } as unknown as AdvisoryRowItem;
+        if (!matchesProductFamily(asAdvisory, selectedProductFamily, taxonomy)) {
           return false;
         }
       }
@@ -100,35 +90,13 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({ cves, advisories, on
 
       return true;
     });
-  }, [cves, selectedProductFamily, selectedSeverity, selectedStatus, searchTerm]);
+  }, [cves, selectedProductFamily, selectedSeverity, selectedStatus, searchTerm, taxonomy]);
 
   const filteredAdvisories = useMemo(() => {
     return advisories.filter((item) => {
       // Product Family filter
       if (selectedProductFamily !== 'ALL') {
-        const prodMatch = item.affected_products.some((p) => {
-          const pLower = p.toLowerCase();
-          if (selectedProductFamily === 'rhel') return pLower.includes('enterprise linux') || pLower.includes('rhel');
-          if (selectedProductFamily === 'openshift') return pLower.includes('openshift') || pLower.includes('ocp') || pLower.includes('cluster');
-          if (selectedProductFamily === 'rhoai') return pLower.includes('rhoai') || pLower.includes('ai') || pLower.includes('odh');
-          if (selectedProductFamily === 'ansible') return pLower.includes('ansible') || pLower.includes('tower');
-          if (selectedProductFamily === 'middleware') return pLower.includes('jboss') || pLower.includes('keycloak') || pLower.includes('quarkus') || pLower.includes('mta');
-          if (selectedProductFamily === 'storage') return pLower.includes('ceph') || pLower.includes('gluster') || pLower.includes('storage');
-          return pLower.includes(selectedProductFamily);
-        });
-
-        const compMatch = (item.product_impacts || []).some((imp) => {
-          const compLower = (imp.component + ' ' + imp.product_name).toLowerCase();
-          if (selectedProductFamily === 'rhel') return compLower.includes('rhel') || compLower.includes('enterprise linux');
-          if (selectedProductFamily === 'openshift') return compLower.includes('openshift') || compLower.includes('ocp') || compLower.includes('cluster');
-          if (selectedProductFamily === 'rhoai') return compLower.includes('rhoai') || compLower.includes('odh') || compLower.includes('torch');
-          if (selectedProductFamily === 'ansible') return compLower.includes('ansible');
-          if (selectedProductFamily === 'middleware') return compLower.includes('jboss') || compLower.includes('spring') || compLower.includes('mta');
-          if (selectedProductFamily === 'storage') return compLower.includes('ceph') || compLower.includes('storage');
-          return false;
-        });
-
-        if (!prodMatch && !compMatch) {
+        if (!matchesProductFamily(item, selectedProductFamily, taxonomy)) {
           return false;
         }
       }
@@ -177,7 +145,19 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({ cves, advisories, on
 
       return true;
     });
-  }, [advisories, selectedProductFamily, selectedSeverity, selectedStatus, searchTerm]);
+  }, [advisories, selectedProductFamily, selectedSeverity, selectedStatus, searchTerm, taxonomy]);
+
+  const productOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const vendor of taxonomy) {
+      for (const product of vendor.products) {
+        if (!seen.has(product.id)) {
+          seen.set(product.id, product.name);
+        }
+      }
+    }
+    return Array.from(seen.entries()).map(([value, label]) => ({ value, label }));
+  }, [taxonomy]);
 
   const handleReset = () => {
     setSearchTerm('');
@@ -241,6 +221,7 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({ cves, advisories, on
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onReset={handleReset}
+        productOptions={productOptions}
       />
 
       {fetchMessage && (

@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, CircularProgress, Typography, Alert, Button } from '@mui/material';
 import { ThemeProvider } from '@/theme/ThemeContext';
 import { Header } from '@/components/common/Header';
-import { Sidebar, NavTab } from '@/components/common/Sidebar';
+import { Sidebar, NavState } from '@/components/common/Sidebar';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ExplorerPage } from '@/pages/ExplorerPage';
+import { ProductPage } from '@/pages/ProductPage';
 import { SyncMonitorPage } from '@/pages/SyncMonitorPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { CveDetailDrawer } from '@/components/explorer/CveDetailDrawer';
@@ -15,10 +16,11 @@ import { CveService } from '@/services/cveService';
 import { SyncService } from '@/services/syncService';
 import { WebhookConfigService } from '@/services/webhookConfigService';
 import { AdvisoryService, AdvisoryRowItem } from '@/services/advisoryService';
+import { deriveTaxonomy } from '@/services/productTaxonomy';
 import { RefreshCw } from 'lucide-react';
 
 export const AppContent: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<NavTab>('dashboard');
+  const [currentNav, setCurrentNav] = useState<NavState>({ section: 'dashboard' });
   const [cves, setCves] = useState<CveTableRowItem[]>([]);
   const [advisories, setAdvisories] = useState<AdvisoryRowItem[]>([]);
   const [syncLogs, setSyncLogs] = useState<VendorSyncLog[]>([]);
@@ -28,6 +30,8 @@ export const AppContent: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  const taxonomy = useMemo(() => deriveTaxonomy(advisories), [advisories]);
 
   const cveService = useMemo(() => new CveService(), []);
   const syncService = useMemo(() => new SyncService(), []);
@@ -107,8 +111,9 @@ export const AppContent: React.FC = () => {
 
       <Box sx={{ display: 'flex', flexGrow: 1 }}>
         <Sidebar
-          currentTab={currentTab}
-          onSelectTab={setCurrentTab}
+          currentNav={currentNav}
+          onSelectNav={setCurrentNav}
+          taxonomy={taxonomy}
         />
 
         <Box component="main" sx={{ flexGrow: 1, p: 3.5, overflowY: 'auto', bgcolor: 'background.default' }}>
@@ -131,7 +136,7 @@ export const AppContent: React.FC = () => {
             </Box>
           ) : (
             <>
-              {cves.length === 0 && advisories.length === 0 && currentTab === 'dashboard' && (
+              {cves.length === 0 && advisories.length === 0 && currentNav.section === 'dashboard' && (
                 <Alert
                   severity="info"
                   action={
@@ -151,33 +156,61 @@ export const AppContent: React.FC = () => {
                 </Alert>
               )}
 
-              {currentTab === 'dashboard' && (
+              {currentNav.section === 'dashboard' && (
                 <DashboardPage
                   advisories={advisories}
                   cves={cves}
                   onSelectAdvisory={setSelectedAdvisory}
                   onSelectCve={setSelectedCve}
-                  onNavigateToExplorer={() => setCurrentTab('explorer')}
+                  onNavigateToExplorer={() => setCurrentNav({ section: 'explorer' })}
+                  taxonomy={taxonomy}
+                  onSelectVendor={(vendorId) => setCurrentNav({ section: 'vendor', vendorId })}
+                  onSelectProduct={(vendorId, productId) => setCurrentNav({ section: 'product', vendorId, productId })}
                 />
               )}
-              {currentTab === 'explorer' && (
+              {currentNav.section === 'explorer' && (
                 <ExplorerPage
                   cves={cves}
                   advisories={advisories}
                   onSelectCve={setSelectedCve}
                   onSelectAdvisory={setSelectedAdvisory}
                   onRefreshCves={loadData}
+                  taxonomy={taxonomy}
                 />
               )}
 
-              {currentTab === 'sync' && (
+              {currentNav.section === 'vendor' && (
+                <ProductPage
+                  vendorId={currentNav.vendorId}
+                  advisories={advisories}
+                  cves={cves}
+                  taxonomy={taxonomy}
+                  onSelectCve={setSelectedCve}
+                  onSelectAdvisory={setSelectedAdvisory}
+                  onRefreshCves={loadData}
+                />
+              )}
+              {currentNav.section === 'product' && (
+                <ProductPage
+                  vendorId={currentNav.vendorId}
+                  productId={currentNav.productId}
+                  advisories={advisories}
+                  cves={cves}
+                  taxonomy={taxonomy}
+                  onSelectCve={setSelectedCve}
+                  onSelectAdvisory={setSelectedAdvisory}
+                  onRefreshCves={loadData}
+                />
+              )}
+
+              {currentNav.section === 'sync' && (
                 <SyncMonitorPage
                   logs={syncLogs}
                   onManualSync={handleManualSync}
                   isSyncing={isSyncing}
                 />
               )}
-              {currentTab === 'settings' && (
+              {currentNav.section === 'settings' && (
                 <SettingsPage
                   webhooks={webhooks}
                   onAddWebhook={handleAddWebhook}

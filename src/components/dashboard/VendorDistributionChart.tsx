@@ -2,13 +2,21 @@ import React from 'react';
 import { Card, CardContent, Typography, Box, LinearProgress } from '@mui/material';
 import { Layers } from 'lucide-react';
 
-interface ProductDistributionProps {
-  distributionCounts: Record<string, number>;
-  total: number;
+interface ProductDistributionItem {
+  vendorId: string;
+  productId: string;
+  name: string;
+  count: number;
 }
 
-export const VendorDistributionChart: React.FC<ProductDistributionProps> = ({ distributionCounts, total }) => {
-  const products = Object.entries(distributionCounts).sort((a, b) => b[1] - a[1]);
+interface ProductDistributionProps {
+  items: ProductDistributionItem[];
+  total: number;
+  onSelectProduct?: (vendorId: string, productId: string) => void;
+}
+
+export const VendorDistributionChart: React.FC<ProductDistributionProps> = ({ items, total, onSelectProduct }) => {
+  const products = items;
 
   return (
     <Card sx={{ bgcolor: 'background.paper', borderRadius: 2.5, height: '100%', border: 1, borderColor: 'divider' }}>
@@ -24,13 +32,17 @@ export const VendorDistributionChart: React.FC<ProductDistributionProps> = ({ di
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {products.map(([productName, count]) => {
+          {products.map(({ vendorId, productId, name, count }) => {
             const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
             return (
-              <Box key={productName}>
+              <Box
+                key={productId}
+                onClick={() => onSelectProduct?.(vendorId, productId)}
+                sx={onSelectProduct ? { cursor: 'pointer' } : undefined}
+              >
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', fontSize: '0.8125rem' }}>
-                    {productName}
+                    {name}
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
