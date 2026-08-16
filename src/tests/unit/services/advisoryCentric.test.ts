@@ -29,6 +29,7 @@ describe('AdvisoryService — one RHSA lists every CVE it fixes', () => {
           url: 'https://access.redhat.com/errata/RHSA-2026:2000',
           summary: 'kernel security update',
           vendor_id: 'redhat',
+          vendors: { code: 'redhat', name: 'Red Hat' },
           advisory_cve_map: [
             {
               affected_products: [
@@ -75,8 +76,9 @@ describe('AdvisoryService — one RHSA lists every CVE it fixes', () => {
       'Red Hat Enterprise Linux 8',
       'Red Hat Enterprise Linux 9',
     ]);
-    // the row must carry vendor_id so the sidebar taxonomy can group by vendor
-    expect(adv.vendor_id).toBe('redhat');
+    // the row must carry vendor_code so the sidebar taxonomy can group by vendor
+    expect(adv.vendor_code).toBe('redhat');
+    expect(adv.vendor_name).toBe('Red Hat');
   });
 
   it('returns an empty list instead of throwing when the query errors', async () => {

@@ -9,7 +9,8 @@ export interface AdvisoryRowItem {
   published_at: string;
   url?: string;
   summary?: string;
-  vendor_id: string;
+  vendor_code: string;
+  vendor_name?: string;
   cves: {
     cve_id: string;
     description: string;
@@ -30,6 +31,7 @@ export class AdvisoryService {
         .from('advisories')
         .select(`
           id, advisory_id, title, severity, published_at, url, summary, vendor_id,
+          vendors ( code, name ),
           advisory_cve_map (
             affected_products,
             fixed_versions,
@@ -46,6 +48,7 @@ export class AdvisoryService {
       if (!data) return [];
 
       return data.map((row: any): AdvisoryRowItem => {
+        const vendor = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
         const mappings = Array.isArray(row.advisory_cve_map) ? row.advisory_cve_map : [];
 
         // cves: one entry per mapping with a joined cve record, deduplicated by cve_id.
@@ -136,7 +139,8 @@ export class AdvisoryService {
           published_at: row.published_at,
           url: row.url || undefined,
           summary: row.summary || undefined,
-          vendor_id: row.vendor_id,
+          vendor_code: vendor?.code || 'redhat',
+          vendor_name: vendor?.name,
           cves,
           product_impacts: dedupedImpacts,
           affected_products: affectedProducts,

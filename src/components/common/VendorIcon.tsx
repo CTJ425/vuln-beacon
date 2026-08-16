@@ -4,6 +4,7 @@ import { Server, Shield, Layers, HardDrive, Cpu, Cloud, Database, Box as BoxIcon
 
 interface VendorIconProps {
   vendorCode: string;
+  name?: string;
   size?: number;
 }
 
@@ -29,10 +30,10 @@ export const VENDOR_NAMES: Record<string, string> = {
   cohesity: 'Cohesity',
 };
 
-export const VendorIcon: React.FC<VendorIconProps> = ({ vendorCode, size = 20 }) => {
+export const VendorIcon: React.FC<VendorIconProps> = ({ vendorCode, name: nameProp, size = 20 }) => {
   const code = (vendorCode || '').toLowerCase();
   const color = VENDOR_COLORS[code] || '#38bdf8';
-  const name = VENDOR_NAMES[code] || vendorCode;
+  const name = nameProp || VENDOR_NAMES[code] || vendorCode;
 
   const renderIcon = () => {
     switch (code) {

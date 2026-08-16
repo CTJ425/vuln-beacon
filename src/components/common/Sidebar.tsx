@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
-import { Box, List, ListItemButton, ListItemIcon, ListItemText, Collapse } from '@mui/material';
-import { LayoutDashboard, Shield, Activity, Settings, ChevronDown, ChevronRight } from 'lucide-react';
+import React from 'react';
+import { Box, List, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
+import { LayoutDashboard, Shield, Activity, Settings } from 'lucide-react';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { VendorNode } from '@/services/productTaxonomy';
 
 export type NavState =
   | { section: 'dashboard' | 'explorer' | 'sync' | 'settings' }
-  | { section: 'vendor'; vendorId: string }
-  | { section: 'product'; vendorId: string; productId: string };
+  | { section: 'vendor'; vendorCode: string };
 
 interface SidebarProps {
   currentNav: NavState;
@@ -16,21 +15,6 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentNav, onSelectNav, taxonomy }) => {
-  const isVendorActive = (vendorId: string) =>
-    (currentNav.section === 'vendor' || currentNav.section === 'product') && currentNav.vendorId === vendorId;
-
-  const [openVendors, setOpenVendors] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    taxonomy.forEach((vendor) => {
-      initial[vendor.vendorId] = isVendorActive(vendor.vendorId);
-    });
-    return initial;
-  });
-
-  const toggleVendor = (vendorId: string) => {
-    setOpenVendors((prev) => ({ ...prev, [vendorId]: !prev[vendorId] }));
-  };
-
   const staticItems: { id: 'explorer' | 'sync' | 'settings'; label: string; icon: React.ReactNode }[] = [
     { id: 'explorer', label: 'CVE Explorer', icon: <Shield size={20} /> },
     { id: 'sync', label: 'Sync Monitor', icon: <Activity size={20} /> },
@@ -78,56 +62,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentNav, onSelectNav, taxon
         </ListItemButton>
 
         {taxonomy.map((vendor) => {
-          const vendorActive = isVendorActive(vendor.vendorId);
-          const isOpen = openVendors[vendor.vendorId] ?? vendorActive;
-
+          const isSelected = currentNav.section === 'vendor' && currentNav.vendorCode === vendor.vendorCode;
           return (
-            <Box key={vendor.vendorId}>
-              <ListItemButton
-                onClick={() => onSelectNav({ section: 'vendor', vendorId: vendor.vendorId })}
-                selected={currentNav.section === 'vendor' && currentNav.vendorId === vendor.vendorId}
-                sx={rowSx(currentNav.section === 'vendor' && currentNav.vendorId === vendor.vendorId)}
-              >
-                <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center' }}>
-                  <VendorIcon vendorCode={vendor.vendorId} size={16} />
-                </Box>
-                <Box
-                  component="span"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleVendor(vendor.vendorId);
-                  }}
-                  sx={{ display: 'flex', alignItems: 'center' }}
-                >
-                  {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                </Box>
-              </ListItemButton>
-
-              <Collapse in={isOpen} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding sx={{ pl: 3 }}>
-                  {vendor.products.map((product) => {
-                    const isSelected =
-                      currentNav.section === 'product' &&
-                      currentNav.vendorId === vendor.vendorId &&
-                      currentNav.productId === product.id;
-                    return (
-                      <ListItemButton
-                        key={product.id}
-                        onClick={() => onSelectNav({ section: 'product', vendorId: vendor.vendorId, productId: product.id })}
-                        selected={isSelected}
-                        sx={rowSx(isSelected)}
-                      >
-                        <ListItemText
-                          primary={product.name}
-                          secondary={product.advisoryCount}
-                          primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: isSelected ? 700 : 500 }}
-                        />
-                      </ListItemButton>
-                    );
-                  })}
-                </List>
-              </Collapse>
-            </Box>
+            <ListItemButton
+              key={vendor.vendorCode}
+              onClick={() => onSelectNav({ section: 'vendor', vendorCode: vendor.vendorCode })}
+              selected={isSelected}
+              sx={rowSx(isSelected)}
+            >
+              <VendorIcon vendorCode={vendor.vendorCode} name={vendor.vendorName} size={16} />
+            </ListItemButton>
           );
         })}
 

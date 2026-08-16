@@ -16,7 +16,6 @@ interface ExplorerPageProps {
   onSelectAdvisory: (item: AdvisoryRowItem) => void;
   onRefreshCves?: () => Promise<void>;
   taxonomy?: VendorNode[];
-  initialProductFamilyId?: string;
 }
 
 export const ExplorerPage: React.FC<ExplorerPageProps> = ({
@@ -26,10 +25,9 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
   onSelectAdvisory,
   onRefreshCves,
   taxonomy = [],
-  initialProductFamilyId,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedProductFamily, setSelectedProductFamily] = useState(initialProductFamilyId ?? 'ALL');
+  const [selectedProductFamily, setSelectedProductFamily] = useState('ALL');
   const [selectedSeverity, setSelectedSeverity] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [viewMode, setViewMode] = useState<'advisory' | 'cve'>('advisory');
@@ -43,8 +41,7 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
     return cves.filter((item) => {
       // Product Family filter
       if (selectedProductFamily !== 'ALL') {
-        const asAdvisory = { ...item, vendor_id: item.vendor_code } as unknown as AdvisoryRowItem;
-        if (!matchesProductFamily(asAdvisory, selectedProductFamily, taxonomy)) {
+        if (!matchesProductFamily(item, selectedProductFamily, taxonomy)) {
           return false;
         }
       }

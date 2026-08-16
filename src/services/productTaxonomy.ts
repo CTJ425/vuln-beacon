@@ -66,7 +66,7 @@ export interface ProductFamilyNode {
 }
 
 export interface VendorNode {
-  vendorId: string;
+  vendorCode: string;
   vendorName: string;
   advisoryCount: number;
   criticalCount: number;
@@ -78,7 +78,8 @@ export function deriveTaxonomy(
   topN: number = DEFAULT_TOP_N
 ): VendorNode[] {
   interface VendorAccumulator {
-    vendorId: string;
+    vendorCode: string;
+    vendorName?: string;
     advisoryCount: number;
     criticalCount: number;
     families: Map<string, { name: string; advisoryCount: number }>;
@@ -87,11 +88,11 @@ export function deriveTaxonomy(
   const vendors = new Map<string, VendorAccumulator>();
 
   for (const advisory of advisories) {
-    const vendorId = advisory.vendor_id;
-    let vendor = vendors.get(vendorId);
+    const vendorCode = advisory.vendor_code;
+    let vendor = vendors.get(vendorCode);
     if (!vendor) {
-      vendor = { vendorId, advisoryCount: 0, criticalCount: 0, families: new Map() };
-      vendors.set(vendorId, vendor);
+      vendor = { vendorCode, vendorName: advisory.vendor_name, advisoryCount: 0, criticalCount: 0, families: new Map() };
+      vendors.set(vendorCode, vendor);
     }
 
     vendor.advisoryCount += 1;
@@ -138,8 +139,8 @@ export function deriveTaxonomy(
     }
 
     return {
-      vendorId: vendor.vendorId,
-      vendorName: VENDOR_NAMES[vendor.vendorId] ?? vendor.vendorId,
+      vendorCode: vendor.vendorCode,
+      vendorName: vendor.vendorName || VENDOR_NAMES[vendor.vendorCode] || vendor.vendorCode,
       advisoryCount: vendor.advisoryCount,
       criticalCount: vendor.criticalCount,
       products,
@@ -152,7 +153,7 @@ export function deriveTaxonomy(
 }
 
 export function matchesProductFamily(
-  advisory: AdvisoryRowItem,
+  advisory: { vendor_code: string; affected_products?: string[] },
   familyId: string,
   taxonomy: VendorNode[]
 ): boolean {
@@ -161,7 +162,7 @@ export function matchesProductFamily(
   );
 
   if (familyId === 'other') {
-    const vendor = taxonomy.find((v) => v.vendorId === advisory.vendor_id);
+    const vendor = taxonomy.find((v) => v.vendorCode === advisory.vendor_code);
     const otherNode = vendor?.products.find((p) => p.id === 'other');
     if (!otherNode?.memberFamilyIds) return false;
     return otherNode.memberFamilyIds.some((id) => familyIds.has(id));

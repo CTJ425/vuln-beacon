@@ -15,7 +15,7 @@ const advisory = (over: Partial<AdvisoryRowItem> = {}): AdvisoryRowItem => ({
   published_at: '2026-08-02T00:00:00Z',
   url: 'https://access.redhat.com/errata/RHSA-2026:2000',
   summary: 'kernel security update',
-  vendor_id: 'redhat',
+  vendor_code: 'redhat',
   cves: [
     { cve_id: 'CVE-2026-2001', description: 'kernel: flaw one', severity: 'CRITICAL', cvss_v3_score: 9.1, is_known_exploited: false },
     { cve_id: 'CVE-2026-2002', description: 'kernel: flaw two', severity: 'CRITICAL', cvss_v3_score: 9.0, is_known_exploited: false },
@@ -102,7 +102,7 @@ describe('DashboardPage — organised around RHSA advisories', () => {
 describe('DashboardPage — global vendor summary', () => {
   const taxonomy: VendorNode[] = [
     {
-      vendorId: 'redhat',
+      vendorCode: 'redhat',
       vendorName: 'Red Hat',
       advisoryCount: 3,
       criticalCount: 1,
@@ -130,24 +130,6 @@ describe('DashboardPage — global vendor summary', () => {
     expect(vendorCard).toBeInTheDocument();
     await userEvent.click(vendorCard);
     expect(onSelectVendor).toHaveBeenCalledWith('redhat');
-  });
-
-  it('calls onSelectProduct with the vendor and product ids when a distribution row is clicked', async () => {
-    const onSelectProduct = vi.fn();
-    render(
-      <DashboardPage
-        advisories={[advisory()]}
-        cves={[]}
-        onSelectAdvisory={() => {}}
-        onSelectCve={() => {}}
-        onNavigateToExplorer={() => {}}
-        taxonomy={taxonomy}
-        onSelectProduct={onSelectProduct}
-      />
-    );
-
-    await userEvent.click(screen.getByText('Red Hat Enterprise Linux'));
-    expect(onSelectProduct).toHaveBeenCalledWith('redhat', 'red-hat-enterprise-linux');
   });
 
   it('renders without a taxonomy prop (back-compat with existing call sites)', () => {

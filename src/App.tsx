@@ -5,7 +5,7 @@ import { Header } from '@/components/common/Header';
 import { Sidebar, NavState } from '@/components/common/Sidebar';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ExplorerPage } from '@/pages/ExplorerPage';
-import { ProductPage } from '@/pages/ProductPage';
+import { VendorPage } from '@/pages/VendorPage';
 import { SyncMonitorPage } from '@/pages/SyncMonitorPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { CveDetailDrawer } from '@/components/explorer/CveDetailDrawer';
@@ -164,8 +164,7 @@ export const AppContent: React.FC = () => {
                   onSelectCve={setSelectedCve}
                   onNavigateToExplorer={() => setCurrentNav({ section: 'explorer' })}
                   taxonomy={taxonomy}
-                  onSelectVendor={(vendorId) => setCurrentNav({ section: 'vendor', vendorId })}
-                  onSelectProduct={(vendorId, productId) => setCurrentNav({ section: 'product', vendorId, productId })}
+                  onSelectVendor={(vendorCode) => setCurrentNav({ section: 'vendor', vendorCode })}
                 />
               )}
               {currentNav.section === 'explorer' && (
@@ -180,20 +179,8 @@ export const AppContent: React.FC = () => {
               )}
 
               {currentNav.section === 'vendor' && (
-                <ProductPage
-                  vendorId={currentNav.vendorId}
-                  advisories={advisories}
-                  cves={cves}
-                  taxonomy={taxonomy}
-                  onSelectCve={setSelectedCve}
-                  onSelectAdvisory={setSelectedAdvisory}
-                  onRefreshCves={loadData}
-                />
-              )}
-              {currentNav.section === 'product' && (
-                <ProductPage
-                  vendorId={currentNav.vendorId}
-                  productId={currentNav.productId}
+                <VendorPage
+                  vendorCode={currentNav.vendorCode}
                   advisories={advisories}
                   cves={cves}
                   taxonomy={taxonomy}

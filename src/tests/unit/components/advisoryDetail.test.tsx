@@ -14,7 +14,7 @@ const advisory = (over: Partial<AdvisoryRowItem> = {}): AdvisoryRowItem => ({
   published_at: '2026-08-02T00:00:00Z',
   url: 'https://access.redhat.com/errata/RHSA-2026:2000',
   summary: 'A kernel security update is now available.',
-  vendor_id: 'redhat',
+  vendor_code: 'redhat',
   cves: [
     { cve_id: 'CVE-2026-2001', description: 'kernel: flaw one', severity: 'CRITICAL', cvss_v3_score: 9.1, is_known_exploited: false },
     { cve_id: 'CVE-2026-2002', description: 'kernel: flaw two', severity: 'HIGH', cvss_v3_score: 8.2, is_known_exploited: false },

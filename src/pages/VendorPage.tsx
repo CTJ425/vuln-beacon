@@ -4,11 +4,10 @@ import { MetricCards } from '@/components/dashboard/MetricCards';
 import { ExplorerPage } from '@/pages/ExplorerPage';
 import { AdvisoryRowItem } from '@/services/advisoryService';
 import { CveTableRowItem } from '@/components/explorer/CveTable';
-import { VendorNode, matchesProductFamily } from '@/services/productTaxonomy';
+import { VendorNode } from '@/services/productTaxonomy';
 
-interface ProductPageProps {
-  vendorId: string;
-  productId?: string;
+interface VendorPageProps {
+  vendorCode: string;
   advisories: AdvisoryRowItem[];
   cves: CveTableRowItem[];
   taxonomy: VendorNode[];
@@ -17,9 +16,8 @@ interface ProductPageProps {
   onRefreshCves?: () => Promise<void>;
 }
 
-export const ProductPage: React.FC<ProductPageProps> = ({
-  vendorId,
-  productId,
+export const VendorPage: React.FC<VendorPageProps> = ({
+  vendorCode,
   advisories,
   cves,
   taxonomy,
@@ -27,16 +25,12 @@ export const ProductPage: React.FC<ProductPageProps> = ({
   onSelectAdvisory,
   onRefreshCves,
 }) => {
-  const vendor = taxonomy.find((v) => v.vendorId === vendorId);
-  const product = productId ? vendor?.products.find((p) => p.id === productId) : undefined;
+  const vendor = taxonomy.find((v) => v.vendorCode === vendorCode);
 
-  const scopedAdvisories = useMemo(() => {
-    return advisories.filter((a) => {
-      if (a.vendor_id !== vendorId) return false;
-      if (productId && !matchesProductFamily(a, productId, taxonomy)) return false;
-      return true;
-    });
-  }, [advisories, vendorId, productId, taxonomy]);
+  const scopedAdvisories = useMemo(
+    () => advisories.filter((a) => a.vendor_code === vendorCode),
+    [advisories, vendorCode]
+  );
 
   const scopedAdvisoryIds = useMemo(
     () => new Set(scopedAdvisories.map((a) => a.advisory_id)),
@@ -55,14 +49,13 @@ export const ProductPage: React.FC<ProductPageProps> = ({
     totalImpactedComponents += a.product_impacts ? a.product_impacts.length : 0;
   });
 
-  const vendorName = vendor?.vendorName ?? vendorId;
-  const heading = product ? `${vendorName} · ${product.name}` : vendorName;
+  const vendorName = vendor?.vendorName ?? vendorCode;
 
   return (
     <Stack spacing={3.5}>
       <Box>
         <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.02em' }}>
-          {heading}
+          {vendorName}
         </Typography>
       </Box>
 
@@ -86,7 +79,6 @@ export const ProductPage: React.FC<ProductPageProps> = ({
         onSelectAdvisory={onSelectAdvisory}
         onRefreshCves={onRefreshCves}
         taxonomy={taxonomy}
-        initialProductFamilyId={productId}
       />
     </Stack>
   );

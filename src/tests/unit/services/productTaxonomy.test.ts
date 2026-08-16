@@ -15,7 +15,7 @@ const baseAdvisory = (over: Partial<AdvisoryRowItem> = {}): AdvisoryRowItem => (
   published_at: '2026-08-02T00:00:00Z',
   url: 'https://access.redhat.com/errata/RHSA-2026:0001',
   summary: 'test',
-  vendor_id: 'redhat',
+  vendor_code: 'redhat',
   cves: [],
   product_impacts: [],
   affected_products: [],
@@ -54,7 +54,7 @@ describe('slugify', () => {
 
 function makeFamilyAdvisories(
   familyCounts: Record<string, number>,
-  vendorId = 'redhat',
+  vendorCode = 'redhat',
   severity: AdvisoryRowItem['severity'] = 'LOW',
 ): AdvisoryRowItem[] {
   const rows: AdvisoryRowItem[] = [];
@@ -68,7 +68,7 @@ function makeFamilyAdvisories(
           advisory_id: `RHSA-2026:${1000 + n}`,
           affected_products: [family],
           severity,
-          vendor_id: vendorId,
+          vendor_code: vendorCode,
         } as Partial<AdvisoryRowItem>),
       );
     }
@@ -89,7 +89,7 @@ describe('deriveTaxonomy', () => {
 
     expect(taxonomy).toHaveLength(1);
     const redhat = taxonomy[0];
-    expect(redhat.vendorId).toBe('redhat');
+    expect(redhat.vendorCode).toBe('redhat');
     expect(redhat.products).toHaveLength(11); // 10 kept + 1 overflow
 
     const named = redhat.products.filter((p) => !p.isOverflow);
@@ -125,7 +125,7 @@ describe('deriveTaxonomy', () => {
     expect(taxonomy[0].products.some((p) => p.isOverflow)).toBe(false);
   });
 
-  it('produces one VendorNode per distinct vendor_id with correct counts', () => {
+  it('produces one VendorNode per distinct vendor_code with correct counts', () => {
     const redhatAdvisories = makeFamilyAdvisories({ RHEL: 2, OpenShift: 1 }, 'redhat', 'CRITICAL');
     const otherVendorAdvisories = makeFamilyAdvisories({ 'Product X': 1 }, 'vmware', 'LOW');
     const advisories = [...redhatAdvisories, ...otherVendorAdvisories];
@@ -133,12 +133,22 @@ describe('deriveTaxonomy', () => {
     const taxonomy = deriveTaxonomy(advisories, 10);
 
     expect(taxonomy).toHaveLength(2);
-    const redhat = taxonomy.find((v) => v.vendorId === 'redhat')!;
-    const vmware = taxonomy.find((v) => v.vendorId === 'vmware')!;
+    const redhat = taxonomy.find((v) => v.vendorCode === 'redhat')!;
+    const vmware = taxonomy.find((v) => v.vendorCode === 'vmware')!;
     expect(redhat.advisoryCount).toBe(3);
     expect(redhat.criticalCount).toBe(3);
     expect(vmware.advisoryCount).toBe(1);
     expect(vmware.criticalCount).toBe(0);
+  });
+
+  it('prefers advisory.vendor_name over the static VENDOR_NAMES lookup when present', () => {
+    const advisories = [
+      baseAdvisory({ vendor_code: 'redhat', vendor_name: 'Custom Red Hat Label', affected_products: ['RHEL'] } as Partial<AdvisoryRowItem>),
+    ];
+
+    const taxonomy = deriveTaxonomy(advisories, 10);
+
+    expect(taxonomy[0].vendorName).toBe('Custom Red Hat Label');
   });
 });
 

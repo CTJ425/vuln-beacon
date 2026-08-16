@@ -17,7 +17,8 @@ describe('App Root Component', () => {
         published_at: '2026-08-15T00:00:00Z',
         url: 'https://access.redhat.com/errata/RHSA-2026:6821',
         summary: 'kernel security update',
-        vendor_id: 'redhat',
+        vendor_code: 'redhat',
+        vendor_name: 'Red Hat',
         cves: [],
         product_impacts: [],
         affected_products: ['Red Hat Enterprise Linux 9'],
@@ -86,11 +87,10 @@ describe('App Root Component', () => {
     render(<App />);
     await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
-    // vendor group derived from the mocked advisory (vendor_id: 'redhat'); the
+    // vendor entry derived from the mocked advisory (vendor_code: 'redhat'); the
     // vendor name also appears in the Overview's vendor-card row, so allow
     // more than one match — only presence is asserted here.
     expect((await screen.findAllByText('Red Hat', {}, { timeout: 4000 })).length).toBeGreaterThan(0);
-    expect(await screen.findByText('Red Hat Enterprise Linux', {}, { timeout: 4000 })).toBeInTheDocument();
 
     // static nav items must still exist, unchanged
     expect(screen.getByText('CVE Explorer')).toBeInTheDocument();
