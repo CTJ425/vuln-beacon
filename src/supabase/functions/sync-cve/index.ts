@@ -27,6 +27,8 @@ serve(async (req) => {
   }
 
   try {
+    // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are reserved names injected
+    // automatically by the Supabase Edge Function runtime — do not rename these.
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

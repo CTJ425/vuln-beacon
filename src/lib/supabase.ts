@@ -2,14 +2,19 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) ||
-  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL) ||
-  'https://xgrtyjazyqajqinwzlbl.supabase.co';
+  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_URL);
 
-const supabaseAnonKey =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY) ||
-  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_ANON_KEY) ||
-  'sb_publishable_JcVACEHawwtOq_IdScjR1g_WKckOEUu';
+const supabasePublishableKey =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY) ||
+  (typeof process !== 'undefined' && process.env?.VITE_SUPABASE_PUBLISHABLE_KEY);
 
-export const isConfigured = true;
+const isConfigured = Boolean(supabaseUrl && supabasePublishableKey);
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!isConfigured) {
+  throw new Error(
+    'Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY ' +
+      'in src/.env — see src/.env.example.'
+  );
+}
+
+export const supabase = createClient(supabaseUrl, supabasePublishableKey);

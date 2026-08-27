@@ -5,7 +5,7 @@
 //
 // Usage:
 //   SUPABASE_URL=https://<project>.supabase.co \
-//   SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+//   SUPABASE_SECRET_KEY=<service-role-key> \
 //   node scripts/backfillAdvisoryStorage.mjs
 //
 // Resumable: only rows where raw_payload_path is null are selected, so
@@ -32,10 +32,10 @@ const PAGE = 500;
 
 export async function main() {
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables.');
+    console.error('Missing SUPABASE_URL or SUPABASE_SECRET_KEY environment variables.');
     process.exit(1);
   }
 

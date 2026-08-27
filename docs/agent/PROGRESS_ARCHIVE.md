@@ -1,3 +1,9 @@
+## 2026-08-16 22:25:59 Asia/Taipei - read-only code audit completed
+- Completed **read-only code audit** (baseline green: 132 tests pass, `tsc --noEmit` clean).
+- Findings: 14 OPEN bugs recorded in `docs/agent/BUG_FIX.md` (ranked HIGH/MEDIUM/LOW, independent verification by main session, no code changed). (3 HIGH: duplicate webhook alerts, sync stalling on unresponsive webhook, silent sync failure. 8 MEDIUM: optimistic delete, silent truncation, key escaping, partial commit, non-deterministic advisory, webhook test ambiguity, drawer persistence, form validation. 3 LOW: secret in DOM, dead adapter, repo hygiene).
+- Investigation: Rules-of-Hooks violation at src/components/explorer/CveDetailDrawer.tsx:52 was investigated and REJECTED as false positive. No throw on re-hook after 0-hook render (React treats it as fresh mount).
+- No code changed. All files read-only.
+
 ## 2026-08-16 14:39:06 Asia/Taipei - move advisory raw_payload out of Postgres into Supabase Storage
 - Completed **move advisory raw_payload out of Postgres into Supabase Storage** (Lane 2: schema migration + Deno edge function + external storage system, elevated risk).
 - Problem: `advisories.raw_payload` (JSONB) held the full CSAF document per advisory, ~50-200KB each, counting toward the Supabase free-tier 500MB database limit. The prior task removed it from the read path, but it was still being written on every sync, so the column kept growing.

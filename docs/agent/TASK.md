@@ -64,6 +64,15 @@
   - [x] Update sync services to use Edge Function endpoints (webhook handlers use Edge Function for advisory persistence, pending webhook-admin Edge Function task).
   - **Verification**: 58/58 tests passed; clean build; live production verified: anon key RLS restrictions enforced (INSERT fails with 42501), Edge Function validates vendor codes before writing. Completed 2026-08-16 00:04:13 CST.
 
+- [x] **Task 12: Supabase env var naming migration + GitHub Actions removal**
+  - [x] Rename `VITE_SUPABASE_ANON_KEY` to `VITE_SUPABASE_PUBLISHABLE_KEY` throughout codebase; remove hardcoded fallback key from module.
+  - [x] Rewrite `.env.example` template with three sections: frontend vars, local-script secrets, platform-injected Edge Function vars.
+  - [x] Update build config (`vite.config.ts`, `vitest.config.ts`) for self-hosted static builds and test isolation.
+  - [x] Delete GitHub Actions workflow (`.github/workflows/deploy-pages.yml`) and associated documentation.
+  - [x] Update `README.md` environment setup and deployment sections for self-hosted builds.
+  - **Verification**: `npm --prefix src test` 36 files / 159 tests passed; `npm --prefix src run build` clean; reviewer pass on fixes to 2 BLOCKERs (README references) and 3 RISKs (dangling file, dead branch, unobservable export).
+  - **Completed**: 2026-08-27 17:31:17 Asia/Taipei.
+
 - [ ] **Task 11: Webhook Settings & Admin Controls — Edge Function Backend & RLS Write Policies (Phase B2)**
   - [ ] Implement `webhook-admin` Edge Function handler for webhook create/delete/update operations using service-role key.
   - [ ] Apply RLS write policy restrictions to `webhook_configs` table (currently allows direct browser writes via anon key).

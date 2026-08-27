@@ -1,14 +1,16 @@
 # Progress Log
 
+## 2026-08-27 17:31:17 Asia/Taipei - Supabase env var naming migration + GitHub Actions removal
+- Completed **Supabase env var naming migration + GitHub Actions removal** (Lane 1: env var rename, workflow deletion, config updates).
+- Root cause: `src/lib/supabase.ts` hardcoded a fallback with a new-format `sb_publishable_...` key, but the variable was named `VITE_SUPABASE_ANON_KEY` (legacy JWT-era name). The deployed GitHub Pages site ran on that hardcoded fallback because the workflow never injected any `VITE_SUPABASE_*` vars.
+- Changes made: (1) `src/lib/supabase.ts` — renamed to `VITE_SUPABASE_PUBLISHABLE_KEY`; removed hardcoded URL and key literals; `isConfigured` changed from constant `true` to a real check and demoted to module-local const; throws at module load when either var is missing. (2) `src/.env.example` — rewritten as three-group commented template: frontend `VITE_*`, local-script secrets, CLI-only vars; notes Edge Functions receive platform-injected `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`. (3) `src/scripts/backfillAdvisoryStorage.mjs` — reads `SUPABASE_SECRET_KEY` instead of `SUPABASE_SERVICE_ROLE_KEY`. (4) `src/supabase/functions/sync-cve/index.ts` — env names unchanged (platform-injected); clarifying comment added. (5) `src/vitest.config.ts` — added `test.env` with dummy Supabase values for test suite isolation. (6) `src/vite.config.ts` — removed dead `GH_PAGES` branch; `base` is now `'/'`. (7) `README.md` — env snippet, project-structure tree, and Deployment section updated for self-hosted static builds. (8) Deleted `.github/workflows/deploy-pages.yml`, `.github/` directory, and `docs/deployment/github-pages.md`.
+- Review: Route:reviewer initial FAIL with 2 BLOCKERs (README lines 37 and 100 still referenced deleted workflow) plus 3 RISKs (dangling docs file, dead GH_PAGES branch, unobservable isConfigured export). All five fixed; tests and build re-run green.
+- Verification: `npm --prefix src test` → 36 files / 159 tests passed. `npm --prefix src run build` → succeeded, `dist/index.html` references `/assets/...`.
+- Known follow-ups (open items): (1) Workflow removal also removed only automated test gate; no CI currently runs on push. Self-hosted equivalent not yet set up. (2) `.claude/skills/supabase-ops/SKILL.md:48` still describes GitHub Pages workflow (deliberate; that file documents a different project).
+
 ## 2026-08-16 23:01:20 Asia/Taipei - audit findings remediated and verified
 - Completed **remediation of all 14 audit findings** (BUG-003 through BUG-016, plus 1 investigation entry, all moved to `docs/agent/FIXED_BUG.md`). All entries include detailed resolution summaries.
 - Remediation pass: A reviewer identified and fixed 4 further defects in the remediation itself (BLOCKER on syncVendors cve_id select, inflated skipped counts, missing order on backfill select, secret leakage in maskWebhookUrl).
 - Regression tests added: `auditRemediation.test.ts` (webhook timeout/concurrency/secret-logging/ignoreActiveState, alert de-duplication), `advisoryStorageKey.test.ts` (backward compatibility + drift guard for Deno/Node copies), `webhookPanelSecurity.test.tsx` (secret absent from DOM, delete confirmation), `syncServicePersist.test.ts` (narrowed protected-table assertion to "no mutating calls").
 - Verification: **132 → 159 tests** (36 files); `npm --prefix src run build` success; `npx tsc --noEmit` clean.
 - All open bugs now FIXED. BUG-001 (webhook server-side dispatch, deferred) and BUG-002 (accepted risk) remain OPEN per scope.
-
-## 2026-08-16 22:25:59 Asia/Taipei - read-only code audit completed
-- Completed **read-only code audit** (baseline green: 132 tests pass, `tsc --noEmit` clean).
-- Findings: 14 OPEN bugs recorded in `docs/agent/BUG_FIX.md` (ranked HIGH/MEDIUM/LOW, independent verification by main session, no code changed). (3 HIGH: duplicate webhook alerts, sync stalling on unresponsive webhook, silent sync failure. 8 MEDIUM: optimistic delete, silent truncation, key escaping, partial commit, non-deterministic advisory, webhook test ambiguity, drawer persistence, form validation. 3 LOW: secret in DOM, dead adapter, repo hygiene).
-- Investigation: Rules-of-Hooks violation at src/components/explorer/CveDetailDrawer.tsx:52 was investigated and REJECTED as false positive. No throw on re-hook after 0-hook render (React treats it as fresh mount).
-- No code changed. All files read-only.

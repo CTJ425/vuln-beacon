@@ -33,8 +33,7 @@ vuln-beacon/
 │   ├── supabase/          # DB migrations + Deno edge functions (sync-cve)
 │   ├── scripts/           # One-off Node utilities (e.g. Supabase Storage backfill)
 │   ├── types/             # TypeScript type definitions
-│   └── tests/             # Unit / smoke / e2e test suites
-└── .github/workflows/     # CI: deploy to GitHub Pages on push to main
+    └── tests/             # Unit / smoke / e2e test suites
 ```
 
 ## Getting Started
@@ -52,15 +51,28 @@ cd vuln-beacon/src
 npm install
 ```
 
-Create `src/.env` with your Supabase credentials:
+Create `src/.env` with your Supabase credentials (see `src/.env.example`):
 
 ```
+# Frontend (Vite) — inlined into the client bundle at build time, public by design.
 VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+
+# Local scripts only (e.g. `npm run backfill:advisory-storage`) — secret, never commit.
+SUPABASE_URL=
+SUPABASE_SECRET_KEY=
+
+# Supabase CLI only (optional; `supabase login` normally covers this).
 SUPABASE_ACCESS_TOKEN=
 SUPABASE_PROJECT_REF=
+
+# Edge Functions receive SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY automatically
+# from the Supabase platform at runtime — do NOT set those here.
 ```
+
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` must be present in the
+environment when you run `npm run build`, because Vite inlines them into the
+bundle at build time. The app throws on startup if either one is missing.
 
 ### Development
 
@@ -82,9 +94,36 @@ npm --prefix src run test:e2e      # end-to-end tests
 npm --prefix src run test:coverage # coverage report
 ```
 
+### Verify gate
+
+`verify` runs the full test suite plus the production build. It is the single
+entry point any CI runner should call:
+
+```bash
+npm --prefix src run verify
+```
+
+A committed `pre-push` hook runs the same gate before every push. Activate it
+once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Use `git push --no-verify` to bypass the gate.
+
 ## Deployment
 
-Pushing to `main` triggers `.github/workflows/deploy-pages.yml`, which builds the app and deploys it to GitHub Pages.
+The app is a static bundle, self-hosted. Build it with `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_PUBLISHABLE_KEY` present in the environment, then serve `src/dist/`
+from any static web server:
+
+```bash
+npm --prefix src run build   # outputs to src/dist/
+```
+
+The build assumes it is served from the domain root (`/`). To serve it from a
+subpath instead, set `base` in `src/vite.config.ts`.
 
 ## Documentation
 

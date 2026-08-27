@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+echo "pre-push: running verify gate (tests + production build)..."
+
+if ! npm --prefix src run verify; then
+  echo ""
+  echo "pre-push: verify gate FAILED — push blocked."
+  echo "pre-push: fix the failures above, or bypass with 'git push --no-verify'."
+  exit 1
+fi
+
+echo "pre-push: verify gate passed."
