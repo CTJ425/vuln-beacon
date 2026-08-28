@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
-import { IngestionEngine, getAdapterByCode, isVendorDue } from "../_shared/ingest.bundle.js";
+import { IngestionEngine, getAdapterByCode, isVendorDue, WebhookService } from "../_shared/ingest.bundle.js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -129,12 +129,31 @@ serve(async (req) => {
       console.warn('Failed to fetch known CVE ids for de-duplication:', knownIdsErr);
     }
 
+    // Loaded once per invocation and shared across every vendor's engine —
+    // mirrors SyncService.loadWebhooks() so a scheduled run raises the same
+    // alerts a manual sync would. A read failure must not abort the run;
+    // it degrades to zero registered webhooks, same as the known-CVE-ids
+    // fallback above.
+    const webhookService = new WebhookService();
+    const { data: webhookConfigs, error: webhookConfigsError } = await supabaseClient
+      .from('webhook_configs')
+      .select('*')
+      .eq('is_active', true);
+
+    if (webhookConfigsError) {
+      console.warn('Failed to load webhook configs for scheduled sync:', webhookConfigsError);
+    } else {
+      for (const config of webhookConfigs || []) {
+        webhookService.registerWebhook(config);
+      }
+    }
+
     for (const vendor of dueVendors) {
       // A fresh engine per vendor — IngestionEngine accumulates advisories,
       // cves and mappings in instance Maps that are never cleared, so
       // reusing one instance across vendors would leak vendor A's rows
       // into vendor B's upsert and stamp them with vendor B's vendor_id.
-      const engine = new IngestionEngine({ knownCveIds });
+      const engine = new IngestionEngine({ knownCveIds, webhookService });
       const startedAt = new Date().toISOString();
       try {
         const result = await engine.ingestVendor(vendor.code);

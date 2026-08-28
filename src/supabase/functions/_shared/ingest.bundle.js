@@ -306,7 +306,8 @@ var IngestionEngine = class {
           totalCves++;
           const cveKey = cve.cveId;
           const isNew = !this.cves.has(cveKey);
-          if (isNew) newCvesCount++;
+          const isTrulyNew = isNew && !this.knownCveIds.has(cveKey);
+          if (isTrulyNew) newCvesCount++;
           const cveRecord = {
             id: `cve-${cveKey}`,
             cve_id: cve.cveId,
@@ -328,7 +329,6 @@ var IngestionEngine = class {
             fixed_versions: cve.fixedVersions || [],
             created_at: (/* @__PURE__ */ new Date()).toISOString()
           });
-          const isTrulyNew = isNew && !this.knownCveIds.has(cveKey);
           if (this.webhookService && isTrulyNew && (cveRecord.severity === "CRITICAL" || cveRecord.severity === "HIGH")) {
             pendingAlerts.push({
               vendorName: adapter.vendorName,
@@ -488,9 +488,217 @@ function dueOccurrence(state, now) {
 function isVendorDue(state, now) {
   return dueOccurrence(state, now) !== null;
 }
+
+// formatters/discord.ts
+var SEVERITY_COLORS = {
+  CRITICAL: 13840175,
+  // Red
+  HIGH: 16088064,
+  // Orange
+  MEDIUM: 16498733,
+  // Yellow
+  LOW: 3706428,
+  // Green
+  UNKNOWN: 7697781
+  // Grey
+};
+function formatDiscordAlert(alert) {
+  const color = SEVERITY_COLORS[alert.severity] || SEVERITY_COLORS.UNKNOWN;
+  const scoreText = alert.cvssScore ? `${alert.cvssScore} (${alert.severity})` : alert.severity;
+  const fields = [
+    { name: "Vendor", value: alert.vendorName, inline: true },
+    { name: "Advisory ID", value: alert.advisoryId, inline: true },
+    { name: "CVSS Score", value: scoreText, inline: true }
+  ];
+  if (alert.affectedProducts && alert.affectedProducts.length > 0) {
+    fields.push({
+      name: "Affected Products",
+      value: alert.affectedProducts.slice(0, 5).join("\n"),
+      inline: false
+    });
+  }
+  if (alert.fixedVersions && alert.fixedVersions.length > 0) {
+    fields.push({
+      name: "Fixed In",
+      value: alert.fixedVersions.slice(0, 5).join("\n"),
+      inline: false
+    });
+  }
+  return {
+    embeds: [
+      {
+        title: `\u{1F6A8} [${alert.severity}] Security Alert: ${alert.cveId}`,
+        description: alert.summary || alert.advisoryTitle,
+        url: alert.advisoryUrl,
+        color,
+        fields,
+        footer: {
+          text: "VulnBeacon \u2022 Automated Multi-Vendor CVE Intel"
+        },
+        timestamp: (/* @__PURE__ */ new Date()).toISOString()
+      }
+    ]
+  };
+}
+
+// formatters/telegram.ts
+function formatTelegramAlert(alert) {
+  const scoreText = alert.cvssScore ? `${alert.cvssScore} (${alert.severity})` : alert.severity;
+  const products = (alert.affectedProducts || []).slice(0, 3).join(", ") || "N/A";
+  const text = [
+    `\u{1F6A8} <b>[${alert.severity} Security Alert]</b>`,
+    ``,
+    `<b>CVE:</b> <code>${alert.cveId}</code>`,
+    `<b>Vendor:</b> ${alert.vendorName}`,
+    `<b>Advisory:</b> <a href="${alert.advisoryUrl}">${alert.advisoryId}</a>`,
+    `<b>CVSS Score:</b> ${scoreText}`,
+    `<b>Affected:</b> ${products}`,
+    ``,
+    `<b>Summary:</b> ${alert.summary || alert.advisoryTitle}`,
+    alert.dashboardUrl ? `
+\u{1F517} <a href="${alert.dashboardUrl}">Open in VulnBeacon Dashboard</a>` : ""
+  ].filter(Boolean).join("\n");
+  return {
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: false
+  };
+}
+
+// formatters/slack.ts
+function formatSlackAlert(alert) {
+  const scoreText = alert.cvssScore ? `${alert.cvssScore} (${alert.severity})` : alert.severity;
+  const blocks = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: `\u{1F6A8} [${alert.severity}] Security Alert: ${alert.cveId}`,
+        emoji: true
+      }
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Vendor:*
+${alert.vendorName}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Advisory ID:*
+<${alert.advisoryUrl}|${alert.advisoryId}>`
+        },
+        {
+          type: "mrkdwn",
+          text: `*Severity:*
+${scoreText}`
+        },
+        {
+          type: "mrkdwn",
+          text: `*CVE ID:*
+${alert.cveId}`
+        }
+      ]
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Summary:*
+${alert.summary || alert.advisoryTitle}`
+      }
+    }
+  ];
+  if (alert.dashboardUrl) {
+    blocks.push({
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: {
+            type: "plain_text",
+            text: "\u{1F6E1}\uFE0F Triage in VulnBeacon",
+            emoji: true
+          },
+          url: alert.dashboardUrl,
+          style: alert.severity === "CRITICAL" ? "danger" : "primary"
+        }
+      ]
+    });
+  }
+  return { blocks };
+}
+
+// formatters/index.ts
+function formatWebhookAlert(platform, payload) {
+  switch (platform) {
+    case "discord":
+      return formatDiscordAlert(payload);
+    case "telegram":
+      return formatTelegramAlert(payload);
+    case "slack":
+      return formatSlackAlert(payload);
+    default:
+      throw new Error(`Unsupported webhook platform: ${platform}`);
+  }
+}
+
+// services/webhook.ts
+var SEVERITY_RANKS = {
+  CRITICAL: 4,
+  HIGH: 3,
+  MEDIUM: 2,
+  LOW: 1,
+  UNKNOWN: 0
+};
+var WebhookService = class {
+  webhooks = [];
+  registerWebhook(config) {
+    this.webhooks.push(config);
+  }
+  clearWebhooks() {
+    this.webhooks = [];
+  }
+  getWebhooks() {
+    return [...this.webhooks];
+  }
+  async dispatch(config, alert, { ignoreActiveState = false } = {}) {
+    const minRank = SEVERITY_RANKS[config.min_severity] || 0;
+    const alertRank = SEVERITY_RANKS[alert.severity] || 0;
+    if (alertRank < minRank || !config.is_active && !ignoreActiveState) {
+      return false;
+    }
+    const payload = formatWebhookAlert(config.platform, alert);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1e4);
+    try {
+      const response = await fetch(config.webhook_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      return response.ok;
+    } catch (err) {
+      console.warn("Webhook dispatch failed:", config.id, config.platform, err);
+      return false;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  async notifyAll(alert) {
+    const results = await Promise.allSettled(
+      this.webhooks.map((hook) => this.dispatch(hook, alert))
+    );
+    return results.filter((r) => r.status === "fulfilled" && r.value).length;
+  }
+};
 export {
   IngestionEngine,
   SCHEDULE_TICK_TOLERANCE_MINUTES,
+  WebhookService,
   getAdapterByCode,
   isVendorDue
 };

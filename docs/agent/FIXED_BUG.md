@@ -2,6 +2,40 @@
 
 ---
 
+### R6: Scheduled Runs Dispatch No Webhook Alerts — FIXED
+- **Date**: Opened 2026-08-28, fixed 2026-08-29
+- **Severity**: MEDIUM (feature gap; worse than recorded — affected both scheduled AND browser manual sync paths; critical CVEs not alerted)
+- **Location**: `src/supabase/functions/scheduled-sync/index.ts`, `src/services/syncService.ts`, `src/services/webhook.ts`, `src/supabase/functions/_shared/ingest.entry.ts`, `src/supabase/functions/_shared/ingest.bundle.js`
+- **Root Cause**: Three independent defects:
+  1. `SyncService` created a `WebhookService` but never called `registerWebhook()`, and `App.tsx` fetched webhook configs into React state without handing them to `SyncService`. Manual browser syncs raised no alerts either.
+  2. `scheduled-sync` Edge Function constructed `IngestionEngine` with `webhookService=undefined` (no registration path available server-side).
+  3. A follow-on defect: `WebhookService` registration was append-only, so a webhook deleted or edited kept firing with its original snapshot for the rest of the page session (one `SyncService` instance per page load in `App.tsx`).
+- **Fix**:
+  1. New `SyncService.loadWebhooks()` — reads configs via `WebhookConfigService.fetchWebhooks()`, clears the registered set, registers only `is_active` configs, returns the count, never throws. Called first in `syncVendors()`.
+  2. New `WebhookService.clearWebhooks()` — clears registered set so each load REBUILDS it (fixes the append-only snapshot bug).
+  3. `src/supabase/functions/_shared/ingest.entry.ts` now re-exports `WebhookService`.
+  4. `src/supabase/functions/scheduled-sync/index.ts` — reads active `webhook_configs` once per invocation with service-role client, inspects error and degrades to zero webhooks, passes `WebhookService` into every per-vendor `IngestionEngine`. Per-vendor construction preventing cross-vendor contamination is unchanged.
+- **Files Changed**: `src/services/syncService.ts`, `src/services/webhook.ts`, `src/supabase/functions/_shared/ingest.entry.ts`, `src/supabase/functions/scheduled-sync/index.ts`, `src/supabase/functions/_shared/ingest.bundle.js` (regenerated).
+- **Tests**: New: `tests/unit/services/syncServiceWebhookLoad.test.ts`. Updated: `tests/unit/services/syncServiceChunking.test.ts`, `tests/unit/services/syncServicePersist.test.ts`, `tests/unit/supabase/scheduledSyncFunction.test.ts`.
+- **Verification**: `npm run build:edge && npm test && npm run build` from `src/` — 49 test files, 255 tests all passing; build OK.
+
+### R4: new_items_count Over-Reports on Every Recurring Run — FIXED
+- **Date**: Opened 2026-08-28 (pre-existing defect), fixed 2026-08-29
+- **Severity**: MEDIUM (dashboard/reporting accuracy)
+- **Location**: `src/engine/ingestion.ts`, `src/services/syncService.ts`
+- **Root Cause**: Three independent defects:
+  1. `IngestionEngine.newCvesCount` incremented only on within-run dedup, never consulted `knownCveIds` option set (which tracks CVEs from previous runs). It counted every touched CVE as "new" on each sync, even if seen before.
+  2. `SyncService.syncVendors()` did not pass the engine's `newCvesCount` to sync log; instead hardcoded `newItemsCount: cves.length` (all fetched items, not just new ones).
+  3. `SyncService.fetchAndIngestQuery()` on-demand lookup path built engine with no `knownCveIds` (no lookup) and sent no `newItemsCount` to Edge Function. Edge Function fallback counted every CVE as new.
+- **Fix**:
+  1. `src/engine/ingestion.ts` — compute `isTrulyNew` once per CVE (within-run dedup AND absent from `knownCveIds`), reuse for both the new `newCvesCount` and existing webhook gating (unchanged).
+  2. `src/services/syncService.ts` — `syncVendors()` reports engine's `newCvesCount` to sync log.
+  3. `src/services/syncService.ts` — new private `fetchKnownCveIds()` helper (extracted from `syncVendors()`; same paging, same degrade-to-empty-on-error). `fetchAndIngestQuery()` seeds `knownCveIds` and sends both `newItemsCount` and `itemsFetched` to Edge Function.
+- **Impact**: Dashboard `new_items_count` now reflects true incremental growth. Existing browser manual sync fixed; scheduler path (which seeds `knownCveIds` correctly after TASK-13 Phase 2) also now fixed.
+- **Files Changed**: `src/engine/ingestion.ts`, `src/services/syncService.ts`.
+- **Tests**: New: `tests/unit/engine/ingestionNewCveCount.test.ts`. Updated: `tests/unit/services/syncServiceChunking.test.ts`, `tests/unit/services/syncServicePersist.test.ts`.
+- **Verification**: `npm run build:edge && npm test && npm run build` from `src/` — 49 test files, 255 tests all passing; build OK.
+
 ### Bug ID: BUG-003 — Sync failed: one or more vendor feeds could not be ingested
 - **Date**: 2026-08-28, fixed 2026-08-28
 - **Severity**: CRITICAL

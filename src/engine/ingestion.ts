@@ -98,7 +98,8 @@ export class IngestionEngine {
           totalCves++;
           const cveKey = cve.cveId;
           const isNew = !this.cves.has(cveKey);
-          if (isNew) newCvesCount++;
+          const isTrulyNew = isNew && !this.knownCveIds.has(cveKey);
+          if (isTrulyNew) newCvesCount++;
 
           const cveRecord: CveRecord = {
             id: `cve-${cveKey}`,
@@ -127,7 +128,6 @@ export class IngestionEngine {
           // Queue webhook alert if critical or high, but only for CVEs that are
           // both new to this run AND not already persisted in the DB — otherwise
           // every re-sync re-alerts on the same CVEs (BUG-003).
-          const isTrulyNew = isNew && !this.knownCveIds.has(cveKey);
           if (this.webhookService && isTrulyNew && (cveRecord.severity === 'CRITICAL' || cveRecord.severity === 'HIGH')) {
             pendingAlerts.push({
               vendorName: adapter.vendorName,

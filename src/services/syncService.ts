@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { VendorSyncLog } from '@/types';
 import { IngestionEngine } from '@/engine/ingestion';
 import { WebhookService } from '@/services/webhook';
+import { WebhookConfigService } from '@/services/webhookConfigService';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 import { getAdapterByCode } from '@/adapters';
 import { RedHatCsafAdapter } from '@/adapters/redhat-csaf';
@@ -96,6 +97,57 @@ function buildPersistChunks(
 
 export class SyncService {
   private webhookService = new WebhookService();
+  private webhookConfigService = new WebhookConfigService();
+
+  /**
+   * Rebuilds the WebhookService's registered set from the currently active
+   * configs so a sync can raise alerts. Every call clears the previous set
+   * first: a deleted config must stop firing and an edited config must be
+   * picked up, not merged with a stale snapshot from an earlier call in the
+   * same session. Never throws.
+   */
+  async loadWebhooks(): Promise<number> {
+    let configs: Awaited<ReturnType<WebhookConfigService['fetchWebhooks']>> = [];
+    try {
+      configs = await this.webhookConfigService.fetchWebhooks();
+    } catch (err) {
+      console.warn('Failed to load webhook configs:', err);
+      this.webhookService.clearWebhooks();
+      return 0;
+    }
+
+    this.webhookService.clearWebhooks();
+
+    let registered = 0;
+    for (const config of configs) {
+      if (!config.is_active) continue;
+      this.webhookService.registerWebhook(config);
+      registered++;
+    }
+
+    return registered;
+  }
+
+  /**
+   * Already-persisted CVE ids, so the engine can suppress webhook alerts for
+   * CVEs seen in a previous run (BUG-003). A query failure must not abort
+   * the caller — fall back to an empty set instead.
+   */
+  private async fetchKnownCveIds(): Promise<string[]> {
+    try {
+      const { data, error } = await fetchAllRows<{ cve_id: string }>((from, to) =>
+        supabase.from('cves').select('cve_id').range(from, to)
+      );
+      if (error) {
+        console.warn('Failed to fetch known CVE ids for de-duplication:', error.message);
+        return [];
+      }
+      return (data || []).map((row) => row.cve_id);
+    } catch (err) {
+      console.warn('Failed to fetch known CVE ids for de-duplication:', err);
+      return [];
+    }
+  }
 
   async fetchSyncLogs(): Promise<VendorSyncLog[]> {
     try {
@@ -129,22 +181,11 @@ export class SyncService {
   }
 
   async syncVendors(): Promise<{ success: boolean; newLogs: VendorSyncLog[] }> {
-    // Already-persisted CVE ids, so the engine can suppress webhook alerts for
-    // CVEs seen in a previous run (BUG-003). A query failure must not abort
-    // the sync — fall back to an empty set instead.
-    let knownCveIds: string[] = [];
-    try {
-      const { data, error } = await fetchAllRows<{ cve_id: string }>((from, to) =>
-        supabase.from('cves').select('cve_id').range(from, to)
-      );
-      if (error) {
-        console.warn('Failed to fetch known CVE ids for de-duplication:', error.message);
-      } else {
-        knownCveIds = (data || []).map((row) => row.cve_id);
-      }
-    } catch (err) {
-      console.warn('Failed to fetch known CVE ids for de-duplication:', err);
-    }
+    // Register active webhooks before ingestion so alerts actually go out. A
+    // load failure must not abort the sync — loadWebhooks never throws.
+    await this.loadWebhooks();
+
+    const knownCveIds = await this.fetchKnownCveIds();
 
     const engine = new IngestionEngine({ webhookService: this.webhookService, knownCveIds });
     const newLogs: VendorSyncLog[] = [];
@@ -194,7 +235,7 @@ export class SyncService {
               status: result.status,
               errorMessage: result.errorMessage ?? null,
               itemsFetched: advisories.length,
-              newItemsCount: cves.length,
+              newItemsCount: result.newCvesCount,
             },
           },
         });
@@ -281,11 +322,14 @@ export class SyncService {
         return false;
       }
 
-      const engine = new IngestionEngine();
+      const knownCveIds = await this.fetchKnownCveIds();
+      const engine = new IngestionEngine({ knownCveIds });
       const startTime = Date.now();
       const startedAt = new Date(startTime).toISOString();
-      await engine.ingestVendor('redhat', detailDocuments);
+      const result = await engine.ingestVendor('redhat', detailDocuments);
       const durationMs = Date.now() - startTime;
+
+      const advisories = engine.getAdvisories();
 
       // Nothing could be normalised out of the response — reporting success
       // here would make the UI claim it saved records it never wrote.
@@ -297,7 +341,7 @@ export class SyncService {
         body: {
           action: 'persist_ingestion',
           vendorCode: 'redhat',
-          advisories: engine.getAdvisories(),
+          advisories,
           cves: engine.getCves(),
           mappings: engine.getMappings(),
           syncMeta: {
@@ -305,6 +349,8 @@ export class SyncService {
             durationMs,
             status: 'SUCCESS',
             errorMessage: null,
+            itemsFetched: advisories.length,
+            newItemsCount: result.newCvesCount,
           },
         },
       });

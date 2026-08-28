@@ -57,13 +57,13 @@
 - **Impact**: Log queries show those vendors were `skipped` (because they don't appear in any response array: ran/skipped/logs), but the absence is silent — no explicit FAILED entry, no indication a tick was cut short. Requires server-side console trace or monitoring the tick duration to detect the pattern.
 - **Recommendation**: Implement per-vendor timeout guard or edge-case logging to record vendors that were due but never attempted. For now, monitoring tick execution time and final log counts is the mitigation. Accept as low-priority observability gap.
 
-## R4: new_items_count Over-Reports on Every Recurring Run (Pre-Existing)
-- **Status**: OPEN / ACCEPTED RISK (2026-08-28, TASK-13 Phase 2 decision; pre-existing defect)
-- **Severity**: MEDIUM (dashboard/reporting accuracy)
-- **Location**: `src/engine/ingestion.ts` (IngestionEngine.newCvesCount computation), `src/services/scheduleWindow.ts` (knownCveIds now seeded correctly on scheduler path)
-- **Description**: IngestionEngine.newCvesCount is computed only from within-run dedup (never seen in this run before) and does NOT consult the knownCveIds option set (which tracks CVEs seen in previous runs). On the browser manual sync path, knownCveIds was never seeded. On the scheduler path, knownCveIds is now seeded correctly. In both cases, new_items_count over-reports: it counts a CVE as "new" on every sync that touches it, even if it was seen in the previous run.
-- **Impact**: Dashboard new_items_count metric is inflated and does not reflect true incremental growth. Existing browser manual sync affected; scheduler path now also affected because ingestion.ts was not updated. Affects both advisory-first and CVE-first view metrics.
-- **Recommendation**: Fix ingestion.ts to consult knownCveIds when computing newCvesCount. Scheduled as Task 14. Note: this correction will reduce the dashboard count and may appear as a regression to users unfamiliar with the prior inflation.
+## BUG-007: Supabase Mock Missing `.range()` on `select()` Result
+- **Status**: OPEN / TEST-QUALITY GAP (2026-08-29, found during R4/R6 fix review)
+- **Severity**: LOW (test-quality gap, not production defect; behaviour is covered by other tests)
+- **Location**: `tests/unit/services/syncServicePersist.test.ts` (Supabase mock `select()`)
+- **Description**: The Supabase mock in syncServicePersist.test.ts lacks a `.range()` method on its `select()` result. When `fetchKnownCveIds()` calls `select().range()` in production, the test mock throws. The exception is silently swallowed by `fetchKnownCveIds()` own try/catch (designed to degrade on error), so this file never exercises the actual known-CVE-id read path.
+- **Impact**: No regression catch if the query is broken (wrong table, wrong column, logic error). Behaviour itself IS covered by `tests/unit/services/syncServiceWebhookLoad.test.ts` and `tests/unit/engine/ingestionNewCveCount.test.ts`, which have proper mocks. This is a gap in coverage depth of one specific test file, not a gap in test pyramid.
+- **Recommendation**: Add `.range()` mock to Supabase select result, or accept as low-priority test-coverage gap. The two new tests added for R4/R6 fixes already cover the production behaviour.
 
 ## R5: Double vendor_sync_logs Insert Failure Leaves Vendor Orphaned in Response Arrays
 - **Status**: OPEN / ACCEPTED RISK (2026-08-28, TASK-13 Phase 2 decision)
@@ -72,14 +72,6 @@
 - **Description**: scheduled-sync Edge Function collects vendor results in three response arrays: ran (successful), skipped (scheduled timeout), logs (successful log writes). When the vendor_sync_logs insert fails twice (once on the immediate persist, once on the delayed log-write), the vendor appears in none of these arrays. Only a server-side console trace records the error.
 - **Impact**: Response query shows fewer vendors than actually attempted. Silent failure of observability/logging path. Data (CVEs, advisories) may or may not persist depending on where the error occurred (before or after upsert).
 - **Recommendation**: Implement explicit failure logging to response or return a fourth array (`failed`) with error reasons. Accept for now as low-priority observability gap.
-
-## R6: Scheduled Runs Dispatch No Webhook Alerts
-- **Status**: OPEN / ACCEPTED RISK (2026-08-28, TASK-13 Phase 2 decision)
-- **Severity**: MEDIUM (feature gap)
-- **Location**: `src/supabase/functions/scheduled-sync/index.ts` (IngestionEngine construction), `src/services/webhook.ts` (WebhookService registration)
-- **Description**: The browser manual sync path constructs IngestionEngine with a webhookService instance. scheduled-sync Edge Function constructs IngestionEngine with webhookService=undefined (no registration path available server-side). IngestionEngine.notifyAll() loops over registered webhooks; on the scheduler path, that array is empty, so no alerts dispatch.
-- **Impact**: Critical CVEs found by scheduled syncs are not alerted to webhook endpoints (Slack, Discord, Telegram). Alerts only fire on manual browser sync.
-- **Recommendation**: Implement server-side webhook config retrieval (fetch from webhook_configs table using service-role key) and pass to IngestionEngine. Scheduled as Task 15. Related to BUG-001 (webhook alerting non-functional in production).
 
 ## R7: DST Precision Loss on Spring-Forward and Fall-Back Days in Observing Timezones
 - **Status**: OPEN / ACCEPTED RISK (2026-08-28, TASK-13 Phase 2 decision)

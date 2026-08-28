@@ -101,15 +101,19 @@
   - **Completed**: 2026-08-28 23:55:48 Asia/Taipei.
   - **Deployment note**: migration and scheduled-sync Edge Function NOT YET DEPLOYED. See PROGRESS.md entry for deployment steps.
 
-- [ ] **Task 14: Fix IngestionEngine.newCvesCount Over-Reporting (NEW)**
-  - Goal: IngestionEngine.newCvesCount computed only from within-run dedup, never consults knownCveIds (which currently only gates webhook alerting). Scheduler now seeds knownCveIds correctly, but the count stays wrong on both scheduled and browser manual sync paths.
-  - Note: Dashboard new_items_count will change. Needs its own failing tests per TDD.
-  - Task impact: pre-existing defect (R4 accepted risk).
+- [x] **Task 14: Fix IngestionEngine.newCvesCount Over-Reporting**
+  - [x] Fixed ingestion.ts to compute `isTrulyNew` (within-run dedup AND absent from knownCveIds).
+  - [x] Fixed syncService to report engine's `newCvesCount` to sync log instead of hardcoded cves.length.
+  - [x] Added private `fetchKnownCveIds()` helper for on-demand lookup path.
+  - [x] New tests: `tests/unit/engine/ingestionNewCveCount.test.ts`.
+  - **Completed**: 2026-08-29 00:40:13 Asia/Taipei.
 
-- [ ] **Task 15: Dispatch Webhook Alerts from Scheduled Runs (NEW)**
-  - Goal: scheduled runs currently dispatch no webhook alerts. Browser path constructs IngestionEngine with webhookService; Edge Function does not because webhook config retrieval server-side is a separate design question.
-  - Note: Related to BUG-001 (webhook alerting non-functional in production); deferred per user direction.
-  - Task impact: R6 accepted risk.
+- [x] **Task 15: Dispatch Webhook Alerts from Scheduled Runs**
+  - [x] Implemented `SyncService.loadWebhooks()` to read and register active webhook configs.
+  - [x] Added `WebhookService.clearWebhooks()` to rebuild registered set on each load.
+  - [x] Updated scheduled-sync Edge Function to fetch webhook configs server-side with service-role client.
+  - [x] New tests: `tests/unit/services/syncServiceWebhookLoad.test.ts`.
+  - **Completed**: 2026-08-29 00:40:13 Asia/Taipei.
 
 - [x] **Task 10: CVE/RHSA Data Model Redesign — Dashboard Reorganization (Phase C1+C2+C3a+C3b Complete; Bug Fixes 3–5 Complete)**
   - [x] **Phase C1+C2: RHSA-Centric Data Layer** (Completed 2026-08-16)

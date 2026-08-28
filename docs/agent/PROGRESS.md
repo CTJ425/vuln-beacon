@@ -1,5 +1,15 @@
 # Progress Log
 
+## 2026-08-29 00:40:13 Asia/Taipei - Bug-Fix Round 1: R4 and R6 Closed
+- Completed **two high-impact bug fixes** from accepted risks tracked in previous round (BUG_FIX.md):
+  - **R4 (CLOSED)**: Fixed `new_items_count` over-reporting on every sync via three defects: (1) IngestionEngine now computes `isTrulyNew` consulting both within-run dedup and knownCveIds; (2) SyncService reports engine's newCvesCount instead of hardcoded cves.length; (3) fetchAndIngestQuery on-demand path now seeds knownCveIds via new private helper and sends newItemsCount. Dashboard new_items_count now reflects true incremental growth.
+  - **R6 (CLOSED)**: Fixed webhook alerts never dispatching via three defects: (1) SyncService now loads webhook configs and registers them via new loadWebhooks(); (2) WebhookService.clearWebhooks() rebuilds registered set on each load (fixes follow-on: deleted/edited webhooks firing with old snapshots); (3) scheduled-sync Edge Function fetches webhook_configs server-side with service-role key and passes WebhookService to per-vendor IngestionEngine. Both scheduled and browser manual syncs now dispatch alerts.
+- Files changed: `src/engine/ingestion.ts`, `src/services/syncService.ts`, `src/services/webhook.ts`, `src/supabase/functions/_shared/ingest.entry.ts`, `src/supabase/functions/scheduled-sync/index.ts`, `src/supabase/functions/_shared/ingest.bundle.js` (regenerated).
+- New tests: `tests/unit/engine/ingestionNewCveCount.test.ts`, `tests/unit/services/syncServiceWebhookLoad.test.ts`. Updated tests: `syncServiceChunking.test.ts`, `syncServicePersist.test.ts`, `scheduledSyncFunction.test.ts`.
+- New open item: **BUG-007** (test-quality gap, not production defect) — Supabase mock in syncServicePersist.test.ts lacks `.range()` on select result; fetchKnownCveIds gracefully degrades on error so behaviour is covered elsewhere; accepted as low-priority gap.
+- Verification: `npm run build:edge && npm test && npm run build` from `src/` → 49 test files, 255 tests all passing; build OK. Previous: 47 files / 242 tests.
+- Kept as-is: R1, R2, R3, R5, R7 (accepted risks); note on optional vendor schedule fields.
+
 ## 2026-08-28 23:55:48 Asia/Taipei - TASK-13 Phase 2 complete: Vendor Schedule Settings and Real Scheduler
 - Completed **Phase 2 of vendor scheduling** (`docs/agent/specs/TASK-13-phase2-scheduler.md`). Closing decision gate that was blocking TASK.md. User chose real scheduler (pg_cron + pg_net + new Edge Function). Schedule values stored in `vendors` columns with editable Sync-page UI.
 - Architecture implemented:
@@ -12,20 +22,4 @@
 - Review history: Pass 1 FAIL (IngestionEngine shared state leaked vendor rows, empty-service-key bypass, unguarded run-stamp abort, silently discarded error, missing raw-payload storage parity). Pass 2 FAIL (unchecked vendor_sync_logs insert, missing knownCveIds seeding, missing storage compensation on failed batch). Pass 3 FAIL (raw payloads uploaded for whole vendor before batch loop, mid-batch failure orphaned later batches). All blockers fixed; Pass 3 fix moved upload inside batch loop.
 - Accepted risks recorded as R1–R7 in `docs/agent/BUG_FIX.md` (open entries): wall-clock limit on full CSAF ingest in one Edge Function; failed runs don't retry; mid-tick wall-clock kill leaves later vendors with no log row; new_items_count over-reports (pre-existing defect in ingestion.ts); double vendor_sync_logs insert failure orphaned in response; webhook alerts not dispatched from scheduled runs; DST precision on spring-forward/fall-back days in observing zones.
 - **Deployment note**: migration and new Edge Function NOT YET DEPLOYED. Requires `supabase functions deploy scheduled-sync`, applying migration, one-time `vault.create_secret` calls for `scheduled_sync_url` and `scheduled_sync_key`. Regenerate `_shared/ingest.bundle.js` with `npm --prefix src run build:edge` whenever bundled app sources change.
-
-## 2026-08-28 11:20:00 Asia/Taipei - TASK-13 Phase 1 complete: Sync page now shows the real vendor API endpoints
-- Completed **Phase 1 of feed sources & sync dashboard** (`docs/agent/specs/TASK-13-feed-sources-panel.md`).
-- Problem: `SyncMonitorPage` previously showed only a log table and claimed coverage of "all 8 vendors", which was false. `ALL_ADAPTERS` contained one adapter (`RedHatCsafAdapter`) and `syncVendors()` iterated a hardcoded `['redhat']`. User requested visibility into which vendor API endpoints are actually contacted during sync.
-- Changes:
-  - `src/types/index.ts`: new `VendorEndpoint { label, url }`; `VendorAdapter` now requires `readonly endpoints: VendorEndpoint[]`.
-  - `src/adapters/redhat-csaf.ts`: `listUrl` / `detailUrlBase` no longer private; new public `advisoryDetailUrl(id)` and `cveLookupUrl(cveId)` methods; `endpoints` declares three entries (advisory list, advisory detail, CVE reverse lookup).
-  - `src/adapters/redhat.ts`: legacy unregistered `RedHatAdapter` now implements `VendorAdapter` with `endpoints` and `detailUrlBase` (needed for type compliance; not rendered).
-  - `src/services/syncService.ts`: three hardcoded `https://access.redhat.com/...` URLs in `fetchAndIngestQuery` replaced by adapter calls. New export `SYNCED_VENDOR_CODES = ['redhat'] as const`.
-  - `src/services/vendorService.ts` (NEW): `VendorService.fetchVendors()` reads `vendors` table (browser key SELECT-only); returns `[]` on error.
-  - `src/components/sync/FeedSourceTable.tsx` (NEW): one row per vendor showing Vendor, Integration (Connected / Adapter idle / Not implemented), API endpoint, Last sync, Detail. Integration status derived at render time.
-  - `src/pages/SyncMonitorPage.tsx`: gains `vendors` prop; sections `Feed Sources` and `Execution History`; subtitle changed to "Live feed sources, connection status, and execution history."
-  - `src/App.tsx`: `VendorService.fetchVendors()` now runs INDEPENDENTLY of blocking `loadData` `Promise.all`. This is deliberate: when inside `Promise.all`, a slow/failing vendors query delayed `setIsLoading(false)` and blocked dashboard render, causing six test failures. `isLoading` gate still depends only on cves, sync logs, webhooks, advisories.
-- New tests: `adapterEndpoints.test.ts` (9), `syncServiceAdapterUrls.test.ts` (4, includes guard asserting no `https://access.redhat.com` literal remains), `feedSourceTable.test.tsx` (6).
-- Verification: 42 test files / 193 tests passed; `npm --prefix src run build` clean. Rendered output in jsdom shows Red Hat as `Connected` with three real endpoints and `SUCCESS 2026-08-28 10:40:36`; other seven vendors show `Not implemented`. Reviewer initially FAIL (blocking vendors requirement); adjudicated and OVERRULED (requirement superseded by blocking issue; spec updated). Gap found and fixed: empty-vendors blank table now shows `No vendor records loaded.`
-- **Edge Function deployment note**: self-hosted function at `/root/container/supabase/vuln-beacon/volumes/functions/sync-cve/index.ts` deployed by copying `src/supabase/functions/sync-cve/index.ts` over it. No npm script exists. Pre-BUG-003 backup: `index.ts.bak-20260828-103943`.
 

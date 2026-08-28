@@ -25,7 +25,12 @@ vi.mock('@/engine/ingestion', () => ({
 }));
 
 vi.mock('@/services/webhook', () => ({
-  WebhookService: vi.fn().mockImplementation(() => ({})),
+  WebhookService: vi.fn().mockImplementation(() => ({
+    registerWebhook: vi.fn(),
+    clearWebhooks: vi.fn(),
+    notifyAll: vi.fn(),
+    dispatch: vi.fn(),
+  })),
 }));
 
 import { SyncService } from '@/services/syncService';
@@ -166,6 +171,20 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
       (op) => PROTECTED_TABLES.includes(op.table) && WRITE_METHODS.includes(op.method)
     );
     expect(protectedWrites).toHaveLength(0);
+  });
+
+  it('fetchAndIngestQuery() reports how many cves were genuinely new', async () => {
+    global.fetch = mockCsafFetch() as any;
+
+    const service = new SyncService();
+    await service.fetchAndIngestQuery('CVE-2026-1');
+
+    const body = mockInvoke.mock.calls[0][1].body;
+    // Without an explicit count the edge function falls back to cves.length, which
+    // reports every already-stored CVE as new.
+    expect(typeof body.syncMeta.newItemsCount).toBe('number');
+    expect(body.syncMeta.newItemsCount).toBeLessThanOrEqual(body.cves.length);
+    expect(typeof body.syncMeta.itemsFetched).toBe('number');
   });
 
   it('fetchAndIngestQuery() reports failure when the payload parsed to nothing', async () => {

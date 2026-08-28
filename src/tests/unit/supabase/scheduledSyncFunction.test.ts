@@ -34,6 +34,13 @@ describe('scheduled-sync edge function', () => {
     expect(read(scheduledSyncPath)).toContain('isVendorDue');
   });
 
+  it('loads active webhook configs and hands them to the engine', () => {
+    const src = read(scheduledSyncPath);
+    expect(src).toContain('webhook_configs');
+    expect(src).toContain('registerWebhook');
+    expect(src).toMatch(/new\s+IngestionEngine\(\s*\{[^}]*webhookService/);
+  });
+
   it('writes exactly one sync log and stamps the run time', () => {
     const src = read(scheduledSyncPath);
     expect(src).toContain('vendor_sync_logs');
@@ -110,6 +117,10 @@ describe('shared ingestion bundle', () => {
     for (const symbol of ['IngestionEngine', 'getAdapterByCode', 'isVendorDue']) {
       expect(src).toContain(symbol);
     }
+  });
+
+  it('re-exports the webhook service so scheduled runs can raise alerts', () => {
+    expect(read(entryPath)).toContain('WebhookService');
   });
 
   it('has a generated bundle committed for deployment', () => {

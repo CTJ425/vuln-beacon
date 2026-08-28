@@ -25,7 +25,12 @@ vi.mock('@/engine/ingestion', () => ({
 }));
 
 vi.mock('@/services/webhook', () => ({
-  WebhookService: vi.fn().mockImplementation(() => ({})),
+  WebhookService: vi.fn().mockImplementation(() => ({
+    registerWebhook: vi.fn(),
+    clearWebhooks: vi.fn(),
+    notifyAll: vi.fn(),
+    dispatch: vi.fn(),
+  })),
 }));
 
 import { SyncService } from '@/services/syncService';
@@ -186,7 +191,9 @@ describe('SyncService bounds the persist payload (BUG-003)', () => {
     expect(meta).toHaveLength(1);
     expect(meta[0].syncMeta.status).toBe('SUCCESS');
     expect(meta[0].syncMeta.itemsFetched).toBe(run.advisories.length);
-    expect(meta[0].syncMeta.newItemsCount).toBe(run.cves.length);
+    // The engine reports how many CVEs were genuinely new; the run's total CVE count
+    // is not the same number and must not be reported as "new".
+    expect(meta[0].syncMeta.newItemsCount).toBe(1);
     expect(meta[0].advisories).toEqual([]);
     expect(meta[0].cves).toEqual([]);
     expect(meta[0].mappings).toEqual([]);

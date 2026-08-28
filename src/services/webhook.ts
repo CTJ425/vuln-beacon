@@ -16,6 +16,10 @@ export class WebhookService {
     this.webhooks.push(config);
   }
 
+  clearWebhooks() {
+    this.webhooks = [];
+  }
+
   getWebhooks(): WebhookConfig[] {
     return [...this.webhooks];
   }
