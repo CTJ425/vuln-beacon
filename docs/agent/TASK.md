@@ -80,6 +80,37 @@
   - [ ] Verify webhook management UI works correctly with backend Edge Function (no browser direct writes).
   - **Status**: Planned follow-on item (step 2 of 2, Phase B2, blocked on Task 9 completion).
 
+- [x] **Task 13 Phase 1: Feed Sources Panel — Vendor API Endpoint Visibility (COMPLETED)**
+  - [x] Implement `VendorEndpoint { label, url }` type and add `readonly endpoints: VendorEndpoint[]` to `VendorAdapter`.
+  - [x] Expose adapter endpoint URLs (advisory list, detail, CVE lookup) in `RedHatCsafAdapter`.
+  - [x] Create `VendorService.fetchVendors()` to read `vendors` table.
+  - [x] Create `FeedSourceTable` component showing vendor, integration status, endpoint URLs, and last sync time.
+  - [x] Update `SyncMonitorPage` with `Feed Sources` section and real endpoint display.
+  - [x] Move `vendors` fetch outside blocking `Promise.all` in `App.tsx` (discovered constraint: blocking vendors delayed isLoading gate).
+  - **Verification**: 42 files / 193 tests passed; build clean. Rendered: Red Hat shows `Connected` with three endpoints; others show `Not implemented`.
+  - **Completed**: 2026-08-28 11:20:00 Asia/Taipei.
+
+- [x] **Task 13 Phase 2: Vendor Schedule Settings — UI & Edge Function Write Path (COMPLETED)**
+  - [x] Build real scheduler (pg_cron + pg_net + new scheduled-sync Edge Function) that reads schedule values from vendors table columns.
+  - [x] Implement `src/services/scheduleWindow.ts` with due-time logic (dueOccurrence, isVendorDue, SCHEDULE_TICK_TOLERANCE_MINUTES).
+  - [x] Create scheduled-sync Edge Function that reuses app's real ingestion code via esbuild bundle.
+  - [x] Add `update_vendor_schedule` action to sync-cve Edge Function for schedule writes.
+  - [x] Create ScheduleSettings component for editable Sync-page UI.
+  - [x] Implement migration 20260828000000_vendor_schedule.sql with pg_cron scheduling and vault secret documentation.
+  - **Verification**: 47 test files, 242 tests all passing; build clean.
+  - **Completed**: 2026-08-28 23:55:48 Asia/Taipei.
+  - **Deployment note**: migration and scheduled-sync Edge Function NOT YET DEPLOYED. See PROGRESS.md entry for deployment steps.
+
+- [ ] **Task 14: Fix IngestionEngine.newCvesCount Over-Reporting (NEW)**
+  - Goal: IngestionEngine.newCvesCount computed only from within-run dedup, never consults knownCveIds (which currently only gates webhook alerting). Scheduler now seeds knownCveIds correctly, but the count stays wrong on both scheduled and browser manual sync paths.
+  - Note: Dashboard new_items_count will change. Needs its own failing tests per TDD.
+  - Task impact: pre-existing defect (R4 accepted risk).
+
+- [ ] **Task 15: Dispatch Webhook Alerts from Scheduled Runs (NEW)**
+  - Goal: scheduled runs currently dispatch no webhook alerts. Browser path constructs IngestionEngine with webhookService; Edge Function does not because webhook config retrieval server-side is a separate design question.
+  - Note: Related to BUG-001 (webhook alerting non-functional in production); deferred per user direction.
+  - Task impact: R6 accepted risk.
+
 - [x] **Task 10: CVE/RHSA Data Model Redesign — Dashboard Reorganization (Phase C1+C2+C3a+C3b Complete; Bug Fixes 3–5 Complete)**
   - [x] **Phase C1+C2: RHSA-Centric Data Layer** (Completed 2026-08-16)
     - [x] Rewrote `src/adapters/redhat.ts` parse() to emit one NormalizedAdvisoryItem per RHSA in advisoriesList, each with its own errata URL and fixed versions tied to that specific advisory.

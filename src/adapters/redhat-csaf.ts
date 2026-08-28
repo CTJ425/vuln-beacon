@@ -1,4 +1,4 @@
-import { NormalizedAdvisoryItem, VendorAdapter, ProductImpactItem } from '@/types';
+import { NormalizedAdvisoryItem, VendorAdapter, VendorEndpoint, ProductImpactItem } from '@/types';
 import { normalizeSeverity } from '@/utils/cvss';
 
 interface CsafNote {
@@ -134,6 +134,14 @@ function collapseLocalePackages(productImpacts: ProductImpactItem[]): ProductImp
 }
 
 function componentFromNvr(nvr: string): string {
+  // Container image references carry a per-architecture digest, e.g.
+  // "registry.redhat.io/openshift4/ose-hypershift-rhel9@sha256:<hex>_arm64".
+  // Collapse to the repository path so every digest/arch dedupes to one row
+  // (BUG-003). Applied before the NVR cut below.
+  const digestMatch = nvr.match(/@sha256:/i);
+  if (digestMatch && digestMatch.index !== undefined) {
+    return nvr.slice(0, digestMatch.index);
+  }
   // Cut at the first "-<digits>:" occurrence (e.g. "glibc-0:2.28-225.el8_8.6.x86_64" -> "glibc").
   const match = nvr.match(/-\d+:/);
   if (!match || match.index === undefined) return nvr;
@@ -143,8 +151,21 @@ function componentFromNvr(nvr: string): string {
 export class RedHatCsafAdapter implements VendorAdapter {
   readonly vendorCode = 'redhat';
   readonly vendorName = 'Red Hat';
-  private readonly listUrl = 'https://access.redhat.com/hydra/rest/securitydata/csaf.json';
-  private readonly detailUrlBase = 'https://access.redhat.com/hydra/rest/securitydata/csaf';
+  readonly listUrl = 'https://access.redhat.com/hydra/rest/securitydata/csaf.json';
+  readonly detailUrlBase = 'https://access.redhat.com/hydra/rest/securitydata/csaf';
+  readonly endpoints: VendorEndpoint[] = [
+    { label: 'Advisory list (CSAF)', url: `${this.listUrl}?per_page=50` },
+    { label: 'Advisory detail (CSAF)', url: `${this.detailUrlBase}/{advisoryId}.json` },
+    { label: 'CVE reverse lookup', url: `${this.listUrl}?cve={cveId}` },
+  ];
+
+  advisoryDetailUrl(advisoryId: string): string {
+    return `${this.detailUrlBase}/${advisoryId}.json`;
+  }
+
+  cveLookupUrl(cveId: string): string {
+    return `${this.listUrl}?cve=${cveId}`;
+  }
 
   async fetchAdvisories(): Promise<NormalizedAdvisoryItem[]> {
     const response = await fetch(`${this.listUrl}?per_page=50`);
@@ -159,7 +180,7 @@ export class RedHatCsafAdapter implements VendorAdapter {
         list.map(async (entry) => {
           if (!entry.RHSA) return null;
           try {
-            const detailRes = await fetch(`${this.detailUrlBase}/${entry.RHSA}.json`);
+            const detailRes = await fetch(this.advisoryDetailUrl(entry.RHSA));
             if (detailRes.ok) {
               return await detailRes.json();
             }

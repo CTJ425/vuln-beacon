@@ -21,6 +21,58 @@ function sanitiseAdvisoryKey(advisoryId: unknown): string {
     .replace(/[\\/]/g, '_');
 }
 
+const SCHEDULE_TIME_FORMAT = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+function badRequest(error: string): Response {
+  return new Response(
+    JSON.stringify({ success: false, error }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+  );
+}
+
+// TASK-13 D6: lets the Sync page write per-vendor schedule settings without
+// re-opening browser write access to `vendors` (RLS still blocks that) — the
+// Edge Function uses the service-role client instead.
+async function handleUpdateVendorSchedule(supabaseClient: any, body: any): Promise<Response> {
+  const { vendorCode, schedule } = body;
+  const times: string[] = schedule?.times ?? [];
+  const enabled: boolean = !!schedule?.enabled;
+  const timezone: string = schedule?.timezone;
+
+  if (!Array.isArray(times) || !times.every((t) => SCHEDULE_TIME_FORMAT.test(t))) {
+    return badRequest('Invalid schedule time');
+  }
+
+  if (enabled && times.length === 0) {
+    return badRequest('Invalid schedule time');
+  }
+
+  try {
+    // Throws RangeError for an unknown IANA name.
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+  } catch {
+    return badRequest('Invalid timezone');
+  }
+
+  const { data: vendorRow, error } = await supabaseClient
+    .from('vendors')
+    .update({
+      schedule_enabled: enabled,
+      schedule_times: times,
+      schedule_timezone: timezone,
+    })
+    .eq('code', vendorCode)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return new Response(
+    JSON.stringify({ success: true, vendor: vendorRow }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+  );
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -36,6 +88,10 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const { action, vendorCode, advisories, cves, mappings, syncMeta } = body;
+
+    if (action === 'update_vendor_schedule') {
+      return await handleUpdateVendorSchedule(supabaseClient, body);
+    }
 
     if (action !== 'persist_ingestion') {
       return new Response(
@@ -169,6 +225,19 @@ serve(async (req) => {
       }
     }
 
+    // BUG-003: a run is now split into chunks with no syncMeta, closed by one
+    // syncMeta-only call. Only write a vendor_sync_logs row for that closing
+    // call, so a run produces exactly one row.
+    if (!syncMeta) {
+      return new Response(
+        JSON.stringify({ success: true, log: null }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    }
+
     // Record sync log.
     const { data: logRow, error: logError } = await supabaseClient
       .from('vendor_sync_logs')
@@ -176,8 +245,8 @@ serve(async (req) => {
         vendor_id: vendorId,
         vendor_code: vendorCode,
         status: syncMeta.status,
-        items_fetched: (advisories || []).length,
-        new_items_count: (cves || []).length,
+        items_fetched: syncMeta.itemsFetched ?? (advisories || []).length,
+        new_items_count: syncMeta.newItemsCount ?? (cves || []).length,
         duration_ms: syncMeta.durationMs,
         started_at: syncMeta.startedAt,
         finished_at: new Date().toISOString(),

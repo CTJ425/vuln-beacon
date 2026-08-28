@@ -1,27 +1,31 @@
 # Progress Log
 
-## 2026-08-27 17:47:58 CST - Audit of `.claude/skills/` complete; four foreign-project skills deleted; `.env.example` trimmed; pre-push gate and merge staged
-- Completed **audit of `.claude/skills/` and cleanup of cross-project skills**.
-- Audit found four skills documenting a different project (stock-pnl-web), not vuln-beacon:
-  - `ship`: description says "deploy stock-pnl-web"; references `sources/`, `docs/UnitTests/README.md`.
-  - `verify`: description says "Verify stock-pnl-web UI"; references `sources/scripts/verify-admin-status.cjs`, `src/App.smoke.test.tsx`, `stock-pnl-web/local-store-v1` localStorage key.
-  - `versioning`: description says "version rule of stock-pnl-web"; references `sources/src/version.ts`, `sources/package.json`.
-  - `testing`: description says "Run and write stock-pnl-web tests"; references `cd sources`, `docs/UnitTests/README.md`, `supabase-ops`, `generate-all`.
-- All four deleted in commit `2bab05b`. Before deletion, verified that files are plain files with link count 1, tracked by this repo's own git (not symlinks or hard links shared with stock-pnl-web) — removal cannot affect stock-pnl-web; content remains recoverable from git history.
-- Kept: `route` skill (referenced by `CLAUDE.md`) and four generic graph tools (`debug-issue`, `explore-codebase`, `refactor-safely`, `review-changes`).
-- Secondary changes completed:
-  - `src/.env.example` trimmed: removed `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_REF` (not read by any code); kept `SUPABASE_URL` and `SUPABASE_SECRET_KEY` (read by backfill script). README's embedded env template kept byte-identical. Commit `f1d3cdb`.
-  - Pre-push gate activated: `git config core.hooksPath .githooks` applied locally; `dev` merged into `main` by fast-forward. Main branch now has 4 commits not yet pushed to `origin/main`: `5d435d2`, `a937ad8`, `f1d3cdb`, `2bab05b`.
+## 2026-08-28 23:55:48 Asia/Taipei - TASK-13 Phase 2 complete: Vendor Schedule Settings and Real Scheduler
+- Completed **Phase 2 of vendor scheduling** (`docs/agent/specs/TASK-13-phase2-scheduler.md`). Closing decision gate that was blocking TASK.md. User chose real scheduler (pg_cron + pg_net + new Edge Function). Schedule values stored in `vendors` columns with editable Sync-page UI.
+- Architecture implemented:
+  - pg_cron fires every 5 minutes, calls `public.tick_scheduled_syncs()`, reads endpoint URL and key from `vault.decrypted_secrets`, issues one `net.http_post` to new `scheduled-sync` Edge Function. No secret stored in committed files; migration documents one-time `vault.create_secret` step in SQL comment.
+  - Due-time logic is pure TypeScript in `src/services/scheduleWindow.ts` (`dueOccurrence`, `isVendorDue`, `SCHEDULE_TICK_TOLERANCE_MINUTES`), unit tested, not duplicated in SQL.
+  - Edge Function reuses app's real ingestion code instead of hand-written Deno copy: `src/scripts/buildEdgeBundle.mjs` esbuild-bundles `_shared/ingest.entry.ts` into committed `_shared/ingest.bundle.js`. New npm script `build:edge`. Removed "adapter double maintenance" risk.
+  - Server-side persistence does NOT use 3 MB chunking; limit exists only for browser → Edge Function HTTP boundary.
+- Files new: `src/services/scheduleWindow.ts`, `src/scripts/buildEdgeBundle.mjs`, `src/supabase/functions/_shared/ingest.entry.ts`, `src/supabase/functions/_shared/ingest.bundle.js` (generated, committed), `src/supabase/functions/scheduled-sync/index.ts`, `src/supabase/migrations/20260828000000_vendor_schedule.sql`, `src/components/sync/ScheduleSettings.tsx`. Files edited: `src/supabase/functions/sync-cve/index.ts` (added `update_vendor_schedule` action; `persist_ingestion` unchanged), `src/package.json`, `src/types/index.ts`, `src/services/vendorService.ts`, `src/pages/SyncMonitorPage.tsx`, `src/App.tsx`. New tests: scheduleWindow.test.ts (unit), vendorScheduleService.test.ts, vendorScheduleMigration.test.ts, scheduledSyncFunction.test.ts, scheduleSettings.test.tsx.
+- Verification: `npm run build:edge && npm test && npm run build` from src/ → 47 test files, 242 tests all passing; build OK. Before: 42 files / 193 tests.
+- Review history: Pass 1 FAIL (IngestionEngine shared state leaked vendor rows, empty-service-key bypass, unguarded run-stamp abort, silently discarded error, missing raw-payload storage parity). Pass 2 FAIL (unchecked vendor_sync_logs insert, missing knownCveIds seeding, missing storage compensation on failed batch). Pass 3 FAIL (raw payloads uploaded for whole vendor before batch loop, mid-batch failure orphaned later batches). All blockers fixed; Pass 3 fix moved upload inside batch loop.
+- Accepted risks recorded as R1–R7 in `docs/agent/BUG_FIX.md` (open entries): wall-clock limit on full CSAF ingest in one Edge Function; failed runs don't retry; mid-tick wall-clock kill leaves later vendors with no log row; new_items_count over-reports (pre-existing defect in ingestion.ts); double vendor_sync_logs insert failure orphaned in response; webhook alerts not dispatched from scheduled runs; DST precision on spring-forward/fall-back days in observing zones.
+- **Deployment note**: migration and new Edge Function NOT YET DEPLOYED. Requires `supabase functions deploy scheduled-sync`, applying migration, one-time `vault.create_secret` calls for `scheduled_sync_url` and `scheduled_sync_key`. Regenerate `_shared/ingest.bundle.js` with `npm --prefix src run build:edge` whenever bundled app sources change.
 
-## 2026-08-27 17:40:35 Asia/Taipei - follow-up work from env migration: verify gate and skill cleanup
-- Completed **close of two follow-up items** from the 2026-08-27 env migration task.
-- Follow-up 1 (was: no CI currently runs on push) — CLOSED with self-hosted verify gate:
-  - Added `"verify": "npm run test && npm run build"` script to `src/package.json`.
-  - Created `.githooks/pre-push` (new, executable) that runs `npm --prefix src run verify` and blocks push on failure.
-  - Updated `README.md` with new `### Verify gate` subsection.
-  - One-time setup required: `git config core.hooksPath .githooks` per clone; `git push --no-verify` bypasses.
-  - Verification: forward path executed successfully → 36 test files / 159 tests passed, build succeeded, `GATE_OK` printed. Negative path tested by shadowing `npm` with stub exiting 1 → hook printed blocked message and exited 1.
-- Follow-up 2 (was: supabase-ops skill still describes GitHub Pages) — CLOSED by complete deletion:
-  - Deleted entire `.claude/skills/supabase-ops/` directory per user instruction.
-  - Root cause: skill documented a different project (stock-pnl-web); contained references to `sources/` paths and `quoteWindow.ts` that do not exist in this repo, would have misdirected agents.
-- All changes committed as `5d435d2` on branch `dev` (created from `main`; `main` unchanged).
+## 2026-08-28 11:20:00 Asia/Taipei - TASK-13 Phase 1 complete: Sync page now shows the real vendor API endpoints
+- Completed **Phase 1 of feed sources & sync dashboard** (`docs/agent/specs/TASK-13-feed-sources-panel.md`).
+- Problem: `SyncMonitorPage` previously showed only a log table and claimed coverage of "all 8 vendors", which was false. `ALL_ADAPTERS` contained one adapter (`RedHatCsafAdapter`) and `syncVendors()` iterated a hardcoded `['redhat']`. User requested visibility into which vendor API endpoints are actually contacted during sync.
+- Changes:
+  - `src/types/index.ts`: new `VendorEndpoint { label, url }`; `VendorAdapter` now requires `readonly endpoints: VendorEndpoint[]`.
+  - `src/adapters/redhat-csaf.ts`: `listUrl` / `detailUrlBase` no longer private; new public `advisoryDetailUrl(id)` and `cveLookupUrl(cveId)` methods; `endpoints` declares three entries (advisory list, advisory detail, CVE reverse lookup).
+  - `src/adapters/redhat.ts`: legacy unregistered `RedHatAdapter` now implements `VendorAdapter` with `endpoints` and `detailUrlBase` (needed for type compliance; not rendered).
+  - `src/services/syncService.ts`: three hardcoded `https://access.redhat.com/...` URLs in `fetchAndIngestQuery` replaced by adapter calls. New export `SYNCED_VENDOR_CODES = ['redhat'] as const`.
+  - `src/services/vendorService.ts` (NEW): `VendorService.fetchVendors()` reads `vendors` table (browser key SELECT-only); returns `[]` on error.
+  - `src/components/sync/FeedSourceTable.tsx` (NEW): one row per vendor showing Vendor, Integration (Connected / Adapter idle / Not implemented), API endpoint, Last sync, Detail. Integration status derived at render time.
+  - `src/pages/SyncMonitorPage.tsx`: gains `vendors` prop; sections `Feed Sources` and `Execution History`; subtitle changed to "Live feed sources, connection status, and execution history."
+  - `src/App.tsx`: `VendorService.fetchVendors()` now runs INDEPENDENTLY of blocking `loadData` `Promise.all`. This is deliberate: when inside `Promise.all`, a slow/failing vendors query delayed `setIsLoading(false)` and blocked dashboard render, causing six test failures. `isLoading` gate still depends only on cves, sync logs, webhooks, advisories.
+- New tests: `adapterEndpoints.test.ts` (9), `syncServiceAdapterUrls.test.ts` (4, includes guard asserting no `https://access.redhat.com` literal remains), `feedSourceTable.test.tsx` (6).
+- Verification: 42 test files / 193 tests passed; `npm --prefix src run build` clean. Rendered output in jsdom shows Red Hat as `Connected` with three real endpoints and `SUCCESS 2026-08-28 10:40:36`; other seven vendors show `Not implemented`. Reviewer initially FAIL (blocking vendors requirement); adjudicated and OVERRULED (requirement superseded by blocking issue; spec updated). Gap found and fixed: empty-vendors blank table now shows `No vendor records loaded.`
+- **Edge Function deployment note**: self-hosted function at `/root/container/supabase/vuln-beacon/volumes/functions/sync-cve/index.ts` deployed by copying `src/supabase/functions/sync-cve/index.ts` over it. No npm script exists. Pre-BUG-003 backup: `index.ts.bak-20260828-103943`.
+

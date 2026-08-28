@@ -14,6 +14,13 @@ export interface Vendor {
   homepage?: string;
   is_active: boolean;
   created_at: string;
+  // Optional: pre-existing Vendor fixtures across the test suite predate the
+  // scheduler and do not set these; VendorService.fetchVendors applies the
+  // runtime defaults described in the spec.
+  schedule_enabled?: boolean;
+  schedule_times?: string[];
+  schedule_timezone?: string;
+  last_scheduled_run_at?: string | null;
 }
 
 export interface Advisory {
@@ -149,9 +156,17 @@ export interface NormalizedAdvisoryItem {
   rawPayload?: Record<string, unknown>;
 }
 
+export interface VendorEndpoint {
+  /** Short human label, e.g. 'Advisory list'. */
+  label: string;
+  /** The URL actually requested. Placeholders in braces mark per-request values. */
+  url: string;
+}
+
 export interface VendorAdapter {
   readonly vendorCode: string;
   readonly vendorName: string;
+  readonly endpoints: VendorEndpoint[];
   fetchAdvisories(): Promise<NormalizedAdvisoryItem[]>;
   parse(rawPayload: unknown): NormalizedAdvisoryItem[];
 }

@@ -11,9 +11,10 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import { CveDetailDrawer } from '@/components/explorer/CveDetailDrawer';
 import { AdvisoryDetailDrawer } from '@/components/explorer/AdvisoryDetailDrawer';
 import { CveTableRowItem } from '@/components/explorer/CveTable';
-import { WebhookConfig, VendorSyncLog } from '@/types';
+import { WebhookConfig, VendorSyncLog, Vendor } from '@/types';
 import { CveService } from '@/services/cveService';
 import { SyncService } from '@/services/syncService';
+import { VendorService } from '@/services/vendorService';
 import { WebhookConfigService } from '@/services/webhookConfigService';
 import { AdvisoryService, AdvisoryRowItem } from '@/services/advisoryService';
 import { deriveTaxonomy } from '@/services/productTaxonomy';
@@ -24,6 +25,7 @@ export const AppContent: React.FC = () => {
   const [cves, setCves] = useState<CveTableRowItem[]>([]);
   const [advisories, setAdvisories] = useState<AdvisoryRowItem[]>([]);
   const [syncLogs, setSyncLogs] = useState<VendorSyncLog[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
   const [selectedCve, setSelectedCve] = useState<CveTableRowItem | null>(null);
   const [selectedAdvisory, setSelectedAdvisory] = useState<AdvisoryRowItem | null>(null);
@@ -35,6 +37,7 @@ export const AppContent: React.FC = () => {
 
   const cveService = useMemo(() => new CveService(), []);
   const syncService = useMemo(() => new SyncService(), []);
+  const vendorService = useMemo(() => new VendorService(), []);
   const webhookConfigService = useMemo(() => new WebhookConfigService(), []);
   const advisoryService = useMemo(() => new AdvisoryService(), []);
 
@@ -64,6 +67,12 @@ export const AppContent: React.FC = () => {
   }, [loadData]);
 
   useEffect(() => {
+    // A slow or unreachable vendors query must never delay or block the rest
+    // of the dashboard: load it independently of the main isLoading gate.
+    vendorService.fetchVendors().then(setVendors);
+  }, [vendorService]);
+
+  useEffect(() => {
     // A drawer opened from one page must not persist over an unrelated page.
     setSelectedCve(null);
     setSelectedAdvisory(null);
@@ -78,7 +87,14 @@ export const AppContent: React.FC = () => {
       if (result.success) {
         setSyncMessage('Ingestion complete! Fetched and updated feeds in Supabase.');
       } else {
-        setSyncMessage('Sync failed: one or more vendor feeds could not be ingested.');
+        // BUG-003: surface the real failure reason when one is available,
+        // instead of always hiding it behind the generic string.
+        const failedLog = result.newLogs.find((log) => log.status === 'FAILED');
+        setSyncMessage(
+          failedLog?.error_message
+            ? `Sync failed: ${failedLog.error_message}`
+            : 'Sync failed: one or more vendor feeds could not be ingested.'
+        );
       }
       // Refresh live records from Supabase
       const [updatedCves, updatedLogs, updatedAdvisories] = await Promise.all([
@@ -126,6 +142,16 @@ export const AppContent: React.FC = () => {
 
   const handleTestWebhook = async (hook: WebhookConfig): Promise<boolean> => {
     return webhookConfigService.testWebhook(hook);
+  };
+
+  const handleSaveSchedule = async (
+    vendorCode: string,
+    schedule: { enabled: boolean; times: string[]; timezone: string }
+  ): Promise<{ success: boolean; error?: string }> => {
+    const result = await vendorService.updateSchedule(vendorCode, schedule);
+    // Refresh in the background; a schedule save must not block on it.
+    vendorService.fetchVendors().then(setVendors);
+    return result;
   };
 
   return (
@@ -215,9 +241,11 @@ export const AppContent: React.FC = () => {
 
               {currentNav.section === 'sync' && (
                 <SyncMonitorPage
+                  vendors={vendors}
                   logs={syncLogs}
                   onManualSync={handleManualSync}
                   isSyncing={isSyncing}
+                  onSaveSchedule={handleSaveSchedule}
                 />
               )}
               {currentNav.section === 'settings' && (

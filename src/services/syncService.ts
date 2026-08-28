@@ -3,6 +3,96 @@ import { VendorSyncLog } from '@/types';
 import { IngestionEngine } from '@/engine/ingestion';
 import { WebhookService } from '@/services/webhook';
 import { fetchAllRows } from '@/lib/fetchAllRows';
+import { getAdapterByCode } from '@/adapters';
+import { RedHatCsafAdapter } from '@/adapters/redhat-csaf';
+
+// The vendors SyncService actually contacts today. Kept as the single source
+// of truth so the UI can state sync coverage truthfully instead of guessing.
+export const SYNCED_VENDOR_CODES = ['redhat'] as const;
+
+// BUG-003: a full vendor run can build a functions.invoke body of tens of MB,
+// which the self-hosted Edge Runtime supervisor kills. Bound the size of each
+// data-carrying invoke instead.
+const PERSIST_CHUNK_MAX_BYTES = 3_000_000;
+
+interface PersistChunk {
+  advisories: any[];
+  cves: any[];
+  mappings: any[];
+}
+
+function persistChunkBodySize(vendorCode: string, chunk: PersistChunk): number {
+  const json = JSON.stringify({
+    action: 'persist_ingestion',
+    vendorCode,
+    advisories: chunk.advisories,
+    cves: chunk.cves,
+    mappings: chunk.mappings,
+  });
+  // functions.invoke transmits UTF-8 bytes, not UTF-16 code units. Non-ASCII
+  // content (e.g. CJK component names from collapseLocalePackages) makes
+  // json.length undershoot the real wire size, so measure encoded bytes.
+  return new TextEncoder().encode(json).length;
+}
+
+/**
+ * Splits a run into chunks of advisories, each carrying its own advisories,
+ * the CVEs those advisories map to, and the matching mappings. A chunk is
+ * closed when adding the next advisory would push the serialised body over
+ * PERSIST_CHUNK_MAX_BYTES. A single advisory that alone exceeds the budget is
+ * still sent as its own chunk (never dropped, never split).
+ */
+function buildPersistChunks(
+  advisories: any[],
+  cves: any[],
+  mappings: any[],
+  vendorCode: string
+): PersistChunk[] {
+  const cveById = new Map(cves.map((c) => [c.id, c]));
+  const mappingsByAdvisory = new Map<string, any[]>();
+  for (const m of mappings) {
+    const list = mappingsByAdvisory.get(m.advisory_id) ?? [];
+    list.push(m);
+    mappingsByAdvisory.set(m.advisory_id, list);
+  }
+
+  const chunks: PersistChunk[] = [];
+  let current: PersistChunk = { advisories: [], cves: [], mappings: [] };
+  let currentCveIds = new Set<string>();
+
+  for (const adv of advisories) {
+    const advMappings = mappingsByAdvisory.get(adv.id) ?? [];
+    const advCveIds = new Set(advMappings.map((m) => m.cve_id));
+
+    const newCveIdsForCurrent = Array.from(advCveIds).filter((id) => !currentCveIds.has(id));
+    const newCvesForCurrent = newCveIdsForCurrent.map((id) => cveById.get(id)).filter(Boolean);
+
+    const candidate: PersistChunk = {
+      advisories: [...current.advisories, adv],
+      cves: [...current.cves, ...newCvesForCurrent],
+      mappings: [...current.mappings, ...advMappings],
+    };
+
+    if (
+      current.advisories.length > 0 &&
+      persistChunkBodySize(vendorCode, candidate) > PERSIST_CHUNK_MAX_BYTES
+    ) {
+      chunks.push(current);
+      const freshCves = Array.from(advCveIds).map((id) => cveById.get(id)).filter(Boolean);
+      current = { advisories: [adv], cves: freshCves, mappings: [...advMappings] };
+      currentCveIds = new Set(advCveIds);
+    } else {
+      current = candidate;
+      for (const id of newCveIdsForCurrent) currentCveIds.add(id);
+    }
+  }
+
+  if (current.advisories.length > 0) {
+    chunks.push(current);
+  }
+
+  return chunks;
+}
 
 export class SyncService {
   private webhookService = new WebhookService();
@@ -57,11 +147,10 @@ export class SyncService {
     }
 
     const engine = new IngestionEngine({ webhookService: this.webhookService, knownCveIds });
-    const vendorCodes = ['redhat'];
     const newLogs: VendorSyncLog[] = [];
     let allSucceeded = true;
 
-    for (const code of vendorCodes) {
+    for (const code of SYNCED_VENDOR_CODES) {
       const startTime = Date.now();
 
       try {
@@ -69,19 +158,43 @@ export class SyncService {
         const duration = result.durationMs || Date.now() - startTime;
 
         // Persist CVEs, Advisories and Mappings via the sync-cve edge function
-        // (runs with service-role key server-side).
+        // (runs with service-role key server-side). BUG-003: split into chunks
+        // bounded by PERSIST_CHUNK_MAX_BYTES so no single invoke body grows
+        // with the feed, then close the run with one syncMeta-only call so
+        // exactly one vendor_sync_logs row is written.
+        const advisories = engine.getAdvisories().filter((a) => a.vendor_id === code);
+        const cves = engine.getCves();
+        const mappings = engine.getMappings();
+        const chunks = buildPersistChunks(advisories, cves, mappings, code);
+
+        for (const chunk of chunks) {
+          const { error: chunkError } = await supabase.functions.invoke('sync-cve', {
+            body: {
+              action: 'persist_ingestion',
+              vendorCode: code,
+              advisories: chunk.advisories,
+              cves: chunk.cves,
+              mappings: chunk.mappings,
+            },
+          });
+
+          if (chunkError) throw chunkError;
+        }
+
         const { data, error } = await supabase.functions.invoke('sync-cve', {
           body: {
             action: 'persist_ingestion',
             vendorCode: code,
-            advisories: engine.getAdvisories().filter((a) => a.vendor_id === code),
-            cves: engine.getCves(),
-            mappings: engine.getMappings(),
+            advisories: [],
+            cves: [],
+            mappings: [],
             syncMeta: {
               startedAt: new Date(startTime).toISOString(),
               durationMs: duration,
               status: result.status,
               errorMessage: result.errorMessage ?? null,
+              itemsFetched: advisories.length,
+              newItemsCount: cves.length,
             },
           },
         });
@@ -132,16 +245,17 @@ export class SyncService {
 
   async fetchAndIngestQuery(query: string): Promise<boolean> {
     const q = query.trim().toUpperCase();
+    const adapter = getAdapterByCode('redhat') as RedHatCsafAdapter;
 
     try {
       const detailDocuments: unknown[] = [];
 
       if (q.startsWith('RHSA-') || q.startsWith('RHBA-') || q.startsWith('RHEA-')) {
-        const res = await fetch(`https://access.redhat.com/hydra/rest/securitydata/csaf/${q}.json`);
+        const res = await fetch(adapter.advisoryDetailUrl(q));
         if (!res.ok) return false;
         detailDocuments.push(await res.json());
       } else {
-        const listRes = await fetch(`https://access.redhat.com/hydra/rest/securitydata/csaf.json?cve=${q}`);
+        const listRes = await fetch(adapter.cveLookupUrl(q));
         if (!listRes.ok) return false;
         const list = (await listRes.json()) as { RHSA?: string }[];
         if (!Array.isArray(list) || list.length === 0) return false;
@@ -150,7 +264,7 @@ export class SyncService {
           list.map(async (entry) => {
             if (!entry.RHSA) return null;
             try {
-              const detailRes = await fetch(`https://access.redhat.com/hydra/rest/securitydata/csaf/${entry.RHSA}.json`);
+              const detailRes = await fetch(adapter.advisoryDetailUrl(entry.RHSA));
               if (detailRes.ok) {
                 return await detailRes.json();
               }

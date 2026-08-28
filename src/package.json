@@ -14,7 +14,8 @@
     "test:e2e": "vitest run tests/e2e",
     "test:coverage": "vitest run --coverage",
     "verify": "npm run test && npm run build",
-    "backfill:advisory-storage": "node scripts/backfillAdvisoryStorage.mjs"
+    "backfill:advisory-storage": "node scripts/backfillAdvisoryStorage.mjs",
+    "build:edge": "node scripts/buildEdgeBundle.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

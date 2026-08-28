@@ -1,6 +1,7 @@
 import {
   NormalizedAdvisoryItem,
   VendorAdapter,
+  VendorEndpoint,
   ProductImpactItem,
   SecurityFixItem,
   UpdatedPackageItem,
@@ -56,6 +57,11 @@ export class RedHatAdapter implements VendorAdapter {
   readonly vendorCode = 'redhat';
   readonly vendorName = 'Red Hat';
   private readonly apiUrl = 'https://access.redhat.com/hydra/rest/securitydata/cve.json';
+  private readonly detailUrlBase = 'https://access.redhat.com/hydra/rest/securitydata/cve';
+  readonly endpoints: VendorEndpoint[] = [
+    { label: 'CVE list (legacy Security Data API)', url: `${this.apiUrl}?per_page=60` },
+    { label: 'CVE detail (legacy Security Data API)', url: `${this.detailUrlBase}/{cveId}.json` },
+  ];
 
   async fetchAdvisories(): Promise<NormalizedAdvisoryItem[]> {
     // Fetch recent CVEs from Red Hat Security Data API
@@ -71,7 +77,7 @@ export class RedHatAdapter implements VendorAdapter {
       list.map(async (item) => {
         if (!item.CVE) return item;
         try {
-          const detailRes = await fetch(`https://access.redhat.com/hydra/rest/securitydata/cve/${item.CVE}.json`);
+          const detailRes = await fetch(`${this.detailUrlBase}/${item.CVE}.json`);
           if (detailRes.ok) {
             const detail = await detailRes.json();
             return {
