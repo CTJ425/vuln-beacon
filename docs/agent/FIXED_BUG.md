@@ -2,6 +2,29 @@
 
 ---
 
+### BUG-018: Vendor schedule migration not applied to live database — FIXED
+- **Date**: Opened 2026-08-29, fixed 2026-08-31
+- **Severity**: HIGH (feature blocking; schedule UI completely non-functional)
+- **Location**: `src/supabase/migrations/20260828000000_vendor_schedule.sql`
+- **Root Cause**: Migration `20260828000000_vendor_schedule.sql` contained an invalid PostgreSQL CHECK constraint using a subquery (`SELECT 1 FROM unnest(schedule_times)...`), triggering `SQLSTATE 0A000: cannot use subquery in check constraint` when applied to PostgreSQL 15+. As a result, migrations were blocked and schedule columns did not exist on the live database.
+- **Fix**: Replaced inline subquery with an `IMMUTABLE` helper function `public.validate_schedule_times(TEXT[])` that evaluates the regex format check. Successfully pushed all database migrations (`20260815000000`, `20260816000000`, `20260816010000`, `20260828000000`) and deployed Edge Functions (`sync-cve`, `scheduled-sync`) to Supabase Cloud (`vuln-beacon-dev`).
+- **Files Changed**: `src/supabase/migrations/20260828000000_vendor_schedule.sql`.
+- **Verification**: `supabase db push` succeeded; `supabase migration list` confirms all 4 migrations applied remotely; `supabase functions deploy` deployed `sync-cve` & `scheduled-sync`; `curl` verified HTTP 200 response on `sync-cve` endpoint; REST API query verified `vendors` table with `schedule_enabled` column populated; `npm run test:unit` & `npm run build` clean.
+
+---
+
+### BUG-017: Sync error reason hidden when Edge Function invoke fails — FIXED
+- **Date**: Opened 2026-08-29, fixed 2026-08-29
+- **Severity**: HIGH (failure diagnostics inaccessible; prevented troubleshooting of real causes)
+- **Location**: `src/services/syncService.ts`, `src/App.tsx`, `src/tests/unit/services/syncServiceErrorSurface.test.ts` (new), `src/tests/unit/components/appSyncError.test.tsx` (updated)
+- **Root Cause**: Two independent defects: (1) `SyncService.syncVendors()` surfaced failure reason only through the `vendor_sync_logs` row that the `sync-cve` Edge Function writes and returns. When the `supabase.functions.invoke` call itself failed, no row was written, `newLogs` came back empty, and `App.tsx` `handleManualSync` fell back to generic "Sync failed: one or more vendor feeds could not be ingested" — even though the real error message was in `err?.message`. (2) The per-vendor `catch` block's `supabase.functions.invoke` call inside it was unguarded, so a rejecting invoke propagated out of `syncVendors()` instead of being collected.
+- **Fix**: (1) `syncVendors()` now returns optional `errors?: string[]`, collecting the in-memory reason for every vendor that did not succeed — at most one entry per vendor, the ingest reason winning over any transport error that follows it (tracked via per-iteration `recordedError` flag). (2) Catch block's invoke wrapped in its own try/catch and logged via `console.error`. (3) `App.tsx` `handleManualSync` message priority: persisted `error_message` → `result.errors?.[0]` → unchanged generic string.
+- **Files Changed**: `src/services/syncService.ts`, `src/App.tsx`, `src/tests/unit/services/syncServiceErrorSurface.test.ts` (new, 4 tests), `src/tests/unit/components/appSyncError.test.tsx` (2 tests added).
+- **Tests**: New: `tests/unit/services/syncServiceErrorSurface.test.ts` (4 tests for error collection in syncVendors). Updated: `tests/unit/components/appSyncError.test.tsx` (+2 tests for message priority in handleManualSync).
+- **Verification**: `npm run test:unit` — 44 files, 247 tests, all passing. `npm run build` — clean (pre-existing chunk-size warning only). Lane 1 with review: route:reviewer returned FAIL on duplicate `errors` entry → fixed in one round → re-verified green.
+
+---
+
 ### R6: Scheduled Runs Dispatch No Webhook Alerts — FIXED
 - **Date**: Opened 2026-08-28, fixed 2026-08-29
 - **Severity**: MEDIUM (feature gap; worse than recorded — affected both scheduled AND browser manual sync paths; critical CVEs not alerted)

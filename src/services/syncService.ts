@@ -180,7 +180,7 @@ export class SyncService {
     }
   }
 
-  async syncVendors(): Promise<{ success: boolean; newLogs: VendorSyncLog[] }> {
+  async syncVendors(): Promise<{ success: boolean; newLogs: VendorSyncLog[]; errors?: string[] }> {
     // Register active webhooks before ingestion so alerts actually go out. A
     // load failure must not abort the sync — loadWebhooks never throws.
     await this.loadWebhooks();
@@ -189,14 +189,28 @@ export class SyncService {
 
     const engine = new IngestionEngine({ webhookService: this.webhookService, knownCveIds });
     const newLogs: VendorSyncLog[] = [];
+    const errors: string[] = [];
     let allSucceeded = true;
 
     for (const code of SYNCED_VENDOR_CODES) {
       const startTime = Date.now();
+      // Per-iteration guard: at most one entry in `errors` per vendor. The
+      // ingest failure reason is the root cause and wins over any transport
+      // error that follows it in the same iteration.
+      let recordedError = false;
 
       try {
         const result = await engine.ingestVendor(code);
         const duration = result.durationMs || Date.now() - startTime;
+
+        // Record the in-memory failure reason before any persist call runs —
+        // a persist failure below jumps straight to the catch block, which
+        // would otherwise discard this message in favour of the transport
+        // error.
+        if (result.status === 'FAILED' && result.errorMessage) {
+          errors.push(result.errorMessage);
+          recordedError = true;
+        }
 
         // Persist CVEs, Advisories and Mappings via the sync-cve edge function
         // (runs with service-role key server-side). BUG-003: split into chunks
@@ -252,28 +266,37 @@ export class SyncService {
       } catch (err: any) {
         allSucceeded = false;
         const duration = Date.now() - startTime;
-        const { data: errData, error: errDataError } = await supabase.functions.invoke('sync-cve', {
-          body: {
-            action: 'persist_ingestion',
-            vendorCode: code,
-            advisories: [],
-            cves: [],
-            mappings: [],
-            syncMeta: {
-              startedAt: new Date(startTime).toISOString(),
-              durationMs: duration,
-              status: 'FAILED',
-              errorMessage: err?.message || 'Sync failed',
-            },
-          },
-        });
-
-        if (errDataError) {
-          console.error(`Failed to persist FAILED sync log for vendor ${code}:`, errDataError);
+        const errorMessage = err?.message || 'Sync failed';
+        if (!recordedError) {
+          errors.push(errorMessage);
         }
 
-        if (errData?.log) {
-          newLogs.push(errData.log as VendorSyncLog);
+        try {
+          const { data: errData, error: errDataError } = await supabase.functions.invoke('sync-cve', {
+            body: {
+              action: 'persist_ingestion',
+              vendorCode: code,
+              advisories: [],
+              cves: [],
+              mappings: [],
+              syncMeta: {
+                startedAt: new Date(startTime).toISOString(),
+                durationMs: duration,
+                status: 'FAILED',
+                errorMessage,
+              },
+            },
+          });
+
+          if (errDataError) {
+            console.error(`Failed to persist FAILED sync log for vendor ${code}:`, errDataError);
+          }
+
+          if (errData?.log) {
+            newLogs.push(errData.log as VendorSyncLog);
+          }
+        } catch (persistErr) {
+          console.error(`Failed to persist FAILED sync log for vendor ${code}:`, persistErr);
         }
       }
     }
@@ -281,6 +304,7 @@ export class SyncService {
     return {
       success: allSucceeded,
       newLogs,
+      errors,
     };
   }
 

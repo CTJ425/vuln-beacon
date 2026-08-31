@@ -161,5 +161,12 @@
     - [x] Live database re-ingestion: User-authorised purge of advisory_cve_map/advisories/cves. Ran advisory-first pipeline against live Red Hat API and Edge Function. Result: 50 advisories, 142 CVEs, 238 mappings. Average CVEs/advisory 1.00 → 4.76. Maximum 1 → 25. Cross-mapped advisories 0 → 55. Sample: RHSA-2026:54622 (Apache Camel, 25 CVEs), RHSA-2026:54757 (OpenStack, 24), RHSA-2026:54572 (webkit2gtk3, 23).
     - [x] Verification: npm test 29 files / 101 tests passing; npm run build clean.
 
+## Current Work Stream: Self-Hosted Deployment Network Topology
+
+- [ ] **Task 11a: Network Layer Only — No Code Change** — Implement Cloudflare Tunnel + Caddy reverse proxy with path prefix (`/supabase`). Ref: `docs/agent/specs/self-host-deployment-topology.md` (design points D1–D4).
+- [ ] **Task 11b: Fix ENV Example & Document Self-Host Edge Function Deploy** — Correct `src/.env.example` comment claiming Edge Functions auto-receive `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` (false under self-host). Document manual function deploy to self-hosted edge-runtime volume (D5, D6). Ref: `docs/agent/specs/self-host-deployment-topology.md`.
+- [ ] **Task 11c: Move Browser Manual Sync Server-Side** — Relocate sync trigger from browser (`syncService.ts:319-332`) to Edge Function endpoint (`scheduled-sync`), allowing scheduled sync to succeed for tailnet-restricted users (C1). Requires own spec; existing spec `docs/agent/specs/webhook-admin-and-server-dispatch.md` still applies to webhook tasks. Ref: `docs/agent/specs/self-host-deployment-topology.md` (consequence C1).
+- [ ] **Task 11d: Webhook Admin & Server Dispatch Edge Function** — Add Role-Based Access to webhook_configs table (C2); prevent unauthenticated SELECT/write. Ref: `docs/agent/specs/webhook-admin-and-server-dispatch.md`.
+
 
 

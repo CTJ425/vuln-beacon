@@ -88,11 +88,14 @@ export const AppContent: React.FC = () => {
         setSyncMessage('Ingestion complete! Fetched and updated feeds in Supabase.');
       } else {
         // BUG-003: surface the real failure reason when one is available,
-        // instead of always hiding it behind the generic string.
+        // instead of always hiding it behind the generic string. A persisted
+        // log's error_message takes priority; when no row could be written
+        // at all, fall back to the in-memory reason syncVendors() collected.
         const failedLog = result.newLogs.find((log) => log.status === 'FAILED');
+        const reason = failedLog?.error_message || result.errors?.[0];
         setSyncMessage(
-          failedLog?.error_message
-            ? `Sync failed: ${failedLog.error_message}`
+          reason
+            ? `Sync failed: ${reason}`
             : 'Sync failed: one or more vendor feeds could not be ingested.'
         );
       }

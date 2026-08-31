@@ -40,3 +40,5 @@ coverage/
 
 # Supabase CLI link metadata (holds project ref / pooler URL)
 supabase/.temp/
+src/supabase/.temp/
+**/.temp/

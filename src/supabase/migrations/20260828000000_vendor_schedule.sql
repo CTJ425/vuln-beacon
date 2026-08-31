@@ -15,17 +15,23 @@ ALTER TABLE public.vendors
   ADD COLUMN IF NOT EXISTS schedule_timezone TEXT NOT NULL DEFAULT 'Asia/Taipei',
   ADD COLUMN IF NOT EXISTS last_scheduled_run_at TIMESTAMPTZ;
 
+CREATE OR REPLACE FUNCTION public.validate_schedule_times(times TEXT[])
+RETURNS boolean
+LANGUAGE sql
+IMMUTABLE
+AS $$
+  SELECT NOT EXISTS (
+    SELECT 1 FROM unnest(times) AS t
+    WHERE t !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+  );
+$$;
+
 ALTER TABLE public.vendors
   DROP CONSTRAINT IF EXISTS vendors_schedule_times_format;
 
 ALTER TABLE public.vendors
   ADD CONSTRAINT vendors_schedule_times_format
-  CHECK (
-    NOT EXISTS (
-      SELECT 1 FROM unnest(schedule_times) AS t
-      WHERE t !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
-    )
-  );
+  CHECK (public.validate_schedule_times(schedule_times));
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
