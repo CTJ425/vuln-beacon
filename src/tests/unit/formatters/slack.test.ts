@@ -29,4 +29,15 @@ describe('Slack Webhook Formatter', () => {
     expect(fieldsSection.type).toBe('section');
     expect(fieldsSection.fields).toBeDefined();
   });
+
+  it('truncates summary if it exceeds Slack block character threshold', () => {
+    const longAlert: WebhookAlertPayload = {
+      ...sampleAlert,
+      summary: 'S'.repeat(4000),
+    };
+    const payload = formatSlackAlert(longAlert);
+    const summarySection = payload.blocks[2] as { type: string; text: { text: string } };
+    expect(summarySection.text.text.length).toBeLessThanOrEqual(2600);
+    expect(summarySection.text.text).toContain('...');
+  });
 });

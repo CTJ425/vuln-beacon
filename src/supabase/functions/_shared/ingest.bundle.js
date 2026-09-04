@@ -94,19 +94,27 @@ var RedHatCsafAdapter = class {
     }
     const list = await response.json();
     if (!Array.isArray(list)) return [];
-    const detailDocuments = (await Promise.all(
-      list.map(async (entry) => {
-        if (!entry.RHSA) return null;
-        try {
-          const detailRes = await fetch(this.advisoryDetailUrl(entry.RHSA));
-          if (detailRes.ok) {
-            return await detailRes.json();
+    const detailDocuments = [];
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < list.length; i += BATCH_SIZE) {
+      const batch = list.slice(i, i + BATCH_SIZE);
+      const batchDocs = await Promise.all(
+        batch.map(async (entry) => {
+          if (!entry.RHSA) return null;
+          try {
+            const detailRes = await fetch(this.advisoryDetailUrl(entry.RHSA));
+            if (detailRes.ok) {
+              return await detailRes.json();
+            }
+          } catch {
           }
-        } catch {
-        }
-        return null;
-      })
-    )).filter((doc) => doc !== null);
+          return null;
+        })
+      );
+      for (const doc of batchDocs) {
+        if (doc !== null) detailDocuments.push(doc);
+      }
+    }
     return this.parse(detailDocuments);
   }
   parse(rawPayload) {
@@ -510,17 +518,21 @@ function formatDiscordAlert(alert) {
     { name: "Advisory ID", value: alert.advisoryId, inline: true },
     { name: "CVSS Score", value: scoreText, inline: true }
   ];
+  const rawDescription = alert.summary || alert.advisoryTitle || "";
+  const truncatedDescription = rawDescription.length > 3500 ? rawDescription.slice(0, 3497) + "..." : rawDescription;
   if (alert.affectedProducts && alert.affectedProducts.length > 0) {
+    const productsText = alert.affectedProducts.slice(0, 5).join("\n");
     fields.push({
       name: "Affected Products",
-      value: alert.affectedProducts.slice(0, 5).join("\n"),
+      value: productsText.length > 1e3 ? productsText.slice(0, 997) + "..." : productsText,
       inline: false
     });
   }
   if (alert.fixedVersions && alert.fixedVersions.length > 0) {
+    const fixedText = alert.fixedVersions.slice(0, 5).join("\n");
     fields.push({
       name: "Fixed In",
-      value: alert.fixedVersions.slice(0, 5).join("\n"),
+      value: fixedText.length > 1e3 ? fixedText.slice(0, 997) + "..." : fixedText,
       inline: false
     });
   }
@@ -528,7 +540,7 @@ function formatDiscordAlert(alert) {
     embeds: [
       {
         title: `\u{1F6A8} [${alert.severity}] Security Alert: ${alert.cveId}`,
-        description: alert.summary || alert.advisoryTitle,
+        description: truncatedDescription,
         url: alert.advisoryUrl,
         color,
         fields,
@@ -542,32 +554,44 @@ function formatDiscordAlert(alert) {
 }
 
 // formatters/telegram.ts
-function formatTelegramAlert(alert) {
+function escapeHtml(text) {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function formatTelegramAlert(alert, chatId) {
   const scoreText = alert.cvssScore ? `${alert.cvssScore} (${alert.severity})` : alert.severity;
-  const products = (alert.affectedProducts || []).slice(0, 3).join(", ") || "N/A";
+  const products = (alert.affectedProducts || []).slice(0, 3).map(escapeHtml).join(", ") || "N/A";
+  const rawSummary = alert.summary || alert.advisoryTitle || "";
+  const escapedSummary = escapeHtml(rawSummary);
   const text = [
     `\u{1F6A8} <b>[${alert.severity} Security Alert]</b>`,
     ``,
-    `<b>CVE:</b> <code>${alert.cveId}</code>`,
-    `<b>Vendor:</b> ${alert.vendorName}`,
-    `<b>Advisory:</b> <a href="${alert.advisoryUrl}">${alert.advisoryId}</a>`,
+    `<b>CVE:</b> <code>${escapeHtml(alert.cveId)}</code>`,
+    `<b>Vendor:</b> ${escapeHtml(alert.vendorName)}`,
+    `<b>Advisory:</b> <a href="${alert.advisoryUrl}">${escapeHtml(alert.advisoryId)}</a>`,
     `<b>CVSS Score:</b> ${scoreText}`,
     `<b>Affected:</b> ${products}`,
     ``,
-    `<b>Summary:</b> ${alert.summary || alert.advisoryTitle}`,
+    `<b>Summary:</b> ${escapedSummary}`,
     alert.dashboardUrl ? `
 \u{1F517} <a href="${alert.dashboardUrl}">Open in VulnBeacon Dashboard</a>` : ""
   ].filter(Boolean).join("\n");
-  return {
-    text,
+  const truncatedText = text.length > 4e3 ? text.slice(0, 3997) + "..." : text;
+  const result = {
+    text: truncatedText,
     parse_mode: "HTML",
     disable_web_page_preview: false
   };
+  if (chatId !== void 0 && chatId !== "") {
+    result.chat_id = chatId;
+  }
+  return result;
 }
 
 // formatters/slack.ts
 function formatSlackAlert(alert) {
   const scoreText = alert.cvssScore ? `${alert.cvssScore} (${alert.severity})` : alert.severity;
+  const rawSummary = alert.summary || alert.advisoryTitle || "";
+  const truncatedSummary = rawSummary.length > 2500 ? rawSummary.slice(0, 2497) + "..." : rawSummary;
   const blocks = [
     {
       type: "header",
@@ -607,7 +631,7 @@ ${alert.cveId}`
       text: {
         type: "mrkdwn",
         text: `*Summary:*
-${alert.summary || alert.advisoryTitle}`
+${truncatedSummary}`
       }
     }
   ];
@@ -632,16 +656,53 @@ ${alert.summary || alert.advisoryTitle}`
 }
 
 // formatters/index.ts
-function formatWebhookAlert(platform, payload) {
+function formatWebhookAlert(platform, payload, options) {
   switch (platform) {
     case "discord":
       return formatDiscordAlert(payload);
     case "telegram":
-      return formatTelegramAlert(payload);
+      return formatTelegramAlert(payload, options?.chatId);
     case "slack":
       return formatSlackAlert(payload);
     default:
       throw new Error(`Unsupported webhook platform: ${platform}`);
+  }
+}
+
+// utils/urlValidator.ts
+function isSafeDestinationUrl(inputUrl) {
+  try {
+    const parsed = new URL(inputUrl);
+    if (parsed.protocol !== "https:") {
+      return false;
+    }
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local") || hostname.endsWith(".internal")) {
+      return false;
+    }
+    if (hostname === "[::1]" || hostname === "::1") {
+      return false;
+    }
+    const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+    const match = hostname.match(ipv4Regex);
+    if (match) {
+      const o1 = Number(match[1]);
+      const o2 = Number(match[2]);
+      const o3 = Number(match[3]);
+      const o4 = Number(match[4]);
+      if (o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) {
+        return false;
+      }
+      if (o1 === 0) return false;
+      if (o1 === 127) return false;
+      if (o1 === 10) return false;
+      if (o1 === 172 && o2 >= 16 && o2 <= 31) return false;
+      if (o1 === 192 && o2 === 168) return false;
+      if (o1 === 169 && o2 === 254) return false;
+    }
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -670,7 +731,19 @@ var WebhookService = class {
     if (alertRank < minRank || !config.is_active && !ignoreActiveState) {
       return false;
     }
-    const payload = formatWebhookAlert(config.platform, alert);
+    if (!isSafeDestinationUrl(config.webhook_url)) {
+      console.warn("Webhook dispatch aborted: unsafe destination URL", config.id, config.platform);
+      return false;
+    }
+    let chatId;
+    if (config.platform === "telegram") {
+      try {
+        const parsed = new URL(config.webhook_url);
+        chatId = parsed.searchParams.get("chat_id") ?? void 0;
+      } catch {
+      }
+    }
+    const payload = formatWebhookAlert(config.platform, alert, { chatId });
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1e4);
     try {

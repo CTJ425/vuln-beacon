@@ -146,6 +146,44 @@ describe('BUG-011: a disabled webhook is distinguishable from a broken one', () 
     expect(sent).toBe(false);
     expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  it('aborts dispatch when destination URL is unsafe (SSRF protection)', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true }) as any;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const sent = await new WebhookService().dispatch(
+      makeConfig({ webhook_url: 'https://169.254.169.254/latest/meta-data' }),
+      alert
+    );
+
+    expect(sent).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('unsafe destination URL'),
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('extracts chat_id from telegram webhook URL query and passes it in payload', async () => {
+    let capturedBody = '';
+    global.fetch = vi.fn(async (_url: string, init: any) => {
+      capturedBody = init.body;
+      return { ok: true } as any;
+    }) as any;
+
+    const sent = await new WebhookService().dispatch(
+      makeConfig({
+        platform: 'telegram',
+        webhook_url: 'https://api.telegram.org/bot12345/sendMessage?chat_id=987654',
+      }),
+      alert
+    );
+
+    expect(sent).toBe(true);
+    const parsed = JSON.parse(capturedBody);
+    expect(parsed.chat_id).toBe('987654');
+  });
 });
 
 describe('BUG-003: alerts are not re-sent for already-persisted CVEs', () => {

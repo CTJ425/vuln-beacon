@@ -73,9 +73,46 @@ async function handleUpdateVendorSchedule(supabaseClient: any, body: any): Promi
   );
 }
 
+function isSafeDestinationUrl(inputUrl: string): boolean {
+  try {
+    const parsed = new URL(inputUrl);
+    if (parsed.protocol !== 'https:') return false;
+    const hostname = parsed.hostname.toLowerCase();
+    if (
+      hostname === 'localhost' ||
+      hostname.endsWith('.localhost') ||
+      hostname.endsWith('.local') ||
+      hostname.endsWith('.internal')
+    ) {
+      return false;
+    }
+    if (hostname === '[::1]' || hostname === '::1') return false;
+    const match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (match) {
+      const [o1, o2, o3, o4] = match.slice(1).map(Number);
+      if (o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) return false;
+      if (o1 === 0 || o1 === 127 || o1 === 10) return false;
+      if (o1 === 172 && o2 >= 16 && o2 <= 31) return false;
+      if (o1 === 192 && o2 === 168) return false;
+      if (o1 === 169 && o2 === 254) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Unauthorized: missing or invalid Authorization header' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+    );
   }
 
   try {
@@ -91,6 +128,75 @@ serve(async (req) => {
 
     if (action === 'update_vendor_schedule') {
       return await handleUpdateVendorSchedule(supabaseClient, body);
+    }
+
+    if (action === 'test_webhook') {
+      const { webhook, alert } = body;
+      if (!webhook?.webhook_url || !isSafeDestinationUrl(webhook.webhook_url)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid or unsafe destination URL' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+      try {
+        const testPayload = alert ?? {
+          text: '🚨 [Test Alert] VulnBeacon webhook delivery test.',
+          content: '🚨 [Test Alert] VulnBeacon webhook delivery test.',
+        };
+        const res = await fetch(webhook.webhook_url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(testPayload),
+        });
+        return new Response(
+          JSON.stringify({ success: res.ok, status: res.status }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      } catch (fetchErr: any) {
+        return new Response(
+          JSON.stringify({ success: false, error: fetchErr.message }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+    }
+
+    if (action === 'create_webhook') {
+      const { webhook } = body;
+      if (!webhook?.webhook_url || !isSafeDestinationUrl(webhook.webhook_url)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid or unsafe destination URL' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
+      }
+      const { data, error } = await supabaseClient
+        .from('webhook_configs')
+        .insert({
+          name: webhook.name,
+          platform: webhook.platform,
+          webhook_url: webhook.webhook_url,
+          min_severity: webhook.min_severity,
+          is_active: webhook.is_active ?? true,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return new Response(
+        JSON.stringify({ success: true, data }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    if (action === 'delete_webhook') {
+      const { id } = body;
+      const { error } = await supabaseClient
+        .from('webhook_configs')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
     }
 
     if (action !== 'persist_ingestion') {
@@ -123,8 +229,12 @@ serve(async (req) => {
     const vendorId = vendor.id;
 
     // Upsert CVEs, keeping a map from client-local correlation id -> real DB id.
+    const CVE_ID_REGEX = /^CVE-\d{4}-\d{4,}$/i;
     const cveIdMap = new Map<string, string>();
     for (const cveObj of (cves || [])) {
+      if (!cveObj?.cve_id || !CVE_ID_REGEX.test(cveObj.cve_id)) {
+        continue;
+      }
       const { data: insertedCve, error: cveError } = await supabaseClient
         .from('cves')
         .upsert(
@@ -155,10 +265,14 @@ serve(async (req) => {
       const hasPayload = adv.raw_payload && Object.keys(adv.raw_payload).length > 0;
 
       if (hasPayload) {
+        const payloadStr = JSON.stringify(adv.raw_payload);
+        if (payloadStr.length > 5 * 1024 * 1024) {
+          throw new Error(`Payload for advisory ${adv.advisory_id} exceeds 5MB limit`);
+        }
         const path = `${vendorCode}/${sanitiseAdvisoryKey(adv.advisory_id)}.json`;
         const { error: uploadError } = await supabaseClient.storage
           .from(ADVISORY_BUCKET)
-          .upload(path, JSON.stringify(adv.raw_payload), {
+          .upload(path, payloadStr, {
             contentType: 'application/json',
             upsert: true,
           });

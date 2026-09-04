@@ -175,9 +175,12 @@ export class RedHatCsafAdapter implements VendorAdapter {
     const list = (await response.json()) as { RHSA?: string }[];
     if (!Array.isArray(list)) return [];
 
-    const detailDocuments: unknown[] = (
-      await Promise.all(
-        list.map(async (entry) => {
+    const detailDocuments: unknown[] = [];
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < list.length; i += BATCH_SIZE) {
+      const batch = list.slice(i, i + BATCH_SIZE);
+      const batchDocs = await Promise.all(
+        batch.map(async (entry) => {
           if (!entry.RHSA) return null;
           try {
             const detailRes = await fetch(this.advisoryDetailUrl(entry.RHSA));
@@ -189,8 +192,11 @@ export class RedHatCsafAdapter implements VendorAdapter {
           }
           return null;
         })
-      )
-    ).filter((doc) => doc !== null);
+      );
+      for (const doc of batchDocs) {
+        if (doc !== null) detailDocuments.push(doc);
+      }
+    }
 
     return this.parse(detailDocuments);
   }

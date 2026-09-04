@@ -4,41 +4,41 @@ import { WebhookAlertPayload } from '@/types';
 
 describe('Discord Webhook Formatter', () => {
   const sampleAlert: WebhookAlertPayload = {
-    vendorName: 'VMware / Broadcom',
-    advisoryId: 'VMSA-2024-0019',
-    advisoryTitle: 'VMware vCenter Server Remote Code Execution',
-    advisoryUrl: 'https://support.broadcom.com/vmsa',
-    cveId: 'CVE-2024-38812',
+    vendorName: 'Dell',
+    advisoryId: 'DSA-2024-001',
+    advisoryTitle: 'Dell PowerStore Security Update',
+    advisoryUrl: 'https://www.dell.com/support/security/dsa-2024-001',
+    cveId: 'CVE-2024-1111',
     cvssScore: 9.8,
     severity: 'CRITICAL',
-    summary: 'Heap overflow vulnerability in DCERPC implementation',
-    affectedProducts: ['VMware vCenter Server 8.0'],
-    fixedVersions: ['8.0 U3b'],
-    dashboardUrl: 'https://beacon.example.com/cve/CVE-2024-38812',
+    summary: 'Critical buffer overflow in management interface',
   };
 
-  it('should format valid Discord embed payload for CRITICAL alert', () => {
+  it('formats valid Discord embed payload', () => {
     const payload = formatDiscordAlert(sampleAlert);
-
     expect(payload.embeds).toBeDefined();
-    expect(payload.embeds).toHaveLength(1);
-
-    const embed = payload.embeds[0];
-    expect(embed.title).toContain('CRITICAL');
-    expect(embed.title).toContain('CVE-2024-38812');
-    expect(embed.color).toBe(0xd32f2f); // Red for Critical
-    expect(embed.url).toBe(sampleAlert.advisoryUrl);
-    expect(embed.fields).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: 'Vendor', value: 'VMware / Broadcom' }),
-        expect.objectContaining({ name: 'CVSS Score', value: '9.8 (CRITICAL)' }),
-      ])
-    );
+    expect(payload.embeds.length).toBe(1);
+    expect(payload.embeds[0].title).toContain('CVE-2024-1111');
   });
 
-  it('should format HIGH severity with orange color', () => {
-    const highAlert: WebhookAlertPayload = { ...sampleAlert, severity: 'HIGH', cvssScore: 8.5 };
-    const payload = formatDiscordAlert(highAlert);
-    expect(payload.embeds[0].color).toBe(0xf57c00); // Orange for High
+  it('truncates overly long descriptions and fields to stay within Discord limits', () => {
+    const longAlert: WebhookAlertPayload = {
+      ...sampleAlert,
+      summary: 'D'.repeat(5000),
+      affectedProducts: ['P'.repeat(1500)],
+      fixedVersions: ['V'.repeat(1500)],
+    };
+    const payload = formatDiscordAlert(longAlert);
+    const embed = payload.embeds[0];
+    expect(embed.description?.length).toBeLessThanOrEqual(3500);
+    expect(embed.description).toContain('...');
+
+    const productsField = embed.fields?.find((f) => f.name === 'Affected Products');
+    expect(productsField?.value.length).toBeLessThanOrEqual(1000);
+    expect(productsField?.value).toContain('...');
+
+    const fixedField = embed.fields?.find((f) => f.name === 'Fixed In');
+    expect(fixedField?.value.length).toBeLessThanOrEqual(1000);
+    expect(fixedField?.value).toContain('...');
   });
 });

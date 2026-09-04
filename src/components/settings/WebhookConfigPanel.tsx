@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import { Plus, Send, Trash2 } from 'lucide-react';
 import { WebhookConfig, WebhookPlatform, SeverityLevel } from '@/types';
+import { isSafeDestinationUrl } from '@/utils/urlValidator';
 
 interface WebhookConfigPanelProps {
   webhooks: WebhookConfig[];
@@ -47,11 +48,7 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const isValidDestinationUrl = (value: string): boolean => {
-    try {
-      return new URL(value).protocol === 'https:';
-    } catch {
-      return false;
-    }
+    return isSafeDestinationUrl(value);
   };
 
   const handleAdd = (e: React.FormEvent) => {
@@ -59,7 +56,7 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({
     if (!name || !webhookUrl) return;
 
     if (!isValidDestinationUrl(webhookUrl)) {
-      setUrlError('Destination URL must be a valid https:// URL.');
+      setUrlError('Destination URL must be a valid public https:// URL (no private IPs or localhost).');
       return;
     }
     setUrlError(null);
@@ -174,7 +171,11 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({
                 fullWidth
                 size="small"
                 label="Webhook Destination URL"
-                placeholder="https://discord.com/api/webhooks/... or https://hooks.slack.com/services/..."
+                placeholder={
+                  platform === 'telegram'
+                    ? 'https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<CHAT_ID>'
+                    : 'https://discord.com/api/webhooks/... or https://hooks.slack.com/services/...'
+                }
                 value={webhookUrl}
                 onChange={(e) => {
                   setWebhookUrl(e.target.value);
@@ -182,7 +183,12 @@ export const WebhookConfigPanel: React.FC<WebhookConfigPanelProps> = ({
                 }}
                 required
                 error={Boolean(urlError)}
-                helperText={urlError}
+                helperText={
+                  urlError ??
+                  (platform === 'telegram'
+                    ? 'Note: Include ?chat_id=<CHAT_ID> in the URL for Telegram alerts'
+                    : undefined)
+                }
                 sx={{ bgcolor: 'background.default' }}
               />
             </Box>

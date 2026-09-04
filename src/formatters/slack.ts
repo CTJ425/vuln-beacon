@@ -3,6 +3,9 @@ import { WebhookAlertPayload } from '@/types';
 export function formatSlackAlert(alert: WebhookAlertPayload) {
   const scoreText = alert.cvssScore ? `${alert.cvssScore} (${alert.severity})` : alert.severity;
 
+  const rawSummary = alert.summary || alert.advisoryTitle || '';
+  const truncatedSummary = rawSummary.length > 2500 ? rawSummary.slice(0, 2497) + '...' : rawSummary;
+
   const blocks: Array<Record<string, unknown>> = [
     {
       type: 'header',
@@ -37,7 +40,7 @@ export function formatSlackAlert(alert: WebhookAlertPayload) {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Summary:*\n${alert.summary || alert.advisoryTitle}`,
+        text: `*Summary:*\n${truncatedSummary}`,
       },
     },
   ];

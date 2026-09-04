@@ -12,8 +12,11 @@ import {
   Button,
   Typography,
   Box,
+  Chip,
+  Tooltip,
 } from '@mui/material';
 import { Vendor } from '@/types';
+import { isAdapterImplemented } from '@/adapters';
 
 interface ScheduleSettingsProps {
   vendors: Vendor[];
@@ -48,8 +51,10 @@ const ScheduleRow: React.FC<{ vendor: Vendor; onSave: ScheduleSettingsProps['onS
   onSave,
 }) => {
   const [row, setRow] = useState<RowState>(() => initialRowState(vendor));
+  const isImplemented = isAdapterImplemented(vendor.code);
 
   const handleSave = async () => {
+    if (!isImplemented) return;
     const times = row.timesText
       .split(',')
       .map((t) => t.trim())
@@ -82,18 +87,34 @@ const ScheduleRow: React.FC<{ vendor: Vendor; onSave: ScheduleSettingsProps['onS
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
           {vendor.code}
         </Typography>
+        {!isImplemented && (
+          <Box sx={{ mt: 0.5 }}>
+            <Chip
+              label="Adapter not implemented"
+              size="small"
+              variant="outlined"
+              sx={{ fontSize: '0.65rem', height: 18 }}
+            />
+          </Box>
+        )}
       </TableCell>
 
       <TableCell>
-        <Switch
-          checked={row.enabled}
-          onChange={(e) => setRow((prev) => ({ ...prev, enabled: e.target.checked }))}
-          inputProps={{ 'aria-label': `Enable schedule for ${vendor.name}` }}
-        />
+        <Tooltip title={!isImplemented ? 'Adapter not implemented yet' : ''}>
+          <span>
+            <Switch
+              disabled={!isImplemented}
+              checked={isImplemented && row.enabled}
+              onChange={(e) => setRow((prev) => ({ ...prev, enabled: e.target.checked }))}
+              inputProps={{ 'aria-label': `Enable schedule for ${vendor.name}` }}
+            />
+          </span>
+        </Tooltip>
       </TableCell>
 
       <TableCell>
         <TextField
+          disabled={!isImplemented}
           label={`Schedule times for ${vendor.name}`}
           value={row.timesText}
           onChange={(e) => setRow((prev) => ({ ...prev, timesText: e.target.value }))}
@@ -104,6 +125,7 @@ const ScheduleRow: React.FC<{ vendor: Vendor; onSave: ScheduleSettingsProps['onS
 
       <TableCell>
         <TextField
+          disabled={!isImplemented}
           label={`Timezone for ${vendor.name}`}
           value={row.timezone}
           onChange={(e) => setRow((prev) => ({ ...prev, timezone: e.target.value }))}
@@ -114,7 +136,12 @@ const ScheduleRow: React.FC<{ vendor: Vendor; onSave: ScheduleSettingsProps['onS
 
       <TableCell>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.5 }}>
-          <Button variant="contained" size="small" disabled={row.saving} onClick={handleSave}>
+          <Button
+            variant="contained"
+            size="small"
+            disabled={!isImplemented || row.saving}
+            onClick={handleSave}
+          >
             {`Save ${vendor.name}`}
           </Button>
           {row.status && (

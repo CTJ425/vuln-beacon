@@ -72,10 +72,14 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
       };
       return {
         // Awaitable and chainable, so a plain `.select()` read resolves.
-        select: () =>
-          Object.assign(Promise.resolve({ data: [], error: null }), {
+        select: () => {
+          const chain: any = Object.assign(Promise.resolve({ data: [], error: null }), {
             eq: () => Promise.resolve({ data: [], error: null }),
-          }),
+            range: () => Promise.resolve({ data: [], error: null }),
+            order: () => chain,
+          });
+          return chain;
+        },
         insert: recordWrite('insert'),
         update: recordWrite('update'),
         upsert: recordWrite('upsert'),
@@ -209,5 +213,19 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
     const ok = await service.fetchAndIngestQuery('CVE-2026-1');
 
     expect(ok).toBe(false);
+  });
+
+  it('fetchAndIngestQuery() provides webhookService to IngestionEngine', async () => {
+    global.fetch = mockCsafFetch() as any;
+
+    const { IngestionEngine } = await import('@/engine/ingestion');
+    const service = new SyncService();
+    await service.fetchAndIngestQuery('CVE-2026-1');
+
+    expect(IngestionEngine).toHaveBeenCalledWith(
+      expect.objectContaining({
+        webhookService: expect.anything(),
+      })
+    );
   });
 });

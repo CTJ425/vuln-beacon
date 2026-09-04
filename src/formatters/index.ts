@@ -5,12 +5,16 @@ import { formatSlackAlert } from './slack';
 
 export { formatDiscordAlert, formatTelegramAlert, formatSlackAlert };
 
-export function formatWebhookAlert(platform: WebhookPlatform, payload: WebhookAlertPayload) {
+export function formatWebhookAlert(
+  platform: WebhookPlatform,
+  payload: WebhookAlertPayload,
+  options?: { chatId?: string | number }
+) {
   switch (platform) {
     case 'discord':
       return formatDiscordAlert(payload);
     case 'telegram':
-      return formatTelegramAlert(payload);
+      return formatTelegramAlert(payload, options?.chatId);
     case 'slack':
       return formatSlackAlert(payload);
     default:

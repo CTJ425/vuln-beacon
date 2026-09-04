@@ -18,18 +18,24 @@ export function formatDiscordAlert(alert: WebhookAlertPayload) {
     { name: 'CVSS Score', value: scoreText, inline: true },
   ];
 
+  const rawDescription = alert.summary || alert.advisoryTitle || '';
+  const truncatedDescription =
+    rawDescription.length > 3500 ? rawDescription.slice(0, 3497) + '...' : rawDescription;
+
   if (alert.affectedProducts && alert.affectedProducts.length > 0) {
+    const productsText = alert.affectedProducts.slice(0, 5).join('\n');
     fields.push({
       name: 'Affected Products',
-      value: alert.affectedProducts.slice(0, 5).join('\n'),
+      value: productsText.length > 1000 ? productsText.slice(0, 997) + '...' : productsText,
       inline: false,
     });
   }
 
   if (alert.fixedVersions && alert.fixedVersions.length > 0) {
+    const fixedText = alert.fixedVersions.slice(0, 5).join('\n');
     fields.push({
       name: 'Fixed In',
-      value: alert.fixedVersions.slice(0, 5).join('\n'),
+      value: fixedText.length > 1000 ? fixedText.slice(0, 997) + '...' : fixedText,
       inline: false,
     });
   }
@@ -38,7 +44,7 @@ export function formatDiscordAlert(alert: WebhookAlertPayload) {
     embeds: [
       {
         title: `🚨 [${alert.severity}] Security Alert: ${alert.cveId}`,
-        description: alert.summary || alert.advisoryTitle,
+        description: truncatedDescription,
         url: alert.advisoryUrl,
         color,
         fields,

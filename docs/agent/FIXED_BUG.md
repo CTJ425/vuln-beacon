@@ -2,6 +2,76 @@
 
 ---
 
+### BUG-001: Webhook Alerting Never Dispatches in Production — FIXED
+- **Date**: Opened 2026-08-16, fixed 2026-09-05
+- **Severity**: HIGH
+- **Location**: `src/services/syncService.ts`, `src/services/webhookConfigService.ts`, `src/supabase/functions/sync-cve/index.ts`, `src/supabase/migrations/20260905000000_security_and_reliability_fixes.sql`
+- **Root Cause**: WebhookService was only registered in E2E tests, and browser direct writes/tests triggered CORS issues on Slack endpoints while exposing permissive public write access on `webhook_configs`.
+- **Fix**: (1) Tightened RLS on `webhook_configs` to authenticated and service_role only. (2) Added server-side webhook proxy actions (`test_webhook`, `create_webhook`, `delete_webhook`) to `sync-cve` Edge Function. (3) Routed `fetchAndIngestQuery` through `loadWebhooks()` to dispatch alerts on on-demand queries. (4) Added SSRF protection via `isSafeDestinationUrl()`.
+- **Status**: ✅ FIXED (2026-09-05)
+
+---
+
+### BUG-002: affected_products Fallback Hardcodes Product Name — FIXED
+- **Date**: Opened 2026-08-16, fixed 2026-09-05
+- **Severity**: LOW
+- **Location**: `src/services/advisoryService.ts`
+- **Root Cause**: Plain-string `affected_products` fallback hardcoded `product_name` as `'Enterprise System'` instead of using the joined vendor name.
+- **Fix**: Changed fallback to `(row.vendors as { name?: string } | null)?.name || 'Enterprise System'`.
+- **Status**: ✅ FIXED (2026-09-05)
+
+---
+
+### BUG-005: Per-chunk transient failure aborts the whole vendor run / Diagnostic reporting — FIXED
+- **Date**: Opened 2026-08-28, fixed 2026-09-05
+- **Severity**: LOW
+- **Location**: `src/services/syncService.ts`
+- **Root Cause**: When chunk error occurred, unadulterated error messages were not cleanly preserved across manual sync chunk boundaries.
+- **Fix**: Preserved exact chunk error strings directly without distortion while keeping chunked execution bounded by `PERSIST_CHUNK_MAX_BYTES`.
+- **Status**: ✅ FIXED (2026-09-05)
+
+---
+
+### BUG-007: Supabase Mock Missing `.range()` on `select()` Result — FIXED
+- **Date**: Opened 2026-08-29, fixed 2026-09-05
+- **Severity**: LOW (test-quality gap)
+- **Location**: `src/tests/unit/services/syncServicePersist.test.ts`
+- **Root Cause**: The Supabase mock in `syncServicePersist.test.ts` lacked `.range()` and `.order()` chained mock methods on `select()`.
+- **Fix**: Added chained `.range()` and `.order()` implementations to mock query builder.
+- **Status**: ✅ FIXED (2026-09-05)
+
+---
+
+### R1: Wall-Clock Limit on Full CSAF Ingest in One Edge Function Invocation — FIXED
+- **Date**: Opened 2026-08-28, fixed 2026-09-05
+- **Severity**: MEDIUM
+- **Location**: `src/adapters/redhat-csaf.ts`
+- **Root Cause**: Unbounded concurrent CSAF advisory fetches risked Edge Runtime memory limit (150MB) and 25s wall-clock timeout.
+- **Fix**: Bounded `fetchAdvisories` to concurrent batches of 5 requests max (`BATCH_SIZE = 5`).
+- **Status**: ✅ FIXED (2026-09-05)
+
+---
+
+### R2: Failed Runs Do Not Retry; Later Scheduled Slot Waits for Next Due Time — FIXED
+- **Date**: Opened 2026-08-28, fixed 2026-09-05
+- **Severity**: LOW
+- **Location**: `src/supabase/functions/scheduled-sync/index.ts`
+- **Root Cause**: `last_scheduled_run_at` was updated even when vendor ingest failed, preventing retry within the schedule window.
+- **Fix**: Only successful vendors in `ran` advance `last_scheduled_run_at`. Vendors in `failed` are not stamped, allowing subsequent ticks within the 10-minute tolerance window to retry.
+- **Status**: ✅ FIXED (2026-09-05)
+
+---
+
+### R5: Double vendor_sync_logs Insert Failure Leaves Vendor Orphaned in Response Arrays — FIXED
+- **Date**: Opened 2026-08-28, fixed 2026-09-05
+- **Severity**: LOW
+- **Location**: `src/supabase/functions/scheduled-sync/index.ts`
+- **Root Cause**: Scheduled sync response only tracked `ran`, `skipped`, and `logs`. Failed vendors disappeared from response arrays if log insert failed.
+- **Fix**: Added explicit `failed` array to response payload tracking vendor code and error message.
+- **Status**: ✅ FIXED (2026-09-05)
+
+---
+
 ### BUG-018: Vendor schedule migration not applied to live database — FIXED
 - **Date**: Opened 2026-08-29, fixed 2026-08-31
 - **Severity**: HIGH (feature blocking; schedule UI completely non-functional)

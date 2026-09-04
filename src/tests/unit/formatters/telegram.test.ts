@@ -24,4 +24,28 @@ describe('Telegram Webhook Formatter', () => {
     expect(payload.text).toContain('Red Hat');
     expect(payload.text).toContain('RHSA-2024:6821');
   });
+
+  it('includes chat_id when provided', () => {
+    const payload = formatTelegramAlert(sampleAlert, '12345678');
+    expect(payload.chat_id).toBe('12345678');
+  });
+
+  it('escapes HTML special characters in summary to prevent parse errors', () => {
+    const alertWithHtml: WebhookAlertPayload = {
+      ...sampleAlert,
+      summary: 'Vulnerability in kernel < 5.14 & glibc > 2.28',
+    };
+    const payload = formatTelegramAlert(alertWithHtml);
+    expect(payload.text).toContain('&lt; 5.14 &amp; glibc &gt; 2.28');
+    expect(payload.text).not.toContain('< 5.14 & glibc >');
+  });
+
+  it('truncates message to 4000 characters if summary is very long', () => {
+    const longAlert: WebhookAlertPayload = {
+      ...sampleAlert,
+      summary: 'A'.repeat(5000),
+    };
+    const payload = formatTelegramAlert(longAlert);
+    expect(payload.text.length).toBeLessThanOrEqual(4000);
+  });
 });

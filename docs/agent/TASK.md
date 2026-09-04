@@ -73,12 +73,12 @@
   - **Verification**: `npm --prefix src test` 36 files / 159 tests passed; `npm --prefix src run build` clean; reviewer pass on fixes to 2 BLOCKERs (README references) and 3 RISKs (dangling file, dead branch, unobservable export).
   - **Completed**: 2026-08-27 17:31:17 Asia/Taipei.
 
-- [ ] **Task 11: Webhook Settings & Admin Controls — Edge Function Backend & RLS Write Policies (Phase B2)**
-  - [ ] Implement `webhook-admin` Edge Function handler for webhook create/delete/update operations using service-role key.
-  - [ ] Apply RLS write policy restrictions to `webhook_configs` table (currently allows direct browser writes via anon key).
-  - [ ] Update `webhookConfigService.ts` to route all mutations through `webhook-admin` Edge Function.
-  - [ ] Verify webhook management UI works correctly with backend Edge Function (no browser direct writes).
-  - **Status**: Planned follow-on item (step 2 of 2, Phase B2, blocked on Task 9 completion).
+- [x] **Task 11: Webhook Settings & Admin Controls — Edge Function Backend & RLS Write Policies (Phase B2)**
+  - [x] Implement webhook proxy handler in `sync-cve` Edge Function for webhook create/delete/test operations using service-role key.
+  - [x] Apply RLS write policy restrictions to `webhook_configs` table (migration `20260905000000_security_and_reliability_fixes.sql`).
+  - [x] Update `webhookConfigService.ts` to route all mutations and tests through `sync-cve` Edge Function.
+  - [x] Verify webhook management UI works correctly with backend Edge Function (bypasses browser CORS on Slack, blocks SSRF).
+  - **Verification**: 52 test files, 279 tests passing; clean build. Completed 2026-09-05 Asia/Taipei.
 
 - [x] **Task 13 Phase 1: Feed Sources Panel — Vendor API Endpoint Visibility (COMPLETED)**
   - [x] Implement `VendorEndpoint { label, url }` type and add `readonly endpoints: VendorEndpoint[]` to `VendorAdapter`.
@@ -166,7 +166,26 @@
 - [ ] **Task 11a: Network Layer Only — No Code Change** — Implement Cloudflare Tunnel + Caddy reverse proxy with path prefix (`/supabase`). Ref: `docs/agent/specs/self-host-deployment-topology.md` (design points D1–D4).
 - [ ] **Task 11b: Fix ENV Example & Document Self-Host Edge Function Deploy** — Correct `src/.env.example` comment claiming Edge Functions auto-receive `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` (false under self-host). Document manual function deploy to self-hosted edge-runtime volume (D5, D6). Ref: `docs/agent/specs/self-host-deployment-topology.md`.
 - [ ] **Task 11c: Move Browser Manual Sync Server-Side** — Relocate sync trigger from browser (`syncService.ts:319-332`) to Edge Function endpoint (`scheduled-sync`), allowing scheduled sync to succeed for tailnet-restricted users (C1). Requires own spec; existing spec `docs/agent/specs/webhook-admin-and-server-dispatch.md` still applies to webhook tasks. Ref: `docs/agent/specs/self-host-deployment-topology.md` (consequence C1).
-- [ ] **Task 11d: Webhook Admin & Server Dispatch Edge Function** — Add Role-Based Access to webhook_configs table (C2); prevent unauthenticated SELECT/write. Ref: `docs/agent/specs/webhook-admin-and-server-dispatch.md`.
+- [x] **Task 11d: Webhook Admin & Server Dispatch Edge Function** — Add Role-Based Access to webhook_configs table (C2); prevent unauthenticated SELECT/write. Proxy actions implemented in `sync-cve` Edge Function. Ref: `docs/agent/specs/webhook-admin-and-server-dispatch.md`.
+
+## Completed Work Streams
+
+- [x] **Task 16: Comprehensive Security & Reliability Audit Remediation (16 Findings)**
+  - [x] P0.1 Auth token verification, CVE regex format validation, and 5MB payload ceiling in `sync-cve` Edge Function.
+  - [x] P0.2 & P0.4 Revoke `tick_scheduled_syncs` from public/anon/auth, add `pg_try_advisory_xact_lock` concurrency lock, vault secrets check, and tighten `webhook_configs` RLS write policy.
+  - [x] P0.3 SSRF guard (`isSafeDestinationUrl`) enforcing HTTPS and blocking loopback, RFC1918, RFC3927, RFC4193 addresses across all webhooks.
+  - [x] P1.1 Telegram chat_id query extraction, HTML escaping, and 4000 char message truncation.
+  - [x] P1.2 Slack webhook CORS proxy via `sync-cve` Edge Function.
+  - [x] P1.3 Slack (2,500 char) and Discord (3,500 description / 1,000 field) payload truncation guards.
+  - [x] P1.4 Dispatch webhooks on on-demand explorer queries (`loadWebhooks` in `fetchAndIngestQuery`).
+  - [x] P1/P2.1 Edge Function build synchronization (`build:edge` before `tsc` and `vite build`).
+  - [x] P2.1 Manual sync error reporting and unadulterated error diagnostics preservation.
+  - [x] P2.2 Explorer query chunking using `buildPersistChunks`.
+  - [x] P2.3 CSAF concurrent fetch bounded to batches of 5 requests max.
+  - [x] P2.4 Scheduled sync retry on transient failure (`failed` vendor array, `last_scheduled_run_at` stamped only on success).
+  - [x] UI & Data Integrity: vendor name fallback in `advisoryService`, unimplemented vendor disabled state in `ScheduleSettings`, Supabase select mock range/order chaining.
+  - **Verification**: 52 test files, 279 tests all passing (100%); build clean.
+  - **Completed**: 2026-09-05 00:25:00 Asia/Taipei.
 
 
 

@@ -1,5 +1,6 @@
 import { WebhookAlertPayload, WebhookConfig, SeverityLevel } from '@/types';
 import { formatWebhookAlert } from '@/formatters';
+import { isSafeDestinationUrl } from '@/utils/urlValidator';
 
 const SEVERITY_RANKS: Record<SeverityLevel, number> = {
   CRITICAL: 4,
@@ -37,7 +38,20 @@ export class WebhookService {
       return false;
     }
 
-    const payload = formatWebhookAlert(config.platform, alert);
+    if (!isSafeDestinationUrl(config.webhook_url)) {
+      console.warn('Webhook dispatch aborted: unsafe destination URL', config.id, config.platform);
+      return false;
+    }
+
+    let chatId: string | undefined;
+    if (config.platform === 'telegram') {
+      try {
+        const parsed = new URL(config.webhook_url);
+        chatId = parsed.searchParams.get('chat_id') ?? undefined;
+      } catch {}
+    }
+
+    const payload = formatWebhookAlert(config.platform, alert, { chatId });
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);

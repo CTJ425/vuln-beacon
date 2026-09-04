@@ -27,3 +27,7 @@ for (const adapter of ALL_ADAPTERS) {
 export function getAdapterByCode(code: string): VendorAdapter | undefined {
   return ALL_ADAPTERS.find((a) => a.vendorCode === code.toLowerCase());
 }
+
+export function isAdapterImplemented(code: string): boolean {
+  return getAdapterByCode(code) !== undefined;
+}

@@ -222,7 +222,8 @@ export class SyncService {
         const mappings = engine.getMappings();
         const chunks = buildPersistChunks(advisories, cves, mappings, code);
 
-        for (const chunk of chunks) {
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
           const { error: chunkError } = await supabase.functions.invoke('sync-cve', {
             body: {
               action: 'persist_ingestion',
@@ -346,8 +347,12 @@ export class SyncService {
         return false;
       }
 
+      await this.loadWebhooks();
       const knownCveIds = await this.fetchKnownCveIds();
-      const engine = new IngestionEngine({ knownCveIds });
+      const engine = new IngestionEngine({
+        knownCveIds,
+        webhookService: this.webhookService,
+      });
       const startTime = Date.now();
       const startedAt = new Date(startTime).toISOString();
       const result = await engine.ingestVendor('redhat', detailDocuments);
@@ -361,25 +366,55 @@ export class SyncService {
         return false;
       }
 
-      const { error } = await supabase.functions.invoke('sync-cve', {
-        body: {
-          action: 'persist_ingestion',
-          vendorCode: 'redhat',
-          advisories,
-          cves: engine.getCves(),
-          mappings: engine.getMappings(),
-          syncMeta: {
-            startedAt,
-            durationMs,
-            status: 'SUCCESS',
-            errorMessage: null,
-            itemsFetched: advisories.length,
-            newItemsCount: result.newCvesCount,
-          },
-        },
-      });
+      const syncMeta = {
+        startedAt,
+        durationMs,
+        status: 'SUCCESS' as const,
+        errorMessage: null,
+        itemsFetched: advisories.length,
+        newItemsCount: result.newCvesCount,
+      };
 
-      if (error) return false;
+      const chunks = buildPersistChunks(advisories, engine.getCves(), engine.getMappings(), 'redhat');
+      if (chunks.length === 1) {
+        const chunk = chunks[0];
+        const { error } = await supabase.functions.invoke('sync-cve', {
+          body: {
+            action: 'persist_ingestion',
+            vendorCode: 'redhat',
+            advisories: chunk.advisories,
+            cves: chunk.cves,
+            mappings: chunk.mappings,
+            syncMeta,
+          },
+        });
+        if (error) return false;
+      } else {
+        for (const chunk of chunks) {
+          const { error: chunkError } = await supabase.functions.invoke('sync-cve', {
+            body: {
+              action: 'persist_ingestion',
+              vendorCode: 'redhat',
+              advisories: chunk.advisories,
+              cves: chunk.cves,
+              mappings: chunk.mappings,
+            },
+          });
+          if (chunkError) return false;
+        }
+
+        const { error } = await supabase.functions.invoke('sync-cve', {
+          body: {
+            action: 'persist_ingestion',
+            vendorCode: 'redhat',
+            advisories: [],
+            cves: [],
+            mappings: [],
+            syncMeta,
+          },
+        });
+        if (error) return false;
+      }
 
       return true;
     } catch (e) {

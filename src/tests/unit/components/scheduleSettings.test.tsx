@@ -27,6 +27,8 @@ describe('ScheduleSettings', () => {
     expect(screen.getByLabelText('Timezone for Red Hat')).toHaveValue('Asia/Taipei');
     expect(screen.getByLabelText('Enable schedule for Red Hat')).toBeChecked();
     expect(screen.getByLabelText('Enable schedule for VMware')).not.toBeChecked();
+    expect(screen.getByLabelText('Enable schedule for VMware')).toBeDisabled();
+    expect(screen.getByText('Adapter not implemented')).toBeInTheDocument();
   });
 
   it('saves the edited schedule through the callback', async () => {

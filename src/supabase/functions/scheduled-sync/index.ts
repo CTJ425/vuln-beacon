@@ -111,6 +111,7 @@ serve(async (req) => {
     const dueVendors = (vendors || []).filter((v: any) => isVendorDue(v, now));
 
     const ran: string[] = [];
+    const failed: string[] = [];
     const skipped: string[] = ((vendors || []) as any[])
       .filter((v) => !dueVendors.includes(v))
       .map((v: any) => v.code);
@@ -338,37 +339,37 @@ serve(async (req) => {
 
         if (logInsertError) {
           // The vendor already failed and now its failure log couldn't be
-          // written either — do not report it as a successful run, that
-          // would hide the failure entirely.
+          // written either — record in failed array and log error.
           console.error(`Failed to insert vendor_sync_logs row for vendor ${vendor.code}:`, logInsertError);
+          failed.push(vendor.code);
         } else {
-          ran.push(vendor.code);
+          failed.push(vendor.code);
           if (logRow) logs.push(logRow);
         }
       } finally {
-        // Stamped after the run, success or failure, so one failed slot
-        // waits for the next slot instead of retrying every tick (D5/R2).
-        // Wrapped so a throw here cannot escape the vendor loop and skip
-        // every remaining due vendor.
-        try {
-          const { error: stampError } = await supabaseClient
-            .from('vendors')
-            .update({ last_scheduled_run_at: new Date().toISOString() })
-            .eq('id', vendor.id);
+        // Only update vendor schedule stamp if the vendor run succeeded (D5/R2).
+        // A transient failure is not stamped so the next tick can retry.
+        if (ran.includes(vendor.code)) {
+          try {
+            const { error: stampError } = await supabaseClient
+              .from('vendors')
+              .update({ last_scheduled_run_at: new Date().toISOString() })
+              .eq('id', vendor.id);
 
-          if (stampError) {
-            console.error(`Failed to stamp last_scheduled_run_at for vendor ${vendor.code}:`, stampError);
+            if (stampError) {
+              console.error(`Failed to stamp last_scheduled_run_at for vendor ${vendor.code}:`, stampError);
+              stampFailures.push(vendor.code);
+            }
+          } catch (stampErr: any) {
+            console.error(`Failed to stamp last_scheduled_run_at for vendor ${vendor.code}:`, stampErr);
             stampFailures.push(vendor.code);
           }
-        } catch (stampErr: any) {
-          console.error(`Failed to stamp last_scheduled_run_at for vendor ${vendor.code}:`, stampErr);
-          stampFailures.push(vendor.code);
         }
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true, ran, skipped, logs, stampFailures }),
+      JSON.stringify({ success: true, ran, failed, skipped, logs, stampFailures }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
   } catch (error: any) {
