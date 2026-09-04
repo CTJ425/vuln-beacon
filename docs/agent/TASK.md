@@ -184,8 +184,8 @@
   - [x] P2.3 CSAF concurrent fetch bounded to batches of 5 requests max.
   - [x] P2.4 Scheduled sync retry on transient failure (`failed` vendor array, `last_scheduled_run_at` stamped only on success).
   - [x] UI & Data Integrity: vendor name fallback in `advisoryService`, unimplemented vendor disabled state in `ScheduleSettings`, Supabase select mock range/order chaining.
-  - **Verification**: 52 test files, 279 tests all passing (100%); build clean.
-  - **Completed**: 2026-09-05 00:25:00 Asia/Taipei.
+  - **Verification**: 52 test files, 283 tests all passing (100%); build clean.
+  - **Completed**: 2026-09-05 00:36:00 Asia/Taipei.
 
 
 

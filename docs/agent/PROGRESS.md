@@ -1,5 +1,24 @@
 # Progress Log
 
+## 2026-09-05 00:36:00 Asia/Taipei - Fixed Audit Remediation Bugs & Hardened Webhook/Sync Systems
+- **Fixed critical issues identified during adversarial review of prior remediation attempt**:
+  - **Database Migration Fixes**:
+    - Corrected column names in `tick_scheduled_syncs()` diagnostic logging (`sync_status` -> `status`, `sync_duration_ms` -> `duration_ms`, plus `vendor_code`), eliminating fatal PostgreSQL execution errors.
+    - Fixed RLS policy dropping in `20260905000000_security_and_reliability_fixes.sql` to explicitly drop the actual `Allow write access to webhook_configs` policy (which was previously active, leaving write access open to anonymous users).
+  - **Scheduled Sync Retry & Failure Tracking**:
+    - Added error throw on `result.status === 'FAILED'` in `scheduled-sync/index.ts` so failed runs route into the catch block, populate the `failed` array, and do not update `last_scheduled_run_at`, allowing retry within the schedule window.
+  - **Webhook Formatter & Proxy Fixes**:
+    - Added pre-formatted payload transmission in `WebhookConfigService.testWebhook` to prevent Slack/Discord/Telegram from rejecting unformatted raw alert objects with HTTP 400.
+    - Implemented platform-appropriate fallback payload generation in `sync-cve` `test_webhook` action.
+    - Added top-level `text` field to `formatSlackAlert` for notifications compatibility.
+    - Added HTML quote escaping and safe URL href formatting in `formatTelegramAlert`.
+  - **SSRF Hardening**:
+    - Expanded `isSafeDestinationUrl` across client and Edge Function to block RFC 4193 IPv6 ULA (`fc00::/7`), RFC 4291 link-local (`fe80::/10`), IPv4-mapped IPv6 (`::ffff:`), and CGNAT/broadcast IPv4 ranges.
+  - **Client Concurrency & Data Integrity**:
+    - Bounded `fetchAndIngestQuery` advisory fetches to batches of 5 concurrent requests (`BATCH_SIZE = 5`).
+    - Fixed PostgREST joined array fallback in `advisoryService.ts` to use normalized `vendor?.name`.
+- **Verification**: All 52 test files (283 tests) passed 100%; `build:edge` + `tsc` + `vite build` completed cleanly.
+
 ## 2026-09-05 00:23:00 Asia/Taipei - Resolved 16 Codebase Risks Across Security, Webhooks, Pipeline & Ingestion
 - **Resolved all 16 audit findings and open defects**:
   - **P0 Security Hardening**:
@@ -24,10 +43,3 @@
     - Fixed BUG-007: added `.range()` to select mock in `syncServicePersist.test.ts`.
     - Disabled schedule controls in `ScheduleSettings.tsx` for unimplemented vendor adapters (`isAdapterImplemented`).
 - **Verification**: All 52 test files (279 tests) passed 100%; `npm --prefix src run build` passed cleanly.
-
-## 2026-08-31 10:40:00 Asia/Taipei - Supabase Cloud deployment & BUG-018 resolved
-- **Supabase Cloud migration and function deployment complete**: Project linked to Supabase Cloud instance (`vuln-beacon-dev` / `kxtzxtxpsywhvfisarye`).
-- **BUG-018 fixed**: Resolved PostgreSQL 15+ syntax error in `20260828000000_vendor_schedule.sql` where `CHECK` constraint attempted to use a subquery (`SELECT 1 FROM unnest(schedule_times)...`). Replaced with `IMMUTABLE` function `public.validate_schedule_times(TEXT[])`.
-- **Database & Storage deployed**: All 4 migrations (`20260815000000_init_cve_collector.sql`, `20260816000000_restrict_write_rls.sql`, `20260816010000_advisory_storage.sql`, `20260828000000_vendor_schedule.sql`) successfully pushed via `supabase db push`. Verified `vendors` (all 8 seed rows), tables, indexes, RLS, and `advisory-documents` public storage bucket.
-- **Edge Functions deployed**: Deployed `sync-cve` and `scheduled-sync` to Supabase Cloud runtime via `supabase functions deploy`. Verified `sync-cve` CORS OPTIONS returns HTTP 200 `ok`.
-- **Verification**: `npm run build` clean; `supabase migration list` confirms all migrations in sync with remote; `curl` verification on PostgREST `vendors` endpoint and Storage bucket endpoint confirmed healthy.

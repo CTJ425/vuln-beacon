@@ -156,8 +156,10 @@ serve(async (req) => {
       // into vendor B's upsert and stamp them with vendor B's vendor_id.
       const engine = new IngestionEngine({ knownCveIds, webhookService });
       const startedAt = new Date().toISOString();
-      try {
         const result = await engine.ingestVendor(vendor.code);
+        if (result.status === 'FAILED') {
+          throw new Error(result.errorMessage || `Ingestion failed for vendor ${vendor.code}`);
+        }
 
         const advisories = engine.getAdvisories();
         const cves = engine.getCves();

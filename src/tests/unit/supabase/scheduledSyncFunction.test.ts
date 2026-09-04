@@ -108,6 +108,13 @@ describe('scheduled-sync edge function', () => {
     expect(uploadAt).toBeGreaterThan(-1);
     expect(uploadAt).toBeGreaterThan(advisoryBatchAt);
   });
+
+  it('throws on FAILED result status so failed vendor is tracked and not stamped', () => {
+    const src = read(scheduledSyncPath);
+    expect(src).toMatch(/result\.status\s*===\s*['"]FAILED['"]/);
+    expect(src).toContain('failed.push(vendor.code)');
+    expect(src).toMatch(/if\s*\(\s*ran\.includes\(vendor\.code\)\s*\)/);
+  });
 });
 
 describe('shared ingestion bundle', () => {
@@ -132,6 +139,19 @@ describe('shared ingestion bundle', () => {
 describe('sync-cve edge function', () => {
   it('accepts the schedule write action', () => {
     expect(read(syncCvePath)).toContain('update_vendor_schedule');
+  });
+
+  it('supports test_webhook, create_webhook, and delete_webhook actions', () => {
+    const src = read(syncCvePath);
+    expect(src).toContain('test_webhook');
+    expect(src).toContain('create_webhook');
+    expect(src).toContain('delete_webhook');
+  });
+
+  it('enforces bearer authorization header', () => {
+    const src = read(syncCvePath);
+    expect(src).toMatch(/Bearer /);
+    expect(src).toContain('401');
   });
 
   it('still supports persist_ingestion and still rejects unknown actions', () => {

@@ -326,21 +326,27 @@ export class SyncService {
         const list = (await listRes.json()) as { RHSA?: string }[];
         if (!Array.isArray(list) || list.length === 0) return false;
 
-        const fetched = await Promise.all(
-          list.map(async (entry) => {
-            if (!entry.RHSA) return null;
-            try {
-              const detailRes = await fetch(adapter.advisoryDetailUrl(entry.RHSA));
-              if (detailRes.ok) {
-                return await detailRes.json();
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < list.length; i += BATCH_SIZE) {
+          const batch = list.slice(i, i + BATCH_SIZE);
+          const batchDocs = await Promise.all(
+            batch.map(async (entry) => {
+              if (!entry.RHSA) return null;
+              try {
+                const detailRes = await fetch(adapter.advisoryDetailUrl(entry.RHSA));
+                if (detailRes.ok) {
+                  return await detailRes.json();
+                }
+              } catch {
+                // Skip this advisory rather than failing the whole batch.
               }
-            } catch {
-              // Skip this advisory rather than failing the whole batch.
-            }
-            return null;
-          })
-        );
-        detailDocuments.push(...fetched.filter((doc) => doc !== null));
+              return null;
+            })
+          );
+          for (const doc of batchDocs) {
+            if (doc !== null) detailDocuments.push(doc);
+          }
+        }
       }
 
       if (detailDocuments.length === 0) {

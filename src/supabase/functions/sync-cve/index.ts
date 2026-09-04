@@ -82,19 +82,41 @@ function isSafeDestinationUrl(inputUrl: string): boolean {
       hostname === 'localhost' ||
       hostname.endsWith('.localhost') ||
       hostname.endsWith('.local') ||
-      hostname.endsWith('.internal')
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.lan') ||
+      hostname.endsWith('.home.arpa')
     ) {
       return false;
     }
-    if (hostname === '[::1]' || hostname === '::1') return false;
+
+    if (hostname.startsWith('[') && hostname.endsWith(']')) {
+      const ip6 = hostname.slice(1, -1).toLowerCase();
+      if (ip6 === '::' || ip6 === '::1') return false;
+      if (ip6.startsWith('fc') || ip6.startsWith('fd')) return false;
+      if (
+        ip6.startsWith('fe8') ||
+        ip6.startsWith('fe9') ||
+        ip6.startsWith('fea') ||
+        ip6.startsWith('feb')
+      ) {
+        return false;
+      }
+      if (ip6.startsWith('::ffff:')) return false;
+      return true;
+    }
+
+    if (hostname === '::1' || hostname === '::') return false;
+
     const match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
     if (match) {
       const [o1, o2, o3, o4] = match.slice(1).map(Number);
       if (o1 > 255 || o2 > 255 || o3 > 255 || o4 > 255) return false;
-      if (o1 === 0 || o1 === 127 || o1 === 10) return false;
+      if (o1 === 0 || o1 === 10 || o1 === 127) return false;
+      if (o1 === 169 && o2 === 254) return false;
       if (o1 === 172 && o2 >= 16 && o2 <= 31) return false;
       if (o1 === 192 && o2 === 168) return false;
-      if (o1 === 169 && o2 === 254) return false;
+      if (o1 === 100 && o2 >= 64 && o2 <= 127) return false;
+      if (o1 >= 224) return false;
     }
     return true;
   } catch {
@@ -108,7 +130,7 @@ serve(async (req) => {
   }
 
   const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.slice(7).trim().length === 0) {
     return new Response(
       JSON.stringify({ success: false, error: 'Unauthorized: missing or invalid Authorization header' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
@@ -131,7 +153,7 @@ serve(async (req) => {
     }
 
     if (action === 'test_webhook') {
-      const { webhook, alert } = body;
+      const { webhook, payload } = body;
       if (!webhook?.webhook_url || !isSafeDestinationUrl(webhook.webhook_url)) {
         return new Response(
           JSON.stringify({ success: false, error: 'Invalid or unsafe destination URL' }),
@@ -139,10 +161,46 @@ serve(async (req) => {
         );
       }
       try {
-        const testPayload = alert ?? {
-          text: '🚨 [Test Alert] VulnBeacon webhook delivery test.',
-          content: '🚨 [Test Alert] VulnBeacon webhook delivery test.',
-        };
+        let testPayload = payload;
+        if (!testPayload) {
+          if (webhook.platform === 'telegram') {
+            let chatId: string | undefined;
+            try {
+              const parsed = new URL(webhook.webhook_url);
+              chatId = parsed.searchParams.get('chat_id') ?? undefined;
+            } catch {}
+            testPayload = {
+              text: '🚨 <b>[Test Alert]</b> VulnBeacon webhook delivery test.',
+              parse_mode: 'HTML',
+              disable_web_page_preview: false,
+              ...(chatId ? { chat_id: chatId } : {}),
+            };
+          } else if (webhook.platform === 'slack') {
+            testPayload = {
+              text: '🚨 [Test Alert] VulnBeacon webhook delivery test.',
+              blocks: [
+                {
+                  type: 'section',
+                  text: {
+                    type: 'mrkdwn',
+                    text: '🚨 *[Test Alert]* VulnBeacon webhook delivery test.',
+                  },
+                },
+              ],
+            };
+          } else {
+            testPayload = {
+              content: '🚨 [Test Alert] VulnBeacon webhook delivery test.',
+              embeds: [
+                {
+                  title: '🚨 [Test Alert] VulnBeacon webhook delivery test.',
+                  description: 'Verified live delivery from VulnBeacon connected to Supabase backend.',
+                  color: 0x388e3c,
+                },
+              ],
+            };
+          }
+        }
         const res = await fetch(webhook.webhook_url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -162,6 +220,16 @@ serve(async (req) => {
 
     if (action === 'create_webhook') {
       const { webhook } = body;
+      if (!webhook?.name || typeof webhook.name !== 'string' || !webhook.name.trim()) {
+        return badRequest('Invalid webhook name');
+      }
+      if (!['discord', 'telegram', 'slack'].includes(webhook?.platform)) {
+        return badRequest('Invalid platform');
+      }
+      const allowedSeverities = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+      if (webhook.min_severity && !allowedSeverities.includes(webhook.min_severity)) {
+        return badRequest('Invalid min_severity');
+      }
       if (!webhook?.webhook_url || !isSafeDestinationUrl(webhook.webhook_url)) {
         return new Response(
           JSON.stringify({ success: false, error: 'Invalid or unsafe destination URL' }),
@@ -171,10 +239,10 @@ serve(async (req) => {
       const { data, error } = await supabaseClient
         .from('webhook_configs')
         .insert({
-          name: webhook.name,
+          name: webhook.name.trim(),
           platform: webhook.platform,
           webhook_url: webhook.webhook_url,
-          min_severity: webhook.min_severity,
+          min_severity: webhook.min_severity || 'HIGH',
           is_active: webhook.is_active ?? true,
         })
         .select()
@@ -188,6 +256,9 @@ serve(async (req) => {
 
     if (action === 'delete_webhook') {
       const { id } = body;
+      if (!id || typeof id !== 'string') {
+        return badRequest('Missing or invalid id');
+      }
       const { error } = await supabaseClient
         .from('webhook_configs')
         .delete()
@@ -266,7 +337,8 @@ serve(async (req) => {
 
       if (hasPayload) {
         const payloadStr = JSON.stringify(adv.raw_payload);
-        if (payloadStr.length > 5 * 1024 * 1024) {
+        const payloadBytes = new TextEncoder().encode(payloadStr).length;
+        if (payloadBytes > 5 * 1024 * 1024) {
           throw new Error(`Payload for advisory ${adv.advisory_id} exceeds 5MB limit`);
         }
         const path = `${vendorCode}/${sanitiseAdvisoryKey(adv.advisory_id)}.json`;

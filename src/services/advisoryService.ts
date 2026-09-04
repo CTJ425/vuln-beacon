@@ -92,7 +92,7 @@ export class AdvisoryService {
               });
             } else if (typeof item === 'string') {
               productImpacts.push({
-                product_name: row.vendors?.name || 'Enterprise System',
+                product_name: vendor?.name || 'Enterprise System',
                 component: item,
                 state: 'Affected',
                 justification: 'None',

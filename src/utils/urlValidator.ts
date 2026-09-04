@@ -16,13 +16,35 @@ export function isSafeDestinationUrl(inputUrl: string): boolean {
       hostname === 'localhost' ||
       hostname.endsWith('.localhost') ||
       hostname.endsWith('.local') ||
-      hostname.endsWith('.internal')
+      hostname.endsWith('.internal') ||
+      hostname.endsWith('.lan') ||
+      hostname.endsWith('.home.arpa')
     ) {
       return false;
     }
 
-    // Check IPv6 loopback
-    if (hostname === '[::1]' || hostname === '::1') {
+    // Check IPv6 addresses (enclosed in brackets in WHATWG URLs)
+    if (hostname.startsWith('[') && hostname.endsWith(']')) {
+      const ip6 = hostname.slice(1, -1).toLowerCase();
+      // Unspecified / loopback
+      if (ip6 === '::' || ip6 === '::1') return false;
+      // RFC 4193 Unique Local Addresses (fc00::/7 -> fc.. and fd..)
+      if (ip6.startsWith('fc') || ip6.startsWith('fd')) return false;
+      // RFC 4291 Link-Local Unicast (fe80::/10 -> fe8, fe9, fea, feb)
+      if (
+        ip6.startsWith('fe8') ||
+        ip6.startsWith('fe9') ||
+        ip6.startsWith('fea') ||
+        ip6.startsWith('feb')
+      ) {
+        return false;
+      }
+      // IPv4-mapped IPv6 addresses (::ffff:0:0/96)
+      if (ip6.startsWith('::ffff:')) return false;
+      return true;
+    }
+
+    if (hostname === '::1' || hostname === '::') {
       return false;
     }
 
@@ -49,6 +71,10 @@ export function isSafeDestinationUrl(inputUrl: string): boolean {
       if (o1 === 192 && o2 === 168) return false;
       // 169.254.0.0/16 (Link-local / Cloud metadata AWS/GCP/Azure)
       if (o1 === 169 && o2 === 254) return false;
+      // 100.64.0.0/10 (Carrier-Grade NAT / Shared Address Space)
+      if (o1 === 100 && o2 >= 64 && o2 <= 127) return false;
+      // 224.0.0.0/4 (Multicast / Reserved / Broadcast)
+      if (o1 >= 224) return false;
     }
 
     return true;

@@ -32,9 +32,9 @@ BEGIN
   -- Surface missing vault secrets into vendor_sync_logs instead of silent exit
   IF sync_url IS NULL OR sync_key IS NULL THEN
     INSERT INTO public.vendor_sync_logs (
-      vendor_id, sync_status, error_message, sync_duration_ms
+      vendor_id, vendor_code, status, error_message, duration_ms
     )
-    SELECT id, 'FAILED', 'Missing vault secrets: scheduled_sync_url or scheduled_sync_key not configured', 0
+    SELECT id, code, 'FAILED', 'Missing vault secrets: scheduled_sync_url or scheduled_sync_key not configured', 0
     FROM public.vendors
     WHERE schedule_enabled = TRUE
     LIMIT 1;
@@ -55,6 +55,8 @@ $$;
 -- Tighten webhook_configs RLS:
 -- Public / anonymous may read active configurations for dashboard display,
 -- but only authenticated users or service_role can insert, update, or delete.
+DROP POLICY IF EXISTS "Allow write access to webhook_configs" ON public.webhook_configs;
+DROP POLICY IF EXISTS "Allow read access to webhook_configs" ON public.webhook_configs;
 DROP POLICY IF EXISTS "Allow public all access on webhook_configs" ON public.webhook_configs;
 DROP POLICY IF EXISTS "Allow anon read webhook_configs" ON public.webhook_configs;
 DROP POLICY IF EXISTS "Allow authenticated manage webhook_configs" ON public.webhook_configs;

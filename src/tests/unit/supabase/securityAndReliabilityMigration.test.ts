@@ -25,15 +25,19 @@ describe('security and reliability fixes migration', () => {
     expect(text).toContain('pg_try_advisory_xact_lock');
   });
 
-  it('logs failure diagnostics when vault secrets are missing', () => {
+  it('logs failure diagnostics with correct column names when vault secrets are missing', () => {
     const text = sql();
     expect(text).toContain('vendor_sync_logs');
     expect(text).toContain('Missing vault secrets');
+    expect(text).toContain('status');
+    expect(text).toContain('duration_ms');
+    expect(text).not.toContain('sync_status');
+    expect(text).not.toContain('sync_duration_ms');
   });
 
-  it('restricts public write access on webhook_configs', () => {
+  it('restricts public write access on webhook_configs by dropping existing write policy', () => {
     const text = sql();
-    expect(text).toMatch(/DROP POLICY IF EXISTS "Allow public all access on webhook_configs"/i);
+    expect(text).toMatch(/DROP POLICY IF EXISTS "Allow write access to webhook_configs"/i);
     expect(text).toMatch(/CREATE POLICY "Allow anon read webhook_configs"/i);
     expect(text).toMatch(/CREATE POLICY "Allow authenticated manage webhook_configs"/i);
   });

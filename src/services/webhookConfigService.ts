@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { WebhookConfig } from '@/types';
 import { WebhookService } from '@/services/webhook';
+import { formatWebhookAlert } from '@/formatters';
 
 export class WebhookConfigService {
   private webhookDispatcher = new WebhookService();
@@ -125,8 +126,17 @@ export class WebhookConfigService {
 
     // Attempt server-side proxy via sync-cve to avoid browser CORS issues (e.g. Slack incoming webhooks)
     try {
+      let chatId: string | undefined;
+      if (webhook.platform === 'telegram') {
+        try {
+          const parsed = new URL(webhook.webhook_url);
+          chatId = parsed.searchParams.get('chat_id') ?? undefined;
+        } catch {}
+      }
+      const formattedPayload = formatWebhookAlert(webhook.platform, alert, { chatId });
+
       const { data, error } = await supabase.functions.invoke('sync-cve', {
-        body: { action: 'test_webhook', webhook, alert },
+        body: { action: 'test_webhook', webhook, payload: formattedPayload, alert },
       });
       if (!error && data?.success !== undefined) {
         return Boolean(data.success);

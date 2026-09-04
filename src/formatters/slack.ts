@@ -63,5 +63,8 @@ export function formatSlackAlert(alert: WebhookAlertPayload) {
     });
   }
 
-  return { blocks };
+  return {
+    text: `🚨 [${alert.severity}] Security Alert: ${alert.cveId} (${alert.vendorName})`,
+    blocks,
+  };
 }

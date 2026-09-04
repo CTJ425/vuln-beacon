@@ -555,25 +555,26 @@ function formatDiscordAlert(alert) {
 
 // formatters/telegram.ts
 function escapeHtml(text) {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 function formatTelegramAlert(alert, chatId) {
   const scoreText = alert.cvssScore ? `${alert.cvssScore} (${alert.severity})` : alert.severity;
   const products = (alert.affectedProducts || []).slice(0, 3).map(escapeHtml).join(", ") || "N/A";
   const rawSummary = alert.summary || alert.advisoryTitle || "";
   const escapedSummary = escapeHtml(rawSummary);
+  const advisoryLine = alert.advisoryUrl ? `<b>Advisory:</b> <a href="${escapeHtml(alert.advisoryUrl)}">${escapeHtml(alert.advisoryId || "N/A")}</a>` : `<b>Advisory:</b> ${escapeHtml(alert.advisoryId || "N/A")}`;
   const text = [
     `\u{1F6A8} <b>[${alert.severity} Security Alert]</b>`,
     ``,
-    `<b>CVE:</b> <code>${escapeHtml(alert.cveId)}</code>`,
-    `<b>Vendor:</b> ${escapeHtml(alert.vendorName)}`,
-    `<b>Advisory:</b> <a href="${alert.advisoryUrl}">${escapeHtml(alert.advisoryId)}</a>`,
+    `<b>CVE:</b> <code>${escapeHtml(alert.cveId || "N/A")}</code>`,
+    `<b>Vendor:</b> ${escapeHtml(alert.vendorName || "Unknown Vendor")}`,
+    advisoryLine,
     `<b>CVSS Score:</b> ${scoreText}`,
     `<b>Affected:</b> ${products}`,
     ``,
     `<b>Summary:</b> ${escapedSummary}`,
     alert.dashboardUrl ? `
-\u{1F517} <a href="${alert.dashboardUrl}">Open in VulnBeacon Dashboard</a>` : ""
+\u{1F517} <a href="${escapeHtml(alert.dashboardUrl)}">Open in VulnBeacon Dashboard</a>` : ""
   ].filter(Boolean).join("\n");
   const truncatedText = text.length > 4e3 ? text.slice(0, 3997) + "..." : text;
   const result = {
@@ -652,7 +653,10 @@ ${truncatedSummary}`
       ]
     });
   }
-  return { blocks };
+  return {
+    text: `\u{1F6A8} [${alert.severity}] Security Alert: ${alert.cveId} (${alert.vendorName})`,
+    blocks
+  };
 }
 
 // formatters/index.ts
@@ -677,10 +681,20 @@ function isSafeDestinationUrl(inputUrl) {
       return false;
     }
     const hostname = parsed.hostname.toLowerCase();
-    if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local") || hostname.endsWith(".internal")) {
+    if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local") || hostname.endsWith(".internal") || hostname.endsWith(".lan") || hostname.endsWith(".home.arpa")) {
       return false;
     }
-    if (hostname === "[::1]" || hostname === "::1") {
+    if (hostname.startsWith("[") && hostname.endsWith("]")) {
+      const ip6 = hostname.slice(1, -1).toLowerCase();
+      if (ip6 === "::" || ip6 === "::1") return false;
+      if (ip6.startsWith("fc") || ip6.startsWith("fd")) return false;
+      if (ip6.startsWith("fe8") || ip6.startsWith("fe9") || ip6.startsWith("fea") || ip6.startsWith("feb")) {
+        return false;
+      }
+      if (ip6.startsWith("::ffff:")) return false;
+      return true;
+    }
+    if (hostname === "::1" || hostname === "::") {
       return false;
     }
     const ipv4Regex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
@@ -699,6 +713,8 @@ function isSafeDestinationUrl(inputUrl) {
       if (o1 === 172 && o2 >= 16 && o2 <= 31) return false;
       if (o1 === 192 && o2 === 168) return false;
       if (o1 === 169 && o2 === 254) return false;
+      if (o1 === 100 && o2 >= 64 && o2 <= 127) return false;
+      if (o1 >= 224) return false;
     }
     return true;
   } catch {

@@ -21,8 +21,26 @@ describe('isSafeDestinationUrl (SSRF protection)', () => {
     expect(isSafeDestinationUrl('https://internal-host.internal/webhook')).toBe(false);
   });
 
-  it('rejects IPv6 loopback', () => {
+  it('rejects IPv6 loopback, unspecified, and private/link-local ranges', () => {
+    // Loopback & unspecified
     expect(isSafeDestinationUrl('https://[::1]/webhook')).toBe(false);
+    expect(isSafeDestinationUrl('https://[::]/webhook')).toBe(false);
+
+    // RFC 4193 Unique Local Address (fc00::/7)
+    expect(isSafeDestinationUrl('https://[fc00::1]/webhook')).toBe(false);
+    expect(isSafeDestinationUrl('https://[fd12:3456:789a:1::1]/webhook')).toBe(false);
+
+    // RFC 4291 Link-Local Unicast (fe80::/10)
+    expect(isSafeDestinationUrl('https://[fe80::1]/webhook')).toBe(false);
+
+    // IPv4-mapped IPv6 (::ffff:0:0/96)
+    expect(isSafeDestinationUrl('https://[::ffff:127.0.0.1]/webhook')).toBe(false);
+    expect(isSafeDestinationUrl('https://[::ffff:169.254.169.254]/webhook')).toBe(false);
+    expect(isSafeDestinationUrl('https://[::ffff:10.0.0.1]/webhook')).toBe(false);
+  });
+
+  it('allows valid public IPv6 destinations', () => {
+    expect(isSafeDestinationUrl('https://[2001:4860:4860::8888]/webhook')).toBe(true);
   });
 
   it('rejects private IPv4 addresses and link-local cloud metadata', () => {
