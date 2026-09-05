@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getFunctionHeaders } from '@/lib/functionAuth';
 import { Vendor } from '@/types';
 
 export class VendorService {
@@ -38,7 +39,9 @@ export class VendorService {
     schedule: { enabled: boolean; times: string[]; timezone: string }
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      const headers = await getFunctionHeaders();
       const { data, error } = await supabase.functions.invoke('sync-cve', {
+        headers,
         body: { action: 'update_vendor_schedule', vendorCode, schedule },
       });
 

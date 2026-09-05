@@ -1,4 +1,23 @@
 import { supabase } from '@/lib/supabase';
+import { getFunctionHeaders } from '@/lib/functionAuth';
+
+export async function extractErrorMessage(err: any): Promise<string> {
+  if (err?.context && typeof err.context.json === 'function') {
+    try {
+      const response = typeof err.context.clone === 'function' ? err.context.clone() : err.context;
+      const errorBody = await response.json();
+      if (errorBody?.error && typeof errorBody.error === 'string') {
+        return errorBody.error;
+      }
+      if (errorBody?.message && typeof errorBody.message === 'string') {
+        return errorBody.message;
+      }
+    } catch {
+      // Fall through to err.message on JSON extraction error
+    }
+  }
+  return err?.message || 'Sync failed';
+}
 import { VendorSyncLog } from '@/types';
 import { IngestionEngine } from '@/engine/ingestion';
 import { WebhookService } from '@/services/webhook';
@@ -222,9 +241,12 @@ export class SyncService {
         const mappings = engine.getMappings();
         const chunks = buildPersistChunks(advisories, cves, mappings, code);
 
+        const headers = await getFunctionHeaders();
+
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
           const { error: chunkError } = await supabase.functions.invoke('sync-cve', {
+            headers,
             body: {
               action: 'persist_ingestion',
               vendorCode: code,
@@ -238,6 +260,7 @@ export class SyncService {
         }
 
         const { data, error } = await supabase.functions.invoke('sync-cve', {
+          headers,
           body: {
             action: 'persist_ingestion',
             vendorCode: code,
@@ -267,13 +290,15 @@ export class SyncService {
       } catch (err: any) {
         allSucceeded = false;
         const duration = Date.now() - startTime;
-        const errorMessage = err?.message || 'Sync failed';
+        const errorMessage = await extractErrorMessage(err);
         if (!recordedError) {
           errors.push(errorMessage);
         }
 
         try {
+          const headers = await getFunctionHeaders();
           const { data: errData, error: errDataError } = await supabase.functions.invoke('sync-cve', {
+            headers,
             body: {
               action: 'persist_ingestion',
               vendorCode: code,
@@ -382,9 +407,11 @@ export class SyncService {
       };
 
       const chunks = buildPersistChunks(advisories, engine.getCves(), engine.getMappings(), 'redhat');
+      const headers = await getFunctionHeaders();
       if (chunks.length === 1) {
         const chunk = chunks[0];
         const { error } = await supabase.functions.invoke('sync-cve', {
+          headers,
           body: {
             action: 'persist_ingestion',
             vendorCode: 'redhat',
@@ -394,10 +421,15 @@ export class SyncService {
             syncMeta,
           },
         });
-        if (error) return false;
+        if (error) {
+          const errDetail = await extractErrorMessage(error);
+          console.error('On-demand fetch error:', errDetail);
+          return false;
+        }
       } else {
         for (const chunk of chunks) {
           const { error: chunkError } = await supabase.functions.invoke('sync-cve', {
+            headers,
             body: {
               action: 'persist_ingestion',
               vendorCode: 'redhat',
@@ -406,10 +438,15 @@ export class SyncService {
               mappings: chunk.mappings,
             },
           });
-          if (chunkError) return false;
+          if (chunkError) {
+            const errDetail = await extractErrorMessage(chunkError);
+            console.error('On-demand fetch error:', errDetail);
+            return false;
+          }
         }
 
         const { error } = await supabase.functions.invoke('sync-cve', {
+          headers,
           body: {
             action: 'persist_ingestion',
             vendorCode: 'redhat',
@@ -419,7 +456,11 @@ export class SyncService {
             syncMeta,
           },
         });
-        if (error) return false;
+        if (error) {
+          const errDetail = await extractErrorMessage(error);
+          console.error('On-demand fetch error:', errDetail);
+          return false;
+        }
       }
 
       return true;

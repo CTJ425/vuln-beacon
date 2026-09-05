@@ -136,4 +136,24 @@ describe('SyncService returns the failure reason even when it cannot be persiste
     expect(result.success).toBe(true);
     expect(result.errors ?? []).toEqual([]);
   });
+
+  it('extracts underlying JSON error from err.context.json() when available', async () => {
+    const errorWithContext = Object.assign(new Error('Edge Function returned a non-2xx status code'), {
+      context: {
+        json: async () => ({
+          success: false,
+          error: 'Unauthorized: missing or invalid Authorization or apikey header',
+        }),
+      },
+    });
+    mockInvoke.mockResolvedValue({
+      data: null,
+      error: errorWithContext,
+    });
+
+    const result = await new SyncService().syncVendors();
+
+    expect(result.success).toBe(false);
+    expect(result.errors).toEqual(['Unauthorized: missing or invalid Authorization or apikey header']);
+  });
 });

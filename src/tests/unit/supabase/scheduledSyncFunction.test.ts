@@ -148,15 +148,64 @@ describe('sync-cve edge function', () => {
     expect(src).toContain('delete_webhook');
   });
 
-  it('enforces bearer authorization header', () => {
+  it('enforces bearer authorization header or apikey header', () => {
     const src = read(syncCvePath);
     expect(src).toMatch(/Bearer /);
+    expect(src).toContain('apikey');
     expect(src).toContain('401');
+    expect(src).toMatch(/hasBearer/);
+    expect(src).toMatch(/hasApiKey/);
   });
 
   it('still supports persist_ingestion and still rejects unknown actions', () => {
     const src = read(syncCvePath);
     expect(src).toContain('persist_ingestion');
     expect(src).toContain('Unsupported action');
+  });
+
+  describe('sync-cve auth verification logic matches implementation', () => {
+    function verifyAuth(headers: Record<string, string>): { authorized: boolean; status: number; error?: string } {
+      const reqHeaders = new Headers(headers);
+      const authHeader = reqHeaders.get('Authorization') ?? reqHeaders.get('authorization');
+      const apiKey = reqHeaders.get('apikey') ?? reqHeaders.get('ApiKey') ?? reqHeaders.get('x-api-key');
+
+      const hasBearer = Boolean(authHeader && authHeader.startsWith('Bearer ') && authHeader.slice(7).trim().length > 0);
+      const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
+
+      if (!hasBearer && !hasApiKey) {
+        return { authorized: false, status: 401, error: 'Unauthorized: missing or invalid Authorization or apikey header' };
+      }
+      return { authorized: true, status: 200 };
+    }
+
+    it('authorizes valid Bearer token', () => {
+      expect(verifyAuth({ Authorization: 'Bearer test-token' }).authorized).toBe(true);
+    });
+
+    it('authorizes valid apikey header (e.g. sb_publishable key)', () => {
+      expect(verifyAuth({ apikey: 'sb_publishable_12345' }).authorized).toBe(true);
+    });
+
+    it('authorizes when both Bearer and apikey are present', () => {
+      expect(verifyAuth({ Authorization: 'Bearer test-token', apikey: 'sb_publishable_12345' }).authorized).toBe(true);
+    });
+
+    it('rejects when both headers are missing', () => {
+      const res = verifyAuth({});
+      expect(res.authorized).toBe(false);
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects when Bearer token is empty string', () => {
+      const res = verifyAuth({ Authorization: 'Bearer ' });
+      expect(res.authorized).toBe(false);
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects when apikey is empty whitespace', () => {
+      const res = verifyAuth({ apikey: '   ' });
+      expect(res.authorized).toBe(false);
+      expect(res.status).toBe(401);
+    });
   });
 });

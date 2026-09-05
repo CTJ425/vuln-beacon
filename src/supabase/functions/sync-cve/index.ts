@@ -130,9 +130,14 @@ serve(async (req) => {
   }
 
   const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.slice(7).trim().length === 0) {
+  const apiKey = req.headers.get('apikey') ?? req.headers.get('ApiKey') ?? req.headers.get('x-api-key');
+
+  const hasBearer = Boolean(authHeader && authHeader.startsWith('Bearer ') && authHeader.slice(7).trim().length > 0);
+  const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
+
+  if (!hasBearer && !hasApiKey) {
     return new Response(
-      JSON.stringify({ success: false, error: 'Unauthorized: missing or invalid Authorization header' }),
+      JSON.stringify({ success: false, error: 'Unauthorized: missing or invalid Authorization or apikey header' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
     );
   }

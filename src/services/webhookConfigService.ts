@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { getFunctionHeaders } from '@/lib/functionAuth';
 import { WebhookConfig } from '@/types';
 import { WebhookService } from '@/services/webhook';
 import { formatWebhookAlert } from '@/formatters';
@@ -38,7 +39,9 @@ export class WebhookConfigService {
   ): Promise<WebhookConfig | null> {
     try {
       // Route through sync-cve edge function to enforce RLS write policy
+      const headers = await getFunctionHeaders();
       const { data: edgeData, error: edgeError } = await supabase.functions.invoke('sync-cve', {
+        headers,
         body: { action: 'create_webhook', webhook },
       });
       if (!edgeError && edgeData?.success && edgeData.data) {
@@ -84,7 +87,9 @@ export class WebhookConfigService {
   async deleteWebhook(id: string): Promise<boolean> {
     try {
       // Route through sync-cve edge function to enforce RLS write policy
+      const headers = await getFunctionHeaders();
       const { data: edgeData, error: edgeError } = await supabase.functions.invoke('sync-cve', {
+        headers,
         body: { action: 'delete_webhook', id },
       });
       if (!edgeError && edgeData?.success) {
@@ -135,7 +140,9 @@ export class WebhookConfigService {
       }
       const formattedPayload = formatWebhookAlert(webhook.platform, alert, { chatId });
 
+      const headers = await getFunctionHeaders();
       const { data, error } = await supabase.functions.invoke('sync-cve', {
+        headers,
         body: { action: 'test_webhook', webhook, payload: formattedPayload, alert },
       });
       if (!error && data?.success !== undefined) {
