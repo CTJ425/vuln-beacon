@@ -1,5 +1,20 @@
 # Progress Log
 
+## 2026-09-05 09:17:00 Asia/Taipei - Adversarial Review Fixes: Chunking Timeout Optimization & Auth Robustness
+- **Fixed critical defect and robustness gaps identified during adversarial review**:
+  - **O(N) Incremental Chunk Byte Calculation in `syncService.ts`**:
+    - Replaced O(N^2) repeated `JSON.stringify` / `TextEncoder().encode()` of candidate chunks with incremental byte counting and WeakMap item size caching in `buildPersistChunks`.
+    - Eliminated Vitest 5000ms test timeouts where `tests/unit/services/syncServiceChunking.test.ts` previously timed out and failed 5 tests.
+  - **Auth Header Robustness in `functionAuth.ts` and `sync-cve`**:
+    - Avoided emitting malformed `Authorization: Bearer ` header when token/key is absent in `getFunctionHeaders()`.
+    - Added support for case-insensitive `bearer ` prefix in `sync-cve` edge function authentication handler.
+  - **Nested Error Object Extraction in `extractErrorMessage()`**:
+    - Supported nested `errorBody.error.message` structures in `extractErrorMessage()`.
+  - **Test Suite Completeness**:
+    - Added test coverage for empty token handling, nested error objects, and lowercase bearer authorization.
+    - Added `.order()` and `.range()` mock chaining to avoid noisy console warnings in unit tests.
+- **Verification**: Full test suite (`npm --prefix src test`) passes 100% (53 files, 300 tests); `npm --prefix src run build` passes cleanly.
+
 ## 2026-09-05 09:07:00 Asia/Taipei - Resolved Supabase Edge Function 401 Auth, Context Error Surfacing & Cloud Sync
 - **Resolved Supabase Edge Function 401 Authentication & Error Surfacing Defect**:
   - **`sync-cve` Edge Function Auth**:
@@ -17,23 +32,4 @@
     - Pushed database migrations (`20260815000000` through `20260905000000`) via `supabase db push`.
     - Deployed `sync-cve` and `scheduled-sync` edge functions to remote cloud runtime; verified live CORS and auth responses.
 - **Verification**: All 53 test files (297 tests) passed 100%; `npm --prefix src run build` passed cleanly with zero type errors.
-
-## 2026-09-05 00:36:00 Asia/Taipei - Fixed Audit Remediation Bugs & Hardened Webhook/Sync Systems
-- **Fixed critical issues identified during adversarial review of prior remediation attempt**:
-  - **Database Migration Fixes**:
-    - Corrected column names in `tick_scheduled_syncs()` diagnostic logging (`sync_status` -> `status`, `sync_duration_ms` -> `duration_ms`, plus `vendor_code`), eliminating fatal PostgreSQL execution errors.
-    - Fixed RLS policy dropping in `20260905000000_security_and_reliability_fixes.sql` to explicitly drop the actual `Allow write access to webhook_configs` policy (which was previously active, leaving write access open to anonymous users).
-  - **Scheduled Sync Retry & Failure Tracking**:
-    - Added error throw on `result.status === 'FAILED'` in `scheduled-sync/index.ts` so failed runs route into the catch block, populate the `failed` array, and do not update `last_scheduled_run_at`, allowing retry within the schedule window.
-  - **Webhook Formatter & Proxy Fixes**:
-    - Added pre-formatted payload transmission in `WebhookConfigService.testWebhook` to prevent Slack/Discord/Telegram from rejecting unformatted raw alert objects with HTTP 400.
-    - Implemented platform-appropriate fallback payload generation in `sync-cve` `test_webhook` action.
-    - Added top-level `text` field to `formatSlackAlert` for notifications compatibility.
-    - Added HTML quote escaping and safe URL href formatting in `formatTelegramAlert`.
-  - **SSRF Hardening**:
-    - Expanded `isSafeDestinationUrl` across client and Edge Function to block RFC 4193 IPv6 ULA (`fc00::/7`), RFC 4291 link-local (`fe80::/10`), IPv4-mapped IPv6 (`::ffff:`), and CGNAT/broadcast IPv4 ranges.
-  - **Client Concurrency & Data Integrity**:
-    - Bounded `fetchAndIngestQuery` advisory fetches to batches of 5 concurrent requests (`BATCH_SIZE = 5`).
-    - Fixed PostgREST joined array fallback in `advisoryService.ts` to use normalized `vendor?.name`.
-- **Verification**: All 52 test files (283 tests) passed 100%; `build:edge` + `tsc` + `vite build` completed cleanly.
 

@@ -132,7 +132,11 @@ serve(async (req) => {
   const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
   const apiKey = req.headers.get('apikey') ?? req.headers.get('ApiKey') ?? req.headers.get('x-api-key');
 
-  const hasBearer = Boolean(authHeader && authHeader.startsWith('Bearer ') && authHeader.slice(7).trim().length > 0);
+  const hasBearer = Boolean(
+    authHeader &&
+    (authHeader.startsWith('Bearer ') || authHeader.startsWith('bearer ')) &&
+    authHeader.slice(7).trim().length > 0
+  );
   const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
 
   if (!hasBearer && !hasApiKey) {

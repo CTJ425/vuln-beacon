@@ -191,8 +191,8 @@
   - [x] Add `extractErrorMessage()` in `syncService.ts` to unpack `err.context.json()` on `FunctionsHttpError` so underlying failure reasons reach the user.
   - [x] Restore missing `try {` block in `scheduled-sync/index.ts` vendor loop that broke Deno bundling.
   - [x] Link and deploy migrations & active functions (`sync-cve`, `scheduled-sync`) to cloud Supabase instance (`egofadbvftmbwodjneoy`).
-  - **Verification**: 53 test files, 297 tests all passing (100%); build clean; verified live Edge Function responses.
-  - **Completed**: 2026-09-05 09:07:00 Asia/Taipei.
+  - **Verification**: 53 test files, 300 tests all passing (100%); build clean; verified live Edge Function responses.
+  - **Completed**: 2026-09-05 09:17:00 Asia/Taipei.
 
 
 

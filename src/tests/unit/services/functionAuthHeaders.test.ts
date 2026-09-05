@@ -87,6 +87,33 @@ describe('Function Auth Headers and Client Services Integration', () => {
       expect(headers.Authorization).toBe('Bearer mock-supabase-key-123');
       expect(headers.apikey).toBe('mock-supabase-key-123');
     });
+
+    it('returns empty headers when no token, client key or env key is present', async () => {
+      mockGetSession.mockResolvedValue({
+        data: { session: null },
+        error: null,
+      });
+      const { supabase } = await import('@/lib/supabase');
+      const originalKey = (supabase as any).supabaseKey;
+      const originalEnv = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const originalMeta = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY;
+      (supabase as any).supabaseKey = '';
+      delete process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      if ((import.meta as any).env) {
+        delete (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      }
+      try {
+        const headers = await getFunctionHeaders();
+        expect(headers.Authorization).toBeUndefined();
+        expect(headers.apikey).toBeUndefined();
+      } finally {
+        (supabase as any).supabaseKey = originalKey;
+        if (originalEnv !== undefined) process.env.VITE_SUPABASE_PUBLISHABLE_KEY = originalEnv;
+        if ((import.meta as any).env && originalMeta !== undefined) {
+          (import.meta as any).env.VITE_SUPABASE_PUBLISHABLE_KEY = originalMeta;
+        }
+      }
+    });
   });
 
   describe('SyncService passes Authorization headers', () => {

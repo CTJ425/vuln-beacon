@@ -62,6 +62,8 @@ describe('SyncService returns the failure reason even when it cannot be persiste
     mockFrom.mockReset().mockImplementation(() => ({
       select: () =>
         Object.assign(Promise.resolve({ data: [], error: null }), {
+          order: () => Promise.resolve({ data: [], error: null }),
+          range: () => Promise.resolve({ data: [], error: null }),
           eq: () => Promise.resolve({ data: [], error: null }),
         }),
       insert: () => Promise.resolve({ data: [], error: null }),
@@ -155,5 +157,25 @@ describe('SyncService returns the failure reason even when it cannot be persiste
 
     expect(result.success).toBe(false);
     expect(result.errors).toEqual(['Unauthorized: missing or invalid Authorization or apikey header']);
+  });
+
+  it('extracts nested error.message from err.context.json() when error is an object', async () => {
+    const errorWithContext = Object.assign(new Error('Edge Function returned a non-2xx status code'), {
+      context: {
+        json: async () => ({
+          success: false,
+          error: { message: 'Database connection failed' },
+        }),
+      },
+    });
+    mockInvoke.mockResolvedValue({
+      data: null,
+      error: errorWithContext,
+    });
+
+    const result = await new SyncService().syncVendors();
+
+    expect(result.success).toBe(false);
+    expect(result.errors).toEqual(['Database connection failed']);
   });
 });

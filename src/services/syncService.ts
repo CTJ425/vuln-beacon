@@ -9,6 +9,9 @@ export async function extractErrorMessage(err: any): Promise<string> {
       if (errorBody?.error && typeof errorBody.error === 'string') {
         return errorBody.error;
       }
+      if (typeof errorBody?.error?.message === 'string') {
+        return errorBody.error.message;
+      }
       if (errorBody?.message && typeof errorBody.message === 'string') {
         return errorBody.message;
       }
@@ -41,18 +44,8 @@ interface PersistChunk {
   mappings: any[];
 }
 
-function persistChunkBodySize(vendorCode: string, chunk: PersistChunk): number {
-  const json = JSON.stringify({
-    action: 'persist_ingestion',
-    vendorCode,
-    advisories: chunk.advisories,
-    cves: chunk.cves,
-    mappings: chunk.mappings,
-  });
-  // functions.invoke transmits UTF-8 bytes, not UTF-16 code units. Non-ASCII
-  // content (e.g. CJK component names from collapseLocalePackages) makes
-  // json.length undershoot the real wire size, so measure encoded bytes.
-  return new TextEncoder().encode(json).length;
+function measureUtf8(obj: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(obj)).length;
 }
 
 /**
@@ -76,9 +69,31 @@ function buildPersistChunks(
     mappingsByAdvisory.set(m.advisory_id, list);
   }
 
+  const baseEnvelopeBytes = measureUtf8({
+    action: 'persist_ingestion',
+    vendorCode,
+    advisories: [],
+    cves: [],
+    mappings: [],
+  });
+
+  const itemByteCache = new WeakMap<object, number>();
+  function getItemBytes(item: any): number {
+    if (item && typeof item === 'object') {
+      let size = itemByteCache.get(item);
+      if (size === undefined) {
+        size = measureUtf8(item);
+        itemByteCache.set(item, size);
+      }
+      return size;
+    }
+    return measureUtf8(item);
+  }
+
   const chunks: PersistChunk[] = [];
   let current: PersistChunk = { advisories: [], cves: [], mappings: [] };
   let currentCveIds = new Set<string>();
+  let currentBytes = baseEnvelopeBytes;
 
   for (const adv of advisories) {
     const advMappings = mappingsByAdvisory.get(adv.id) ?? [];
@@ -87,23 +102,36 @@ function buildPersistChunks(
     const newCveIdsForCurrent = Array.from(advCveIds).filter((id) => !currentCveIds.has(id));
     const newCvesForCurrent = newCveIdsForCurrent.map((id) => cveById.get(id)).filter(Boolean);
 
-    const candidate: PersistChunk = {
-      advisories: [...current.advisories, adv],
-      cves: [...current.cves, ...newCvesForCurrent],
-      mappings: [...current.mappings, ...advMappings],
-    };
+    let deltaBytes = getItemBytes(adv) + (current.advisories.length > 0 ? 1 : 0);
+    for (let i = 0; i < newCvesForCurrent.length; i++) {
+      deltaBytes += getItemBytes(newCvesForCurrent[i]) + (current.cves.length + i > 0 ? 1 : 0);
+    }
+    for (let i = 0; i < advMappings.length; i++) {
+      deltaBytes += getItemBytes(advMappings[i]) + (current.mappings.length + i > 0 ? 1 : 0);
+    }
 
     if (
       current.advisories.length > 0 &&
-      persistChunkBodySize(vendorCode, candidate) > PERSIST_CHUNK_MAX_BYTES
+      currentBytes + deltaBytes > PERSIST_CHUNK_MAX_BYTES
     ) {
       chunks.push(current);
       const freshCves = Array.from(advCveIds).map((id) => cveById.get(id)).filter(Boolean);
       current = { advisories: [adv], cves: freshCves, mappings: [...advMappings] };
       currentCveIds = new Set(advCveIds);
+
+      currentBytes = baseEnvelopeBytes + getItemBytes(adv);
+      for (let i = 0; i < freshCves.length; i++) {
+        currentBytes += getItemBytes(freshCves[i]) + (i > 0 ? 1 : 0);
+      }
+      for (let i = 0; i < advMappings.length; i++) {
+        currentBytes += getItemBytes(advMappings[i]) + (i > 0 ? 1 : 0);
+      }
     } else {
-      current = candidate;
+      current.advisories.push(adv);
+      for (const c of newCvesForCurrent) current.cves.push(c);
+      for (const m of advMappings) current.mappings.push(m);
       for (const id of newCveIdsForCurrent) currentCveIds.add(id);
+      currentBytes += deltaBytes;
     }
   }
 

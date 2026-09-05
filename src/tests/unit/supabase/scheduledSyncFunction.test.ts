@@ -169,7 +169,11 @@ describe('sync-cve edge function', () => {
       const authHeader = reqHeaders.get('Authorization') ?? reqHeaders.get('authorization');
       const apiKey = reqHeaders.get('apikey') ?? reqHeaders.get('ApiKey') ?? reqHeaders.get('x-api-key');
 
-      const hasBearer = Boolean(authHeader && authHeader.startsWith('Bearer ') && authHeader.slice(7).trim().length > 0);
+      const hasBearer = Boolean(
+        authHeader &&
+        (authHeader.startsWith('Bearer ') || authHeader.startsWith('bearer ')) &&
+        authHeader.slice(7).trim().length > 0
+      );
       const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
 
       if (!hasBearer && !hasApiKey) {
@@ -180,6 +184,10 @@ describe('sync-cve edge function', () => {
 
     it('authorizes valid Bearer token', () => {
       expect(verifyAuth({ Authorization: 'Bearer test-token' }).authorized).toBe(true);
+    });
+
+    it('authorizes valid lowercase bearer token', () => {
+      expect(verifyAuth({ Authorization: 'bearer test-token' }).authorized).toBe(true);
     });
 
     it('authorizes valid apikey header (e.g. sb_publishable key)', () => {

@@ -120,6 +120,7 @@ describe('SyncService bounds the persist payload (BUG-003)', () => {
       select: () =>
         Object.assign(Promise.resolve({ data: [], error: null }), {
           range: () => Promise.resolve({ data: [], error: null }),
+          order: () => Promise.resolve({ data: [], error: null }),
           eq: () => Promise.resolve({ data: [], error: null }),
         }),
     }));

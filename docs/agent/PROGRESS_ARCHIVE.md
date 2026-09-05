@@ -1,3 +1,22 @@
+## 2026-09-05 00:36:00 Asia/Taipei - Fixed Audit Remediation Bugs & Hardened Webhook/Sync Systems
+- **Fixed critical issues identified during adversarial review of prior remediation attempt**:
+  - **Database Migration Fixes**:
+    - Corrected column names in `tick_scheduled_syncs()` diagnostic logging (`sync_status` -> `status`, `sync_duration_ms` -> `duration_ms`, plus `vendor_code`), eliminating fatal PostgreSQL execution errors.
+    - Fixed RLS policy dropping in `20260905000000_security_and_reliability_fixes.sql` to explicitly drop the actual `Allow write access to webhook_configs` policy (which was previously active, leaving write access open to anonymous users).
+  - **Scheduled Sync Retry & Failure Tracking**:
+    - Added error throw on `result.status === 'FAILED'` in `scheduled-sync/index.ts` so failed runs route into the catch block, populate the `failed` array, and do not update `last_scheduled_run_at`, allowing retry within the schedule window.
+  - **Webhook Formatter & Proxy Fixes**:
+    - Added pre-formatted payload transmission in `WebhookConfigService.testWebhook` to prevent Slack/Discord/Telegram from rejecting unformatted raw alert objects with HTTP 400.
+    - Implemented platform-appropriate fallback payload generation in `sync-cve` `test_webhook` action.
+    - Added top-level `text` field to `formatSlackAlert` for notifications compatibility.
+    - Added HTML quote escaping and safe URL href formatting in `formatTelegramAlert`.
+  - **SSRF Hardening**:
+    - Expanded `isSafeDestinationUrl` across client and Edge Function to block RFC 4193 IPv6 ULA (`fc00::/7`), RFC 4291 link-local (`fe80::/10`), IPv4-mapped IPv6 (`::ffff:`), and CGNAT/broadcast IPv4 ranges.
+  - **Client Concurrency & Data Integrity**:
+    - Bounded `fetchAndIngestQuery` advisory fetches to batches of 5 concurrent requests (`BATCH_SIZE = 5`).
+    - Fixed PostgREST joined array fallback in `advisoryService.ts` to use normalized `vendor?.name`.
+- **Verification**: All 52 test files (283 tests) passed 100%; `build:edge` + `tsc` + `vite build` completed cleanly.
+
 ## 2026-09-05 00:23:00 Asia/Taipei - Resolved 16 Codebase Risks Across Security, Webhooks, Pipeline & Ingestion
 - **Resolved all 16 audit findings and open defects**:
   - **P0 Security Hardening**:

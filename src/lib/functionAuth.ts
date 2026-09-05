@@ -30,11 +30,10 @@ export async function getFunctionHeaders(): Promise<Record<string, string>> {
     token = getEnvKey();
   }
 
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${token}`,
-  };
+  const headers: Record<string, string> = {};
 
   if (token) {
+    headers.Authorization = `Bearer ${token}`;
     headers.apikey = token;
   }
 
