@@ -313,6 +313,7 @@ serve(async (req) => {
             started_at: startedAt,
             finished_at: finishedAt,
             error_message: result.errorMessage ?? null,
+            details: result.details ?? {},
           })
           .select()
           .single();
@@ -336,6 +337,11 @@ serve(async (req) => {
             started_at: startedAt,
             finished_at: finishedAt,
             error_message: err?.message ?? 'Unknown error during scheduled sync',
+            details: {
+              error_message: err?.message ?? 'Unknown error during scheduled sync',
+              error_stack: err?.stack,
+              failed_at: finishedAt,
+            },
           })
           .select()
           .single();

@@ -191,8 +191,16 @@
   - [x] Add `extractErrorMessage()` in `syncService.ts` to unpack `err.context.json()` on `FunctionsHttpError` so underlying failure reasons reach the user.
   - [x] Restore missing `try {` block in `scheduled-sync/index.ts` vendor loop that broke Deno bundling.
   - [x] Link and deploy migrations & active functions (`sync-cve`, `scheduled-sync`) to cloud Supabase instance (`egofadbvftmbwodjneoy`).
-  - **Verification**: 53 test files, 300 tests all passing (100%); build clean; verified live Edge Function responses.
-  - **Completed**: 2026-09-05 09:17:00 Asia/Taipei.
-
-
-
+  - [x] **Task 18: Log Observability Field & Supabase Authenticated Backstage Portal**
+  - [x] Create database migration `20260907000000_add_sync_log_details.sql` adding `details` JSONB column with GIN/btree indexes to `vendor_sync_logs` table and deploy to Supabase Cloud runtime.
+  - [x] Update `VendorSyncLog` domain model, `IngestionEngine`, and `SyncService` to capture structured execution metrics, endpoints, and error stack traces in `details`.
+  - [x] Create `LogDetailModal` component and wire into `SyncLogTable` with an inspect action column.
+  - [x] Create `AdminLoginModal` with Supabase authentication (`signInWithPassword`) and gate `AdminPage` navigation only upon clicking Admin Console; keep public CVE explorer and dashboards open.
+  - [x] Create `AdminPage` with 3 core capabilities:
+    1. **Webhook Settings**: Configured webhooks integration (Discord, Slack, Telegram), connection testing, deletion, and minimum severity threshold.
+    2. **Log Data Query**: Added `AdminLogQuery` component supporting status filtering, vendor filtering, keyword search on errors/details, JSON export, and full observability modal.
+    3. **API & Supabase Operation Status**: Added `SystemHealthMonitor` checking PostgreSQL database latency, GoTrue Auth service, S3 Storage bucket availability, Edge Function runtime, and external vendor feeds (Red Hat CSAF).
+  - [x] Update Edge Functions `sync-cve` and `scheduled-sync` to persist `details` and deploy to Supabase Cloud runtime.
+  - [x] Add unit and E2E test suites for Admin login, Admin page, Log query, Log modal, System health monitor, and migration schema.
+  - **Verification**: 61 test files, 325 tests all passing (100%); build clean.
+  - **Completed**: 2026-09-07 15:15:00 Asia/Taipei.

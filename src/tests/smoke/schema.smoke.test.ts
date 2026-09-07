@@ -53,4 +53,11 @@ describe('Database Schema Smoke Test', () => {
       expect(sql).toContain(`'${code}'`);
     }
   });
+
+  it('should have the sync log details migration file present and valid', () => {
+    const detailsMigrationPath = path.resolve(__dirname, '../../supabase/migrations/20260907000000_add_sync_log_details.sql');
+    expect(fs.existsSync(detailsMigrationPath)).toBe(true);
+    const sql = fs.readFileSync(detailsMigrationPath, 'utf-8');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS details JSONB DEFAULT');
+  });
 });

@@ -267,6 +267,11 @@ var IngestionEngine = class {
     const adapter = getAdapterByCode(vendorCode);
     if (!adapter) {
       const durationMs = Date.now() - startTime;
+      const details = {
+        reason: "adapter_not_found",
+        vendor_code: vendorCode,
+        duration_ms: durationMs
+      };
       const log = {
         id: `log-${Date.now()}`,
         vendor_code: vendorCode,
@@ -276,7 +281,8 @@ var IngestionEngine = class {
         error_message: `Unknown vendor adapter code: ${vendorCode}`,
         duration_ms: durationMs,
         started_at: new Date(startTime).toISOString(),
-        finished_at: (/* @__PURE__ */ new Date()).toISOString()
+        finished_at: (/* @__PURE__ */ new Date()).toISOString(),
+        details
       };
       this.syncLogs.push(log);
       return {
@@ -286,7 +292,8 @@ var IngestionEngine = class {
         cvesCount: 0,
         newCvesCount: 0,
         durationMs,
-        errorMessage: log.error_message || void 0
+        errorMessage: log.error_message || void 0,
+        details
       };
     }
     try {
@@ -357,6 +364,14 @@ var IngestionEngine = class {
         await Promise.allSettled(pendingAlerts.map((alert) => this.webhookService.notifyAll(alert)));
       }
       const durationMs = Date.now() - startTime;
+      const details = {
+        advisories_count: items.length,
+        cves_count: totalCves,
+        new_cves_count: newCvesCount,
+        duration_ms: durationMs,
+        endpoints: adapter.endpoints?.map((e) => e.url) || [],
+        completed_at: (/* @__PURE__ */ new Date()).toISOString()
+      };
       const log = {
         id: `log-${Date.now()}`,
         vendor_code: vendorCode,
@@ -365,7 +380,8 @@ var IngestionEngine = class {
         new_items_count: newCvesCount,
         duration_ms: durationMs,
         started_at: new Date(startTime).toISOString(),
-        finished_at: (/* @__PURE__ */ new Date()).toISOString()
+        finished_at: (/* @__PURE__ */ new Date()).toISOString(),
+        details
       };
       this.syncLogs.push(log);
       return {
@@ -374,11 +390,19 @@ var IngestionEngine = class {
         advisoriesCount: items.length,
         cvesCount: totalCves,
         newCvesCount,
-        durationMs
+        durationMs,
+        details
       };
     } catch (err) {
       const durationMs = Date.now() - startTime;
       const message = err instanceof Error ? err.message : "Unknown error during ingestion";
+      const details = {
+        error_name: err instanceof Error ? err.name : typeof err,
+        error_stack: err instanceof Error ? err.stack : void 0,
+        duration_ms: durationMs,
+        endpoints: adapter ? adapter.endpoints?.map((e) => e.url) || [] : [],
+        failed_at: (/* @__PURE__ */ new Date()).toISOString()
+      };
       const log = {
         id: `log-${Date.now()}`,
         vendor_code: vendorCode,
@@ -388,7 +412,8 @@ var IngestionEngine = class {
         error_message: message,
         duration_ms: durationMs,
         started_at: new Date(startTime).toISOString(),
-        finished_at: (/* @__PURE__ */ new Date()).toISOString()
+        finished_at: (/* @__PURE__ */ new Date()).toISOString(),
+        details
       };
       this.syncLogs.push(log);
       return {
@@ -398,7 +423,8 @@ var IngestionEngine = class {
         cvesCount: 0,
         newCvesCount: 0,
         durationMs,
-        errorMessage: message
+        errorMessage: message,
+        details
       };
     }
   }

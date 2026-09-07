@@ -1,11 +1,11 @@
 import React from 'react';
 import { Box, List, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
-import { LayoutDashboard, Shield, Activity, Settings } from 'lucide-react';
+import { LayoutDashboard, Shield, Activity, Settings, Lock } from 'lucide-react';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { VendorNode } from '@/services/productTaxonomy';
 
 export type NavState =
-  | { section: 'dashboard' | 'explorer' | 'sync' | 'settings' }
+  | { section: 'dashboard' | 'explorer' | 'sync' | 'settings' | 'admin' }
   | { section: 'vendor'; vendorCode: string };
 
 interface SidebarProps {
@@ -15,10 +15,11 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentNav, onSelectNav, taxonomy }) => {
-  const staticItems: { id: 'explorer' | 'sync' | 'settings'; label: string; icon: React.ReactNode }[] = [
+  const staticItems: { id: 'explorer' | 'sync' | 'settings' | 'admin'; label: string; icon: React.ReactNode }[] = [
     { id: 'explorer', label: 'CVE Explorer', icon: <Shield size={20} /> },
     { id: 'sync', label: 'Sync Monitor', icon: <Activity size={20} /> },
     { id: 'settings', label: 'Webhooks & Config', icon: <Settings size={20} /> },
+    { id: 'admin', label: 'Admin Console', icon: <Lock size={20} /> },
   ];
 
   const rowSx = (isSelected: boolean) => ({

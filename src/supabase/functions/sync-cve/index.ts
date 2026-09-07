@@ -446,6 +446,7 @@ serve(async (req) => {
         started_at: syncMeta.startedAt,
         finished_at: new Date().toISOString(),
         error_message: syncMeta.errorMessage ?? null,
+        details: syncMeta.details ?? {},
       })
       .select()
       .single();

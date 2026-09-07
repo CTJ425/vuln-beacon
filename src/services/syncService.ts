@@ -220,6 +220,7 @@ export class SyncService {
         duration_ms: row.duration_ms || 0,
         started_at: row.started_at,
         finished_at: row.finished_at,
+        details: row.details || {},
       }));
     } catch (err) {
       console.error('Failed to fetch sync logs:', err);
@@ -302,6 +303,7 @@ export class SyncService {
               errorMessage: result.errorMessage ?? null,
               itemsFetched: advisories.length,
               newItemsCount: result.newCvesCount,
+              details: result.details ?? {},
             },
           },
         });
@@ -338,6 +340,11 @@ export class SyncService {
                 durationMs: duration,
                 status: 'FAILED',
                 errorMessage,
+                details: {
+                  error_message: errorMessage,
+                  duration_ms: duration,
+                  failed_at: new Date().toISOString(),
+                },
               },
             },
           });
@@ -432,6 +439,7 @@ export class SyncService {
         errorMessage: null,
         itemsFetched: advisories.length,
         newItemsCount: result.newCvesCount,
+        details: result.details ?? {},
       };
 
       const chunks = buildPersistChunks(advisories, engine.getCves(), engine.getMappings(), 'redhat');

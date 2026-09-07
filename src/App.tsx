@@ -8,6 +8,8 @@ import { ExplorerPage } from '@/pages/ExplorerPage';
 import { VendorPage } from '@/pages/VendorPage';
 import { SyncMonitorPage } from '@/pages/SyncMonitorPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { AdminPage } from '@/pages/AdminPage';
+import { AdminLoginModal } from '@/components/admin/AdminLoginModal';
 import { CveDetailDrawer } from '@/components/explorer/CveDetailDrawer';
 import { AdvisoryDetailDrawer } from '@/components/explorer/AdvisoryDetailDrawer';
 import { CveTableRowItem } from '@/components/explorer/CveTable';
@@ -18,10 +20,13 @@ import { VendorService } from '@/services/vendorService';
 import { WebhookConfigService } from '@/services/webhookConfigService';
 import { AdvisoryService, AdvisoryRowItem } from '@/services/advisoryService';
 import { deriveTaxonomy } from '@/services/productTaxonomy';
+import { supabase } from '@/lib/supabase';
 import { RefreshCw } from 'lucide-react';
 
 export const AppContent: React.FC = () => {
   const [currentNav, setCurrentNav] = useState<NavState>({ section: 'dashboard' });
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [showAdminLogin, setShowAdminLogin] = useState<boolean>(false);
   const [cves, setCves] = useState<CveTableRowItem[]>([]);
   const [advisories, setAdvisories] = useState<AdvisoryRowItem[]>([]);
   const [syncLogs, setSyncLogs] = useState<VendorSyncLog[]>([]);
@@ -77,6 +82,59 @@ export const AppContent: React.FC = () => {
     setSelectedCve(null);
     setSelectedAdvisory(null);
   }, [currentNav]);
+
+  useEffect(() => {
+    if (supabase?.auth?.getSession) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data?.session?.user) {
+          setCurrentUser(data.session.user);
+        }
+      }).catch(() => {});
+    }
+
+    if (supabase?.auth?.onAuthStateChange) {
+      const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+        setCurrentUser(session?.user ?? null);
+      });
+      return () => {
+        authListener?.subscription?.unsubscribe();
+      };
+    }
+  }, []);
+
+  const handleSelectNav = (nav: NavState) => {
+    if (nav.section === 'admin' && !currentUser) {
+      setShowAdminLogin(true);
+      return;
+    }
+    setCurrentNav(nav);
+  };
+
+  const handleAdminLoginSuccess = (user?: any) => {
+    setShowAdminLogin(false);
+    if (user) {
+      setCurrentUser(user);
+    } else if (supabase?.auth?.getSession) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data?.session?.user) {
+          setCurrentUser(data.session.user);
+        }
+      }).catch(() => {});
+    }
+    setCurrentNav({ section: 'admin' });
+  };
+
+  const handleSignOut = async () => {
+    try {
+      if (supabase?.auth?.signOut) {
+        await supabase.auth.signOut();
+      }
+    } catch (err) {
+      console.error('Error signing out:', err);
+    }
+    setCurrentUser(null);
+    setCurrentNav({ section: 'dashboard' });
+  };
 
   const handleManualSync = async () => {
     setIsSyncing(true);
@@ -164,7 +222,7 @@ export const AppContent: React.FC = () => {
       <Box sx={{ display: 'flex', flexGrow: 1 }}>
         <Sidebar
           currentNav={currentNav}
-          onSelectNav={setCurrentNav}
+          onSelectNav={handleSelectNav}
           taxonomy={taxonomy}
         />
 
@@ -259,6 +317,18 @@ export const AppContent: React.FC = () => {
                   onTestWebhook={handleTestWebhook}
                 />
               )}
+              {currentNav.section === 'admin' && (
+                <AdminPage
+                  userEmail={currentUser?.email}
+                  webhooks={webhooks}
+                  onAddWebhook={handleAddWebhook}
+                  onDeleteWebhook={handleDeleteWebhook}
+                  onTestWebhook={handleTestWebhook}
+                  logs={syncLogs}
+                  onRefreshLogs={loadData}
+                  onSignOut={handleSignOut}
+                />
+              )}
             </>
           )}
         </Box>
@@ -274,6 +344,12 @@ export const AppContent: React.FC = () => {
         open={Boolean(selectedAdvisory)}
         item={selectedAdvisory}
         onClose={() => setSelectedAdvisory(null)}
+      />
+
+      <AdminLoginModal
+        open={showAdminLogin}
+        onClose={() => setShowAdminLogin(false)}
+        onSuccess={handleAdminLoginSuccess}
       />
     </Box>
   );

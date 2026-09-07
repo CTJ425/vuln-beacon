@@ -24,6 +24,7 @@ export interface IngestionResult {
   newCvesCount: number;
   durationMs: number;
   errorMessage?: string;
+  details?: Record<string, unknown>;
 }
 
 export class IngestionEngine {
@@ -45,6 +46,11 @@ export class IngestionEngine {
 
     if (!adapter) {
       const durationMs = Date.now() - startTime;
+      const details = {
+        reason: 'adapter_not_found',
+        vendor_code: vendorCode,
+        duration_ms: durationMs,
+      };
       const log: VendorSyncLog = {
         id: `log-${Date.now()}`,
         vendor_code: vendorCode,
@@ -55,6 +61,7 @@ export class IngestionEngine {
         duration_ms: durationMs,
         started_at: new Date(startTime).toISOString(),
         finished_at: new Date().toISOString(),
+        details,
       };
       this.syncLogs.push(log);
       return {
@@ -65,6 +72,7 @@ export class IngestionEngine {
         newCvesCount: 0,
         durationMs,
         errorMessage: log.error_message || undefined,
+        details,
       };
     }
 
@@ -152,6 +160,14 @@ export class IngestionEngine {
       }
 
       const durationMs = Date.now() - startTime;
+      const details = {
+        advisories_count: items.length,
+        cves_count: totalCves,
+        new_cves_count: newCvesCount,
+        duration_ms: durationMs,
+        endpoints: adapter.endpoints?.map((e) => e.url) || [],
+        completed_at: new Date().toISOString(),
+      };
       const log: VendorSyncLog = {
         id: `log-${Date.now()}`,
         vendor_code: vendorCode,
@@ -161,6 +177,7 @@ export class IngestionEngine {
         duration_ms: durationMs,
         started_at: new Date(startTime).toISOString(),
         finished_at: new Date().toISOString(),
+        details,
       };
       this.syncLogs.push(log);
 
@@ -171,10 +188,18 @@ export class IngestionEngine {
         cvesCount: totalCves,
         newCvesCount,
         durationMs,
+        details,
       };
     } catch (err: unknown) {
       const durationMs = Date.now() - startTime;
       const message = err instanceof Error ? err.message : 'Unknown error during ingestion';
+      const details = {
+        error_name: err instanceof Error ? err.name : typeof err,
+        error_stack: err instanceof Error ? err.stack : undefined,
+        duration_ms: durationMs,
+        endpoints: adapter ? (adapter.endpoints?.map((e) => e.url) || []) : [],
+        failed_at: new Date().toISOString(),
+      };
       const log: VendorSyncLog = {
         id: `log-${Date.now()}`,
         vendor_code: vendorCode,
@@ -185,6 +210,7 @@ export class IngestionEngine {
         duration_ms: durationMs,
         started_at: new Date(startTime).toISOString(),
         finished_at: new Date().toISOString(),
+        details,
       };
       this.syncLogs.push(log);
 
@@ -196,6 +222,7 @@ export class IngestionEngine {
         newCvesCount: 0,
         durationMs,
         errorMessage: message,
+        details,
       };
     }
   }

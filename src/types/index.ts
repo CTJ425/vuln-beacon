@@ -116,6 +116,7 @@ export interface VendorSyncLog {
   duration_ms?: number | null;
   started_at: string;
   finished_at?: string | null;
+  details?: Record<string, unknown> | null;
 }
 
 export interface WebhookConfig {

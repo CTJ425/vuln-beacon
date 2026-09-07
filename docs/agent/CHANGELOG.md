@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0-dev.3 - 2026-09-07
+### Added
+- **Log Observation Inspector & Field**: Added `details` JSONB column with GIN/btree indexes to `vendor_sync_logs` table (migration `20260907000000_add_sync_log_details.sql`).
+- **Observability Inspector Modal**: Added `LogDetailModal` to inspect detailed execution metrics, API endpoints, failure traces, and one-click JSON copy from `SyncLogTable`.
+- **Supabase-Authenticated Admin Backstage (`AdminPage`)**:
+  - Gated access with `AdminLoginModal` requiring Supabase credentials (`supabase.auth.signInWithPassword`) only upon clicking the Admin Console in navigation. Public CVE pages remain completely unauthenticated.
+  - **Webhook Settings**: Configured webhooks integration (Discord, Slack, Telegram), connection testing, deletion, and minimum severity threshold.
+  - **Log Data Query**: Added `AdminLogQuery` component supporting status filtering (`SUCCESS`, `FAILED`, `PARTIAL_SUCCESS`, `RUNNING`), vendor filtering, keyword search on errors/details, JSON export, and full observability modal.
+  - **API & Supabase Operation Status**: Added `SystemHealthMonitor` checking PostgreSQL database latency, GoTrue Auth service, S3 Storage bucket availability, Edge Function runtime, and external vendor feeds (Red Hat CSAF).
+- **Edge Function Sync Logs**: Updated `sync-cve` and `scheduled-sync` Edge Functions to record structured `details` metadata and deployed to Supabase Cloud runtime (`egofadbvftmbwodjneoy`).
+- **Test Pyramid**: Added 8 new unit and E2E test suites bringing total test suite to 61 test files (325 tests) passing 100%.
+
 ## 1.0.0-dev.2 - 2026-08-16
 ### Changed
 - **Ingestion engine rewrite (Phase D)**: Converted from CVE-driven to advisory-first model. New `RedHatCsafAdapter` parses CSAF 2.0 documents with one advisory per errata carrying every CVE it fixes (previously averaged 1.00 CVE/advisory, now 4.76).
