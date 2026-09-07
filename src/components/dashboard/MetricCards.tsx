@@ -51,7 +51,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
       title: labels?.total ?? 'Tracked CVE Records',
       value: totalCves,
       icon: <CheckCircle2 size={26} color="#22c55e" />,
-      subtext: 'Red Hat Enterprise Feeds',
+      subtext: 'Aggregated multi-vendor feeds',
       border: 'rgba(34, 197, 94, 0.3)',
       bg: 'rgba(34, 197, 94, 0.06)',
     },

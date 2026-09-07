@@ -14,6 +14,7 @@ interface VendorPageProps {
   onSelectCve: (cve: CveTableRowItem) => void;
   onSelectAdvisory: (item: AdvisoryRowItem) => void;
   onRefreshCves?: () => Promise<void>;
+  isAuthenticated?: boolean;
 }
 
 export const VendorPage: React.FC<VendorPageProps> = ({
@@ -24,6 +25,7 @@ export const VendorPage: React.FC<VendorPageProps> = ({
   onSelectCve,
   onSelectAdvisory,
   onRefreshCves,
+  isAuthenticated,
 }) => {
   const vendor = taxonomy.find((v) => v.vendorCode === vendorCode);
 
@@ -65,7 +67,7 @@ export const VendorPage: React.FC<VendorPageProps> = ({
         highCount={highCount}
         totalImpactedComponents={totalImpactedComponents}
         labels={{
-          critical: 'Critical RHSA',
+          critical: 'Critical Advisories',
           high: 'High Severity',
           components: 'Impacted Components',
           total: 'Tracked Advisories',
@@ -79,6 +81,7 @@ export const VendorPage: React.FC<VendorPageProps> = ({
         onSelectAdvisory={onSelectAdvisory}
         onRefreshCves={onRefreshCves}
         taxonomy={taxonomy}
+        isAuthenticated={isAuthenticated}
       />
     </Stack>
   );

@@ -168,6 +168,10 @@
 - [ ] **Task 11c: Move Browser Manual Sync Server-Side** — Relocate sync trigger from browser (`syncService.ts:319-332`) to Edge Function endpoint (`scheduled-sync`), allowing scheduled sync to succeed for tailnet-restricted users (C1). Requires own spec; existing spec `docs/agent/specs/webhook-admin-and-server-dispatch.md` still applies to webhook tasks. Ref: `docs/agent/specs/self-host-deployment-topology.md` (consequence C1).
 - [x] **Task 11d: Webhook Admin & Server Dispatch Edge Function** — Add Role-Based Access to webhook_configs table (C2); prevent unauthenticated SELECT/write. Proxy actions implemented in `sync-cve` Edge Function. Ref: `docs/agent/specs/webhook-admin-and-server-dispatch.md`.
 
+- [ ] **Open Item: NavState Latent Risk** — `NavState` in `src/components/common/Sidebar.tsx` admits `'sync' | 'settings'` section values with no render branch in `App.tsx`. Unreachable today (no code path sets them); would render a blank main area if reintroduced. Recommendation: Document constraint or add explicit error boundary to catch future regressions.
+
+- [ ] **Open Item: Live Preview Verification Pending** — Acceptance criterion not yet met: live verification against the preview instance at `http://10.8.22.99:3002/` (per `.agents/ORIGINAL_REQUEST.md` R5) has not been performed. Awaiting test environment access or deployment confirmation.
+
 ## Completed Work Streams
 
 - [x] **Task 16: Comprehensive Security & Reliability Audit Remediation (16 Findings)**
@@ -215,3 +219,12 @@
   - [x] Add MUI `TablePagination` to `AdminLogQuery.tsx` and resilient clipboard copy fallback in `LogDetailModal.tsx`.
   - **Verification**: 61 test files, 331 tests all passing (100%); build clean.
   - **Completed**: 2026-09-07 15:30:00 Asia/Taipei.
+
+- [x] **Task 20: UI Navigation Consolidation & Role-Gated Access (1.0.0-dev.5)**
+  - [x] **R1 — Navigation & Access Boundary Consolidation**: Remove `Sync Monitor` and `Webhooks & Config` from public sidebar; consolidate into 4-tab authenticated Admin Console (Webhooks, Sync Monitor, Log Query, System Health). Hide vendor quick-nav sidebar while Admin Console active; vendor views remain accessible via Dashboard vendor tiles.
+  - [x] **R2 — Role-Gated Manual Sync**: Fix security defect in `ExplorerPage.handleFetchDirectly` (no authentication check allowing unauthenticated visitors to perform live vendor fetch and persist CVE data). Gate via `isAuthenticated` prop; control not rendered and handler returns early for unauthenticated users. Forward prop to embedded `ExplorerPage` from `VendorPage`. Fix spec compliance: Dashboard empty-state "Sync All Feeds Now" navigates to Admin Console with login modal when signed out. Add regression test: `src/tests/unit/pages/explorerDirectFetchGate.test.tsx` (4 tests).
+  - [x] **R3 — Vendor-Neutral Nomenclature**: Replace vendor-biased user-facing text across MetricCards, AdvisoryTable, AdvisoryDetailDrawer, CveTable, CveDetailDrawer, CveFilterBar, ExplorerPage, DashboardPage, and VendorPage. Preserve data identifiers (vendor codes, advisory_id, errata, adapter ids, API paths, DB columns, VendorIcon codes).
+  - [x] **R4 — Header & Sidebar** (previously implemented): Header GitHub repository link and Sidebar version footer via new `src/config/version.ts`.
+  - [x] **Additional Quality**: Fix severity filter label/control association in `CveFilterBar`. Realign 6 stale tests encoding pre-R1/R3 behavior without weakening coverage. Version assertions now compare against `APP_VERSION` instead of hardcoded literals. Add `.claude/version.config.json`.
+  - **Verification**: All 70 test files (448 tests) passed 100%; `npm --prefix src run build` clean; `npx tsc --noEmit` clean.
+  - **Completed**: 2026-09-07 18:56:07 CST.

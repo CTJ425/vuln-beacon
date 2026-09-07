@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { App } from '@/App';
+import { APP_VERSION } from '@/config/version';
 import { CveService } from '@/services/cveService';
 import { SyncService } from '@/services/syncService';
 import { WebhookConfigService } from '@/services/webhookConfigService';
@@ -59,6 +60,20 @@ describe('App Root Component', () => {
 
     expect(screen.getByText('VulnBeacon')).toBeInTheDocument();
     expect(await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 })).toBeInTheDocument();
+
+    // Verify Header GitHub repo link
+    const githubLink = screen.getByTestId('header-github-link');
+    expect(githubLink).toBeInTheDocument();
+    expect(githubLink).toHaveAttribute('href', 'https://github.com/CTJ425/vuln-beacon');
+    expect(githubLink).toHaveAttribute('target', '_blank');
+
+    // Verify Header public manual sync button is removed
+    expect(screen.queryByRole('button', { name: 'Sync All Feeds' })).not.toBeInTheDocument();
+
+    // Verify Sidebar version footer
+    const versionEl = screen.getByTestId('sidebar-version');
+    expect(versionEl).toBeInTheDocument();
+    expect(versionEl).toHaveTextContent(`v${APP_VERSION}`);
   });
 
   it('should switch navigation tabs when sidebar links are clicked', async () => {
@@ -67,20 +82,18 @@ describe('App Root Component', () => {
     // Wait for initial load
     await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
-    // Click CVE Explorer tab
+    // Click CVE Explorer tab (R3: heading is vendor-neutral)
     const explorerTab = screen.getByText('CVE Explorer');
     fireEvent.click(explorerTab);
-    expect(await screen.findByText(/Errata Explorer/i, {}, { timeout: 4000 })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { level: 4, name: /Explorer/i }, { timeout: 4000 })
+    ).toBeInTheDocument();
 
-    // Click Sync Monitor tab
-    const syncTab = screen.getByText('Sync Monitor');
-    fireEvent.click(syncTab);
-    expect(await screen.findByText('Feed Synchronization Monitor', {}, { timeout: 4000 })).toBeInTheDocument();
-
-    // Click Webhooks & Config tab
-    const settingsTab = screen.getByText('Webhooks & Config');
-    fireEvent.click(settingsTab);
-    expect(await screen.findByText('Integrations & Notification Settings', {}, { timeout: 4000 })).toBeInTheDocument();
+    // R1: Sync Monitor and Webhooks & Config are no longer public sidebar tabs.
+    // They live inside the authenticated Admin Console, covered by
+    // tests/e2e/admin-backstage-flow.e2e.test.tsx.
+    expect(screen.queryByRole('button', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Webhooks & Config$/i })).not.toBeInTheDocument();
   });
 
   it('should render a vendor group in the sidebar derived from advisory data, with the static nav items unchanged', async () => {
@@ -92,9 +105,10 @@ describe('App Root Component', () => {
     // more than one match — only presence is asserted here.
     expect((await screen.findAllByText('Red Hat', {}, { timeout: 4000 })).length).toBeGreaterThan(0);
 
-    // static nav items must still exist, unchanged
+    // R1: only the public static nav items remain; sync/webhooks moved behind auth
     expect(screen.getByText('CVE Explorer')).toBeInTheDocument();
-    expect(screen.getByText('Sync Monitor')).toBeInTheDocument();
-    expect(screen.getByText('Webhooks & Config')).toBeInTheDocument();
+    expect(screen.getByText('Admin Console')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Webhooks & Config$/i })).not.toBeInTheDocument();
   });
 });

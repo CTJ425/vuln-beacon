@@ -222,7 +222,7 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
             {!primaryAdvisory && (
               <Chip
                 size="small"
-                label="官方 Errata 待發布"
+                label="官方公告待發布"
                 sx={{ bgcolor: 'action.hover', color: 'text.secondary', fontWeight: 700 }}
               />
             )}
@@ -236,16 +236,16 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
             )}
           </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-            {primaryAdvisory ? 'Red Hat Security Advisory (RHSA)' : 'Red Hat CVE Vulnerability Record'} • 發布日期: {formatDate(item.published_date, 'yyyy-MM-dd')}
+            {primaryAdvisory ? 'Security Advisory' : 'CVE Vulnerability Record'} • 發布日期: {formatDate(item.published_date, 'yyyy-MM-dd')}
           </Typography>
         </Box>
 
-        <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
+        <IconButton onClick={onClose} size="small" aria-label="Close" sx={{ color: 'text.secondary' }}>
           <X size={20} />
         </IconButton>
       </Box>
 
-      {/* 1. RHSA 指向之 CVE 清單卡片 */}
+      {/* 1. 公告指向之 CVE 清單卡片 */}
       <Paper
         sx={{
           p: 2.5,
@@ -257,7 +257,7 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
         }}
       >
         <Typography variant="caption" sx={{ fontWeight: 800, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', mb: 1.5 }}>
-          此 RHSA 對應修復之 CVE 弱點 (Target CVEs)
+          此公告對應修復之 CVE 弱點 (Target CVEs)
         </Typography>
 
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
@@ -291,7 +291,7 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
             endIcon={<ExternalLink size={14} />}
             sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.8rem' }}
           >
-            Red Hat CVE 官方頁面
+            檢視官方公告頁面
           </Button>
         </Box>
 
@@ -299,11 +299,11 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
           {item.description}
         </Typography>
 
-        {/* 若有其他關聯之 RHSA Errata 編號 */}
+        {/* 若有其他關聯之公告編號 */}
         {realAdvisories.length > 1 && (
           <Box sx={{ mt: 1.5, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.8 }}>
-              相關釋出之 Errata 公告編號:
+              相關釋出之公告編號:
             </Typography>
             <Stack direction="row" flexWrap="wrap" gap={0.8}>
               {realAdvisories.map((adv, i) => (
@@ -331,7 +331,7 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
               <Layers size={18} color="#ee0000" /> 產品與元件受影響狀態 (Impact Analysis)
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              清楚標示哪些 Red Hat 產品受到此漏洞影響、哪些不受影響或已完成修復。
+              清楚標示哪些產品受到此漏洞影響、哪些不受影響或已完成修復。
             </Typography>
           </Box>
 
@@ -411,7 +411,7 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                 <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>Products / services</TableCell>
                 <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>Components</TableCell>
                 <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>State (狀態)</TableCell>
-                <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>Errata</TableCell>
+                <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>Advisory</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

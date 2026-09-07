@@ -42,3 +42,6 @@ coverage/
 supabase/.temp/
 src/supabase/.temp/
 **/.temp/
+
+# Multi-agent scratch output
+.agents/

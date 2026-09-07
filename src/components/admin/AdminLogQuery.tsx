@@ -223,6 +223,11 @@ export const AdminLogQuery: React.FC<AdminLogQueryProps> = ({
                 <TableRow key={log.id} hover>
                   <TableCell>
                     <VendorIcon vendorCode={log.vendor_code || ''} size={16} />
+                    {/* Raw vendor code: a data identifier for log correlation, kept distinct
+                        from the display name shown by VendorIcon. */}
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                      {log.vendor_code}
+                    </Typography>
                   </TableCell>
 
                   <TableCell>

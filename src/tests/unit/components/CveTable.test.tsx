@@ -54,20 +54,22 @@ describe('CveTable Component', () => {
     const handleSelect = vi.fn();
     render(<CveTable items={mockItems} onSelectRow={handleSelect} viewMode="cve" />);
 
+    // R3: column headers and chips are vendor-neutral; the RHSA-* values below are
+    // raw advisory identifiers (data, not branding) and stay as-is.
     expect(screen.getByText('CVE 漏洞編號')).toBeInTheDocument();
-    expect(screen.getByText('關聯官方 Errata (RHSA)')).toBeInTheDocument();
+    expect(screen.getByText('關聯安全公告 (Advisory)')).toBeInTheDocument();
     expect(screen.getByText('CVE-2026-73086')).toBeInTheDocument();
     expect(screen.getByText('RHSA-2026:48758')).toBeInTheDocument();
 
     // Item with no advisory should show pending chip
-    expect(screen.getByText('Errata 待發布')).toBeInTheDocument();
+    expect(screen.getByText('公告待發布')).toBeInTheDocument();
   });
 
   it('should render in Advisory view mode when viewMode="advisory"', () => {
     const handleSelect = vi.fn();
     render(<CveTable items={mockItems} onSelectRow={handleSelect} viewMode="advisory" />);
 
-    expect(screen.getByText('Red Hat Errata (RHSA)')).toBeInTheDocument();
+    expect(screen.getByText('公告編號 (Advisory ID)')).toBeInTheDocument();
     expect(screen.getByText('對應 CVE 弱點 (Target CVEs)')).toBeInTheDocument();
     expect(screen.getByText('RHSA-2026:48758')).toBeInTheDocument();
     expect(screen.getByText('CVE-2026-73086')).toBeInTheDocument();

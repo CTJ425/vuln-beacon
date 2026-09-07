@@ -11,15 +11,17 @@ import {
 } from '@mui/material';
 import {
   Bell,
+  RefreshCw,
   Terminal,
   Activity,
   LogOut,
   ShieldCheck,
 } from 'lucide-react';
-import { WebhookConfig, VendorSyncLog } from '@/types';
+import { WebhookConfig, VendorSyncLog, Vendor } from '@/types';
 import { WebhookConfigPanel } from '@/components/settings/WebhookConfigPanel';
 import { AdminLogQuery } from '@/components/admin/AdminLogQuery';
 import { SystemHealthMonitor } from '@/components/admin/SystemHealthMonitor';
+import { SyncMonitorPage } from '@/pages/SyncMonitorPage';
 
 interface AdminPageProps {
   userEmail?: string;
@@ -31,6 +33,13 @@ interface AdminPageProps {
   onRefreshLogs?: () => void;
   isRefreshingLogs?: boolean;
   onSignOut: () => void;
+  vendors?: Vendor[];
+  onManualSync?: () => void;
+  isSyncing?: boolean;
+  onSaveSchedule?: (
+    vendorCode: string,
+    schedule: { enabled: boolean; times: string[]; timezone: string }
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const AdminPage: React.FC<AdminPageProps> = ({
@@ -43,6 +52,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   onRefreshLogs,
   isRefreshingLogs = false,
   onSignOut,
+  vendors = [],
+  onManualSync = () => {},
+  isSyncing = false,
+  onSaveSchedule,
 }) => {
   const [activeTab, setActiveTab] = useState<number>(0);
 
@@ -130,18 +143,25 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             aria-controls="admin-tabpanel-0"
           />
           <Tab
+            icon={<RefreshCw size={18} />}
+            iconPosition="start"
+            label="同步監控"
+            id="admin-tab-1"
+            aria-controls="admin-tabpanel-1"
+          />
+          <Tab
             icon={<Terminal size={18} />}
             iconPosition="start"
             label="Log 資料查詢"
-            id="admin-tab-1"
-            aria-controls="admin-tabpanel-1"
+            id="admin-tab-2"
+            aria-controls="admin-tabpanel-2"
           />
           <Tab
             icon={<Activity size={18} />}
             iconPosition="start"
             label="API 與 Supabase 運作狀態"
-            id="admin-tab-2"
-            aria-controls="admin-tabpanel-2"
+            id="admin-tab-3"
+            aria-controls="admin-tabpanel-3"
           />
         </Tabs>
       </Paper>
@@ -161,6 +181,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
         {activeTab === 1 && (
           <Box role="tabpanel" id="admin-tabpanel-1" aria-labelledby="admin-tab-1">
+            <SyncMonitorPage
+              vendors={vendors}
+              logs={logs}
+              onManualSync={onManualSync}
+              isSyncing={isSyncing}
+              onSaveSchedule={onSaveSchedule}
+            />
+          </Box>
+        )}
+
+        {activeTab === 2 && (
+          <Box role="tabpanel" id="admin-tabpanel-2" aria-labelledby="admin-tab-2">
             <AdminLogQuery
               logs={logs}
               onRefreshLogs={onRefreshLogs}
@@ -169,8 +201,8 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </Box>
         )}
 
-        {activeTab === 2 && (
-          <Box role="tabpanel" id="admin-tabpanel-2" aria-labelledby="admin-tab-2">
+        {activeTab === 3 && (
+          <Box role="tabpanel" id="admin-tabpanel-3" aria-labelledby="admin-tab-3">
             <SystemHealthMonitor />
           </Box>
         )}

@@ -146,7 +146,7 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
             <SeverityBadge severity={item.severity} />
           </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-            Red Hat Security Advisory (RHSA) • 發布日期: {formatDate(item.published_at, 'yyyy-MM-dd')}
+            Security Advisory • 發布日期: {formatDate(item.published_at, 'yyyy-MM-dd')}
           </Typography>
         </Box>
 
@@ -162,10 +162,10 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
               endIcon={<ExternalLink size={14} />}
               sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.8rem' }}
             >
-              Red Hat Errata 官方頁面
+              官方公告頁面 (Official Advisory Page)
             </Button>
           )}
-          <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
+          <IconButton onClick={onClose} size="small" aria-label="Close" sx={{ color: 'text.secondary' }}>
             <X size={20} />
           </IconButton>
         </Box>
@@ -251,7 +251,7 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
                 <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>Products / services</TableCell>
                 <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>Components</TableCell>
                 <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>State</TableCell>
-                <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>Errata</TableCell>
+                <TableCell sx={{ fontWeight: 800, bgcolor: 'background.paper', fontSize: '0.75rem' }}>Advisory</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -265,7 +265,7 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
                   </TableCell>
                   <TableCell>{getStateBadge(imp.state)}</TableCell>
                   <TableCell sx={{ fontFamily: 'JetBrains Mono', fontSize: '0.775rem' }}>
-                    {imp.errata && imp.errata !== '-' ? `Errata: ${imp.errata}` : <span style={{ color: '#94a3b8' }}>-</span>}
+                    {imp.errata && imp.errata !== '-' ? `Advisory: ${imp.errata}` : <span style={{ color: '#94a3b8' }}>-</span>}
                   </TableCell>
                 </TableRow>
               ))}
@@ -319,7 +319,7 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
               endIcon={<ExternalLink size={14} />}
               sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.8rem', px: 0 }}
             >
-              查看 Errata 公告
+              查看安全公告
             </Button>
           </Box>
         )}

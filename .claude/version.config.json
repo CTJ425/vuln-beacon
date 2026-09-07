@@ -1,0 +1,13 @@
+{
+  "tagPrefix": "",
+  "releaseBranch": "main",
+  "devBranch": "dev",
+  "changelog": "docs/agent/CHANGELOG.md",
+  "appDir": "src",
+  "syncFiles": [
+    { "path": "src/package.json", "type": "json", "key": "version" },
+    { "path": "src/package-lock.json", "type": "json", "key": "version" },
+    { "path": "src/config/version.ts", "type": "regex", "pattern": "'<version>'" }
+  ],
+  "release": { "enabled": true, "draft": false, "latest": true }
+}

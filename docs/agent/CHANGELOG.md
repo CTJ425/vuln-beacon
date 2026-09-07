@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.0-dev.5 - 2026-09-07
+### Added
+- **Vendor-Neutral Nomenclature (R3)**: Replaced vendor-biased user-facing text across the public UI with neutral wording. `MetricCards` labels (`Critical Advisories`, `Tracked Advisories`), `AdvisoryTable`, `AdvisoryDetailDrawer` (`Advisory` column, `查看安全公告`), `CveTable` headers (`公告編號 (Advisory ID)`, `關聯安全公告 (Advisory)`) and chips (`公告待發布`), `CveDetailDrawer`, `CveFilterBar` placeholder, `ExplorerPage` subtitle and fetch messages, `DashboardPage`, and `VendorPage`. Data identifiers (vendor codes, `advisory_id` values, `errata` fields, adapter ids, API paths, DB columns) are unchanged.
+- **Application Version Surface**: Added `src/config/version.ts` exporting `APP_VERSION`, `APP_NAME` and `getDisplayVersion()`, sourced from `src/package.json`, rendered in the Sidebar footer.
+- **Header GitHub Repository Link (R4)**: Replaced the notification bell with a GitHub link to `https://github.com/CTJ425/vuln-beacon`.
+- **Version Config**: Added `.claude/version.config.json` describing tag prefix, branches, changelog path and version sync files.
+
+### Changed
+- **Navigation & Access Boundary Consolidation (R1)**: Removed `Sync Monitor` and `Webhooks & Config` from the public sidebar. Both now live inside the authenticated Admin Console alongside Log Query and System Health as a 4-tab console.
+- **Sidebar Vendor Quick-Nav**: Hidden while the Admin Console is active; vendor views remain reachable from the Dashboard vendor tiles.
+- **Dashboard Empty State**: The first-sync call to action no longer triggers a sync. It navigates to the Admin Console, opening the login modal when signed out.
+
+### Fixed
+- **Unauthenticated Vendor Sync via Explorer (R2, security)**: `ExplorerPage.handleFetchDirectly` called `syncService.fetchAndIngestQuery`, performing a live vendor fetch and persisting advisories, CVEs and mappings through the `sync-cve` edge function, with no authentication check on a page mounted for every visitor. The control is now rendered only for authenticated admins and the handler returns early when unauthenticated. Covered by `tests/unit/pages/explorerDirectFetchGate.test.tsx`.
+- **Manual Sync Trigger Scope (R2)**: Manual vendor synchronization is now present and operable only inside the authenticated Admin Console.
+- **Vendor View Auth Threading**: `VendorPage` now forwards `isAuthenticated` to the `ExplorerPage` it embeds, so an authenticated admin reaching Explorer through a vendor tile keeps the direct-fetch capability.
+- **Severity Filter Accessibility**: Associated the severity filter label with its form control in `CveFilterBar`.
+- **Brittle Version Assertions**: Test assertions on the displayed version now compare against `APP_VERSION` instead of a hardcoded literal.
+
 ## 1.0.0-dev.4 - 2026-09-07
 ### Fixed
 - **Edge Function Intermediate Chunk Crash**: Wrapped `vendor_sync_logs` insertion in `if (syncMeta && syncMeta.status)` in `sync-cve`, preventing fatal `TypeError: Cannot read properties of undefined (reading 'status')` during multi-chunk ingestion payloads.

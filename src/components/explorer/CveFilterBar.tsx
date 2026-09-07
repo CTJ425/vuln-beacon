@@ -67,7 +67,7 @@ export const CveFilterBar: React.FC<CveFilterBarProps> = ({
           >
             <ToggleButton value="advisory" sx={{ fontWeight: 800, fontSize: '0.8rem', px: 2, py: 0.8 }}>
               <ShieldCheck size={16} style={{ marginRight: 6 }} color="#ee0000" />
-              RHSA 公告視角 (Advisories)
+              安全性通報視角 (Advisories)
             </ToggleButton>
             <ToggleButton value="cve" sx={{ fontWeight: 800, fontSize: '0.8rem', px: 2, py: 0.8 }}>
               <Bug size={16} style={{ marginRight: 6 }} color="#38bdf8" />
@@ -78,7 +78,7 @@ export const CveFilterBar: React.FC<CveFilterBarProps> = ({
 
         <TextField
           size="small"
-          placeholder="搜尋 RHSA 編號、CVE 弱點編號、元件名稱 (Components)、產品或 Errata..."
+          placeholder="搜尋通報編號、CVE 弱點編號、元件名稱 (Components)、產品或公告編號..."
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           InputProps={{
@@ -108,7 +108,7 @@ export const CveFilterBar: React.FC<CveFilterBarProps> = ({
             onChange={(e) => onVendorChange(e.target.value)}
             sx={{ bgcolor: 'background.default' }}
           >
-            <MenuItem value="ALL">All Red Hat Ecosystem</MenuItem>
+            <MenuItem value="ALL">All Product Families</MenuItem>
             {productOptions.map((option) => (
               <MenuItem key={option.value} value={option.value}>
                 {option.label}
@@ -118,8 +118,10 @@ export const CveFilterBar: React.FC<CveFilterBarProps> = ({
         </FormControl>
 
         <FormControl size="small" sx={{ minWidth: 150 }}>
-          <InputLabel>Severity</InputLabel>
+          <InputLabel id="severity-filter-label">Severity</InputLabel>
           <Select
+            labelId="severity-filter-label"
+            id="severity-filter-select"
             value={selectedSeverity}
             label="Severity"
             onChange={(e) => onSeverityChange(e.target.value)}

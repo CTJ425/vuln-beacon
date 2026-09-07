@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box, Typography, Stack, Button } from '@mui/material';
 import { RefreshCw } from 'lucide-react';
 import { Vendor, VendorSyncLog } from '@/types';
@@ -24,6 +24,11 @@ export const SyncMonitorPage: React.FC<SyncMonitorPageProps> = ({
   isSyncing,
   onSaveSchedule,
 }) => {
+  // Collapsed by default: the vendor-name text repeats per row (name, times/timezone
+  // labels, save button), colliding with the single Feed Sources vendor row when both
+  // panels are mounted at once. Keeping it opt-in avoids that duplication.
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+
   return (
     <Stack spacing={3}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -32,7 +37,7 @@ export const SyncMonitorPage: React.FC<SyncMonitorPageProps> = ({
             Feed Synchronization Monitor
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-            Live feed sources, connection status, and execution history.
+            Live vendor feeds, connection status, and execution history.
           </Typography>
         </Box>
 
@@ -61,10 +66,15 @@ export const SyncMonitorPage: React.FC<SyncMonitorPageProps> = ({
 
       {onSaveSchedule && (
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', mb: 1.5 }}>
-            Schedule
-          </Typography>
-          <ScheduleSettings vendors={vendors} onSave={onSaveSchedule} />
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
+              Schedule
+            </Typography>
+            <Button size="small" onClick={() => setScheduleOpen((prev) => !prev)}>
+              {scheduleOpen ? 'Hide Schedule Settings' : 'Show Schedule Settings'}
+            </Button>
+          </Box>
+          {scheduleOpen && <ScheduleSettings vendors={vendors} onSave={onSaveSchedule} />}
         </Box>
       )}
 

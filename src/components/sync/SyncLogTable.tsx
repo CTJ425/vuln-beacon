@@ -43,7 +43,9 @@ export const SyncLogTable: React.FC<SyncLogTableProps> = ({ logs }) => {
             {logs.map((log) => (
               <TableRow key={log.id} hover>
                 <TableCell>
-                  <VendorIcon vendorCode={log.vendor_code || ''} size={16} />
+                  {/* Show the raw vendor code (data identifier), not the display name,
+                      to avoid colliding with the vendor name rendered elsewhere. */}
+                  <VendorIcon vendorCode={log.vendor_code || ''} name={log.vendor_code || ''} size={16} />
                 </TableCell>
 
                 <TableCell>

@@ -71,7 +71,8 @@ describe('DashboardPage — organised around RHSA advisories', () => {
     );
 
     // metric cards are advisory-oriented
-    expect(screen.getByText('Critical RHSA')).toBeInTheDocument();
+    // R3: metric label is vendor-neutral; the advisory IDs below stay as raw data
+    expect(screen.getByText('Critical Advisories')).toBeInTheDocument();
     expect(screen.getByText('Tracked Advisories')).toBeInTheDocument();
 
     // the urgent list shows CRITICAL/HIGH advisories, not the LOW one

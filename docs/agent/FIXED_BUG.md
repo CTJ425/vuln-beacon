@@ -2,6 +2,16 @@
 
 ---
 
+### BUG-011: Unauthenticated Direct Vendor Fetch via Explorer Page — FIXED
+- **Date**: Opened 2026-09-07, fixed 2026-09-07 (1.0.0-dev.5)
+- **Severity**: HIGH
+- **Location**: `src/pages/ExplorerPage.tsx`, `src/pages/VendorPage.tsx`
+- **Root Cause**: `ExplorerPage.handleFetchDirectly` called `syncService.fetchAndIngestQuery` with no authentication check. The control was rendered for every visitor (including unauthenticated ones), and when clicked, initiated a live vendor fetch and persisted CVE/advisory/mapping data directly to Supabase via the `sync-cve` Edge Function. The Edge Function had no per-request auth validation for this action, allowing public write access to production data.
+- **Fix**: Added `isAuthenticated` prop to `ExplorerPage`; control not rendered and handler returns early for unauthenticated users. `VendorPage` forwards same `isAuthenticated` prop to embedded `ExplorerPage`. Fixed spec compliance: Dashboard empty-state "Sync All Feeds Now" now navigates to Admin Console opening login modal when signed out instead of calling `handleManualSync` directly. Added regression test: `src/tests/unit/pages/explorerDirectFetchGate.test.tsx` (4 tests verifying control visibility and handler early-exit).
+- **Status**: ✅ FIXED (2026-09-07 18:56:07 CST)
+
+---
+
 ### BUG-010: Edge Function Chunk Crash, Missing Health Check, Admin Tab Reset & Session Invalidation — FIXED
 - **Date**: Opened 2026-09-07, fixed 2026-09-07 (1.0.0-dev.4)
 - **Severity**: HIGH

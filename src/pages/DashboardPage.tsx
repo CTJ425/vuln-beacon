@@ -45,7 +45,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             Security Intelligence Overview
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-            Automated multi-vendor security advisory feeds, Errata updates, and component impact matrix.
+            Automated multi-vendor advisory feeds, timely security updates, and component impact matrix.
           </Typography>
         </Box>
       </Box>
@@ -56,7 +56,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         highCount={highCount}
         totalImpactedComponents={totalImpactedComponents}
         labels={{
-          critical: 'Critical RHSA',
+          critical: 'Critical Advisories',
           high: 'High Severity',
           components: 'Impacted Components',
           total: 'Tracked Advisories',
@@ -99,7 +99,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               Urgent Vulnerabilities Requiring Attention
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              Critical &amp; High severity Red Hat advisories recently published.
+              Critical &amp; High severity advisories recently published.
             </Typography>
           </Box>
           <Button
@@ -108,7 +108,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             onClick={onNavigateToExplorer}
             sx={{ color: 'primary.main' }}
           >
-            View All Errata Explorer
+            View All Advisories Explorer
           </Button>
         </Box>
 

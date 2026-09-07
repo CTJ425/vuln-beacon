@@ -16,6 +16,7 @@ interface ExplorerPageProps {
   onSelectAdvisory: (item: AdvisoryRowItem) => void;
   onRefreshCves?: () => Promise<void>;
   taxonomy?: VendorNode[];
+  isAuthenticated?: boolean;
 }
 
 export const ExplorerPage: React.FC<ExplorerPageProps> = ({
@@ -25,6 +26,7 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
   onSelectAdvisory,
   onRefreshCves,
   taxonomy = [],
+  isAuthenticated = false,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProductFamily, setSelectedProductFamily] = useState('ALL');
@@ -165,6 +167,10 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
   };
 
   const handleFetchDirectly = async () => {
+    // R2: fetchAndIngestQuery performs a live vendor sync and persists data.
+    // It must never run for an unauthenticated visitor, even if this handler
+    // is somehow invoked without the gated button being rendered.
+    if (!isAuthenticated) return;
     if (!searchTerm.trim()) return;
     setIsFetchingDirect(true);
     setFetchMessage(null);
@@ -174,7 +180,7 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
       if (ok) {
         setFetchMessage({
           type: 'success',
-          text: `成功從 Red Hat 官方 API 抓取 ${searchTerm} 並寫入資料庫！`,
+          text: `成功抓取 ${searchTerm} 並寫入資料庫！`,
         });
         if (onRefreshCves) {
           await onRefreshCves();
@@ -182,7 +188,7 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
       } else {
         setFetchMessage({
           type: 'error',
-          text: `在 Red Hat 官方資料庫中未找到與「${searchTerm}」相關的 RHSA 或 CVE。請檢查編號格式。`,
+          text: `未找到與「${searchTerm}」相關的安全公告或 CVE。請檢查編號格式。`,
         });
       }
     } catch (e: any) {
@@ -199,10 +205,10 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
     <Stack spacing={3}>
       <Box>
         <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.02em' }}>
-          Red Hat Security Advisory (RHSA) &amp; Errata Explorer
+          Security Advisory & CVE Explorer
         </Typography>
         <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-          Search, cross-correlate, and inspect affected Red Hat enterprise products, packages, container states, and official Errata solutions.
+          Search, cross-correlate, and inspect affected enterprise products, packages, container states, and official advisory solutions.
         </Typography>
       </Box>
 
@@ -232,20 +238,22 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
           severity="info"
           icon={<Search size={20} />}
           action={
-            <Button
-              color="primary"
-              size="small"
-              variant="contained"
-              disabled={isFetchingDirect}
-              startIcon={isFetchingDirect ? <CircularProgress size={14} color="inherit" /> : <DownloadCloud size={16} />}
-              onClick={handleFetchDirectly}
-              sx={{ textTransform: 'none', fontWeight: 700 }}
-            >
-              {isFetchingDirect ? '正在向 Red Hat 官方查詢...' : `向 Red Hat 官方即時抓取「${searchTerm}」`}
-            </Button>
+            isAuthenticated ? (
+              <Button
+                color="primary"
+                size="small"
+                variant="contained"
+                disabled={isFetchingDirect}
+                startIcon={isFetchingDirect ? <CircularProgress size={14} color="inherit" /> : <DownloadCloud size={16} />}
+                onClick={handleFetchDirectly}
+                sx={{ textTransform: 'none', fontWeight: 700 }}
+              >
+                {isFetchingDirect ? '正在即時抓取...' : `即時抓取「${searchTerm}」`}
+              </Button>
+            ) : undefined
           }
         >
-          本地資料庫目前尚未收錄「<strong>{searchTerm}</strong>」。點擊右側按鈕可直接向 Red Hat 官方 API 發送即時查詢並自動載入！
+          本地資料庫目前尚未收錄「<strong>{searchTerm}</strong>」。
         </Alert>
       )}
 

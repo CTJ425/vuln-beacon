@@ -82,7 +82,16 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
     ]);
   });
 
-  it('allows public access to explorer and sync monitor without asking for password', async () => {
+  it('restricts public navigation to overview and explorer, and accesses sync monitor within authenticated admin console', async () => {
+    const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com' };
+    vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValue({
+      data: {
+        user: mockUser as any,
+        session: { user: mockUser, access_token: 'fake-jwt' } as any,
+      },
+      error: null,
+    });
+
     render(<App />);
 
     // Wait for overview load
@@ -90,16 +99,28 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
 
     // Navigate to CVE Explorer without any auth prompt
     fireEvent.click(screen.getByText('CVE Explorer'));
-    expect(await screen.findByText(/Errata Explorer/i, {}, { timeout: 4000 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 4, name: /Explorer/i }, { timeout: 4000 })).toBeInTheDocument();
     expect(screen.queryByText(/後台系統身分驗證/i)).not.toBeInTheDocument();
 
-    // Navigate to Sync Monitor without any auth prompt
-    fireEvent.click(screen.getByText('Sync Monitor'));
-    expect(await screen.findByText('Feed Synchronization Monitor', {}, { timeout: 4000 })).toBeInTheDocument();
-    expect(screen.queryByText(/後台系統身分驗證/i)).not.toBeInTheDocument();
+    // Public sidebar does not offer unauthenticated Sync Monitor
+    const publicSyncButton = screen.queryByRole('button', { name: /^Sync Monitor$/i });
+    expect(publicSyncButton).not.toBeInTheDocument();
+
+    // Access Admin Console to reach Sync Monitor
+    fireEvent.click(screen.getByText('Admin Console'));
+    expect(await screen.findByText(/後台系統身分驗證/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'admin@vulnbeacon.com' } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'SuperSecret123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /登入後台/i }));
+
+    expect(await screen.findByText('後台管理系統', {}, { timeout: 4000 })).toBeInTheDocument();
+
+    // Navigate to Tab 1 (同步監控)
+    fireEvent.click(screen.getByRole('tab', { name: /同步監控/i }));
+    expect(await screen.findByText(/Log Details|Log Observability/i, {}, { timeout: 4000 })).toBeInTheDocument();
 
     // Verify Log Observation field exists in Sync Monitor table
-    expect(screen.getByText('Log Details')).toBeInTheDocument();
     const inspectButtons = screen.getAllByRole('button', { name: /Inspect/i });
     expect(inspectButtons.length).toBeGreaterThan(0);
 
@@ -110,7 +131,7 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
     fireEvent.click(screen.getByRole('button', { name: /Close/i }));
   });
 
-  it('requires password only when clicking Admin Console, unlocks admin features upon sign-in, and signs out', async () => {
+  it('requires password only when clicking Admin Console, unlocks 4 admin tabs upon sign-in, and signs out', async () => {
     const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com' };
     vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValue({
       data: {
@@ -138,10 +159,11 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
     fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'SuperSecret123!' } });
     fireEvent.click(screen.getByRole('button', { name: /登入後台/i }));
 
-    // Unlocks Admin Console
+    // Unlocks Admin Console with all 4 consolidated tabs
     expect(await screen.findByText('後台管理系統', {}, { timeout: 4000 })).toBeInTheDocument();
     expect(await screen.findByText(/admin@vulnbeacon.com/i)).toBeInTheDocument();
     expect(await screen.findByRole('tab', { name: /Webhook 設定/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /同步監控/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Log 資料查詢/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /API 與 Supabase 運作狀態/i })).toBeInTheDocument();
 
@@ -149,12 +171,16 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
     expect(screen.getByText(/Add Webhook Integration/i)).toBeInTheDocument();
     expect(screen.getByText('SOC Alerts')).toBeInTheDocument();
 
-    // Feature 2: Log data query
+    // Feature 2: Sync Monitor (Tab 1)
+    fireEvent.click(screen.getByRole('tab', { name: /同步監控/i }));
+    expect(await screen.findByText(/Feed Sources|資料來源/i)).toBeInTheDocument();
+
+    // Feature 3: Log data query (Tab 2)
     fireEvent.click(screen.getByRole('tab', { name: /Log 資料查詢/i }));
     expect(await screen.findByText(/Log 資料查詢與排錯/i)).toBeInTheDocument();
     expect(screen.getByText('503 Service Unavailable')).toBeInTheDocument();
 
-    // Feature 3: API & Supabase Status
+    // Feature 4: API & Supabase Status (Tab 3)
     fireEvent.click(screen.getByRole('tab', { name: /API 與 Supabase 運作狀態/i }));
     expect(await screen.findByText(/API 與 Supabase 運作狀態監控/i)).toBeInTheDocument();
 

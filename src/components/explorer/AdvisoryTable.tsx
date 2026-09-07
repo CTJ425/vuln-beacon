@@ -43,7 +43,7 @@ export const AdvisoryTable: React.FC<AdvisoryTableProps> = ({ items, onSelectRow
       <Table sx={{ minWidth: 700 }}>
         <TableHead>
           <TableRow sx={{ bgcolor: 'action.hover' }}>
-            <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '18%' }}>Red Hat Errata (RHSA)</TableCell>
+            <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '18%' }}>Advisory ID</TableCell>
             <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '18%' }}>修補的 CVE (Fixed CVEs)</TableCell>
             <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>嚴重等級</TableCell>
             <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '24%' }}>公告主旨 (Synopsis)</TableCell>

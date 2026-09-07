@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-09-07 18:56:07 CST - UI Navigation Consolidation & Role-Gated Access (1.0.0-dev.5)
+- **Completed Frontend Navigation Reorganization & Access Control Hardening**:
+  - **R1 — Navigation & Access Boundary Consolidation**:
+    - Removed `Sync Monitor` and `Webhooks & Config` from public sidebar; consolidated into 4-tab authenticated Admin Console (Webhooks, Sync Monitor, Log Query, System Health).
+    - Hidden vendor quick-nav sidebar while Admin Console active; vendor views remain accessible via Dashboard vendor tiles.
+  - **R2 — Role-Gated Manual Sync**:
+    - Fixed security defect: `ExplorerPage.handleFetchDirectly` called `syncService.fetchAndIngestQuery` with no authentication check, allowing unauthenticated visitors to perform live vendor fetch and persist CVE data. Now gated via `isAuthenticated` prop; control not rendered and handler returns early for unauthenticated users.
+    - `VendorPage` forwards same prop to embedded `ExplorerPage`.
+    - Fixed spec compliance: Dashboard empty-state "Sync All Feeds Now" navigates to Admin Console, opening login modal when signed out (no longer calls `handleManualSync` directly).
+    - Added regression test: `src/tests/unit/pages/explorerDirectFetchGate.test.tsx` (4 tests).
+  - **R3 — Vendor-Neutral Nomenclature**:
+    - Replaced vendor-biased user-facing text across MetricCards, AdvisoryTable, AdvisoryDetailDrawer, CveTable, CveDetailDrawer, CveFilterBar, ExplorerPage, DashboardPage, and VendorPage.
+    - Data identifiers (vendor codes, advisory_id values, errata fields, adapter ids, API paths, DB columns, VendorIcon codes) deliberately preserved.
+  - **R4 — Header & Sidebar** (previously implemented):
+    - Header GitHub repository link and Sidebar version footer via new `src/config/version.ts`.
+  - **Additional Quality Work**:
+    - Fixed severity filter label/control association in `CveFilterBar`.
+    - Realigned 6 stale tests encoding pre-R1/R3 behavior without weakening coverage (`App.test.tsx`, `appSyncError.test.tsx`, `advisoryDashboard.test.tsx`, `CveTable.test.tsx`, `Sidebar.test.tsx`, `version.test.ts`, plus precision fix to `real-world-scenarios.e2e.test.tsx` Scenario 3).
+    - Version assertions now compare against `APP_VERSION` instead of hardcoded literals.
+    - Added `.claude/version.config.json`.
+- **Verification**: All 70 test files (448 tests) passed 100%; `npm --prefix src run build` clean; `npx tsc --noEmit` clean.
+
 ## 2026-09-07 15:30:00 Asia/Taipei - Adversarial Review Fixes: Edge Function Health Check, Chunk Guard, Backstage State & Session Redirection (1.0.0-dev.4)
 - **Resolved Critical Bugs & Quality Gaps in Backstage & Edge Runtime**:
   - **Edge Function Crash on Intermediate Chunks (`sync-cve`)**:
@@ -17,22 +39,3 @@
     - Added automatic route guard in `App.tsx` redirecting active unauthenticated sessions back to the public dashboard if an admin token expires or is revoked mid-session.
     - Handled null session state with user-facing warnings in `AdminLoginModal` when email confirmation is pending.
 - **Verification**: All 61 test files (331 tests) passed 100% across Unit, Smoke, and E2E layers; `npm --prefix src run build` compiled production bundle cleanly in 7.55s.
-
-## 2026-09-07 15:15:00 Asia/Taipei - Log Observability & Supabase Auth Backstage System
-- **Completed Log Observability & Admin Backstage System**:
-  - **Database Migration & Cloud Deployment**:
-    - Created `src/supabase/migrations/20260907000000_add_sync_log_details.sql` adding `details JSONB DEFAULT '{}'::jsonb` to `vendor_sync_logs` with GIN and btree index.
-    - Pushed migration to remote Supabase dev database (`egofadbvftmbwodjneoy`) using user token.
-    - Updated `sync-cve` and `scheduled-sync` Edge Functions to record structured `details` metadata and deployed to Supabase Cloud runtime.
-  - **Core Observability & Sync Service**:
-    - Updated `VendorSyncLog` type and `IngestionResult` to capture execution metrics, endpoints, and error stack traces.
-    - Updated `SyncService.ts` to query and pass `details` during manual sync, scheduled sync, and query ingestion.
-  - **Admin Backstage Portal (`AdminPage`)**:
-    - Gated Admin entry via `AdminLoginModal` requiring Supabase credentials (`supabase.auth.signInWithPassword`) only upon clicking the Admin Console. Public pages remain unauthenticated.
-    - Implemented 3 core administrative capabilities:
-      1. **Webhook Settings**: Configured webhooks integration (Discord, Slack, Telegram), connection testing, deletion, and minimum severity threshold.
-      2. **Log Data Query**: Added `AdminLogQuery` component supporting status filtering (`SUCCESS`, `FAILED`, `PARTIAL_SUCCESS`, `RUNNING`), vendor filtering, keyword search on errors/details, JSON export, and full observability modal.
-      3. **API & Supabase Operation Status**: Added `SystemHealthMonitor` checking PostgreSQL database latency, GoTrue Auth service, S3 Storage bucket availability, Edge Function runtime, and external vendor feeds (Red Hat CSAF).
-  - **UI Log Inspector**:
-    - Implemented `LogDetailModal` and added "Log Details" column with "Inspect" trigger button to `SyncLogTable`.
-- **Verification**: All 61 test files (325 tests) passed 100% across Unit, Smoke, and E2E; `npm --prefix src run build` built cleanly in 7.20s.

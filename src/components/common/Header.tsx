@@ -1,14 +1,19 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, Box, Chip, Button, IconButton } from '@mui/material';
-import { ShieldAlert, RefreshCw, Bell, Terminal } from 'lucide-react';
-import { ThemeSwitcher } from './ThemeSwitcher';
+import { AppBar, Toolbar, Typography, Box, Chip, IconButton } from '@mui/material';
+import { ShieldAlert, Github, Terminal, Moon, Sun } from 'lucide-react';
+import { useThemeMode } from '@/theme/ThemeContext';
 
-interface HeaderProps {
+export interface HeaderProps {
+  /** @deprecated Public manual sync is role-gated to Admin Console in M2 */
   onManualSync?: () => void;
+  /** @deprecated Public manual sync is role-gated to Admin Console in M2 */
   isSyncing?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onManualSync, isSyncing = false }) => {
+export const Header: React.FC<HeaderProps> = () => {
+  const { resolvedMode, setThemeMode } = useThemeMode();
+  const isDark = resolvedMode === 'dark';
+
   return (
     <AppBar
       position="sticky"
@@ -28,9 +33,8 @@ export const Header: React.FC<HeaderProps> = ({ onManualSync, isSyncing = false 
           </Typography>
           <Chip
             size="small"
-            label="Red Hat Security & Errata"
+            label="Multi-Vendor Threat Feed"
             sx={{
-
               bgcolor: (theme) =>
                 theme.palette.mode === 'dark' ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.10)',
               color: 'primary.main',
@@ -50,29 +54,38 @@ export const Header: React.FC<HeaderProps> = ({ onManualSync, isSyncing = false 
             <span>Daily Shifts: 08:00 / 12:30 / 18:30 (Asia/Taipei)</span>
           </Box>
 
-          <ThemeSwitcher />
+          <Box role="group" aria-label="Theme mode switcher">
+            <IconButton
+              onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
+              aria-label={isDark ? '切換為淺色模式' : '切換為深色模式'}
+              size="small"
+              sx={{
+                color: 'text.secondary',
+                '&:hover': {
+                  color: 'text.primary',
+                },
+              }}
+            >
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            </IconButton>
+          </Box>
 
-          <Button
-            variant="outlined"
+          <IconButton
+            component="a"
+            href="https://github.com/CTJ425/vuln-beacon"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub Repository"
+            data-testid="header-github-link"
             size="small"
-            startIcon={<RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />}
-            onClick={onManualSync}
-            disabled={isSyncing}
             sx={{
-              borderColor: 'primary.main',
-              color: 'primary.main',
+              color: 'text.secondary',
               '&:hover': {
-                borderColor: 'primary.main',
-                bgcolor: (theme) =>
-                  theme.palette.mode === 'dark' ? 'rgba(56, 189, 248, 0.08)' : 'rgba(2, 132, 199, 0.08)',
+                color: 'text.primary',
               },
             }}
           >
-            {isSyncing ? 'Syncing...' : 'Sync All Feeds'}
-          </Button>
-
-          <IconButton size="small" sx={{ color: 'text.secondary' }}>
-            <Bell size={20} />
+            <Github size={20} />
           </IconButton>
         </Box>
       </Toolbar>

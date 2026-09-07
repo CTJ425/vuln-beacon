@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { App } from '@/App';
+import { supabase } from '@/lib/supabase';
 import { CveService } from '@/services/cveService';
 import { SyncService } from '@/services/syncService';
 import { WebhookConfigService } from '@/services/webhookConfigService';
@@ -24,10 +25,31 @@ const failedLog = (errorMessage: string | null) => ({
   finished_at: '2026-01-01T00:00:00.010Z',
 });
 
+// R2: manual sync is reachable only from the authenticated Admin Console, so the
+// BUG-003 assertions below must sign in first. The behaviour under test is unchanged.
 const triggerSync = async () => {
+  const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com' };
+  vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValue({
+    data: {
+      user: mockUser as any,
+      session: { user: mockUser, access_token: 'fake-jwt' } as any,
+    },
+    error: null,
+  } as any);
+
   render(<App />);
-  fireEvent.click(await screen.findByText('Sync Monitor'));
-  fireEvent.click(await screen.findByText('Trigger Sync Run'));
+
+  fireEvent.click(await screen.findByText('Admin Console'));
+  fireEvent.change(await screen.findByLabelText(/Email/i), {
+    target: { value: 'admin@vulnbeacon.com' },
+  });
+  fireEvent.change(screen.getByLabelText(/Password/i), {
+    target: { value: 'SuperSecret123!' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: /登入後台/i }));
+
+  fireEvent.click(await screen.findByRole('tab', { name: /同步監控/i }, { timeout: 4000 }));
+  fireEvent.click(await screen.findByText('Trigger Sync Run', {}, { timeout: 4000 }));
 };
 
 describe('App surfaces the real sync failure reason (BUG-003)', () => {

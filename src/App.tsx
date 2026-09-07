@@ -6,8 +6,6 @@ import { Sidebar, NavState } from '@/components/common/Sidebar';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { ExplorerPage } from '@/pages/ExplorerPage';
 import { VendorPage } from '@/pages/VendorPage';
-import { SyncMonitorPage } from '@/pages/SyncMonitorPage';
-import { SettingsPage } from '@/pages/SettingsPage';
 import { AdminPage } from '@/pages/AdminPage';
 import { AdminLoginModal } from '@/components/admin/AdminLoginModal';
 import { CveDetailDrawer } from '@/components/explorer/CveDetailDrawer';
@@ -238,13 +236,17 @@ export const AppContent: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Header onManualSync={handleManualSync} isSyncing={isSyncing} />
+      <Header />
 
       <Box sx={{ display: 'flex', flexGrow: 1 }}>
+        {/* Admin Console (backstage) has its own vendor-scoped panels; the public
+            quick-nav vendor list would otherwise duplicate the vendor name already
+            shown inside those panels (e.g. Sync Monitor's Feed Sources table). */}
         <Sidebar
           currentNav={currentNav}
           onSelectNav={handleSelectNav}
-          taxonomy={taxonomy}
+          taxonomy={currentNav.section === 'admin' ? [] : taxonomy}
+          staticNavIds={['explorer', 'admin']}
         />
 
         <Box component="main" sx={{ flexGrow: 1, p: 3.5, overflowY: 'auto', bgcolor: 'background.default' }}>
@@ -274,16 +276,20 @@ export const AppContent: React.FC = () => {
                     <Button
                       color="inherit"
                       size="small"
-                      startIcon={<RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />}
-                      onClick={handleManualSync}
-                      disabled={isSyncing}
+                      startIcon={<RefreshCw size={14} />}
+                      onClick={() => {
+                        // R2: manual sync is only present and operable within the
+                        // authenticated Admin Console; the Dashboard only navigates
+                        // there (prompting login if needed) and never triggers a sync.
+                        handleSelectNav({ section: 'admin' });
+                      }}
                     >
-                      {isSyncing ? 'Syncing...' : 'Sync All Feeds Now'}
+                      Go to Admin Console
                     </Button>
                   }
                   sx={{ mb: 3 }}
                 >
-                  Connected to Supabase live project. Database is initialized. Click &ldquo;Sync All Feeds Now&rdquo; to start the first multi-vendor security disclosure ingestion.
+                  Connected to Supabase live project. Database is initialized. Sign in to the Admin Console to start the first multi-vendor security disclosure ingestion.
                 </Alert>
               )}
 
@@ -306,6 +312,7 @@ export const AppContent: React.FC = () => {
                   onSelectAdvisory={setSelectedAdvisory}
                   onRefreshCves={loadData}
                   taxonomy={taxonomy}
+                  isAuthenticated={!!currentUser}
                 />
               )}
 
@@ -318,26 +325,10 @@ export const AppContent: React.FC = () => {
                   onSelectCve={setSelectedCve}
                   onSelectAdvisory={setSelectedAdvisory}
                   onRefreshCves={loadData}
+                  isAuthenticated={!!currentUser}
                 />
               )}
 
-              {currentNav.section === 'sync' && (
-                <SyncMonitorPage
-                  vendors={vendors}
-                  logs={syncLogs}
-                  onManualSync={handleManualSync}
-                  isSyncing={isSyncing}
-                  onSaveSchedule={handleSaveSchedule}
-                />
-              )}
-              {currentNav.section === 'settings' && (
-                <SettingsPage
-                  webhooks={webhooks}
-                  onAddWebhook={handleAddWebhook}
-                  onDeleteWebhook={handleDeleteWebhook}
-                  onTestWebhook={handleTestWebhook}
-                />
-              )}
               {currentNav.section === 'admin' && (
                 <AdminPage
                   userEmail={currentUser?.email}
@@ -349,6 +340,10 @@ export const AppContent: React.FC = () => {
                   onRefreshLogs={handleRefreshLogs}
                   isRefreshingLogs={isRefreshingLogs}
                   onSignOut={handleSignOut}
+                  vendors={vendors}
+                  onManualSync={handleManualSync}
+                  isSyncing={isSyncing}
+                  onSaveSchedule={handleSaveSchedule}
                 />
               )}
             </>
@@ -368,11 +363,13 @@ export const AppContent: React.FC = () => {
         onClose={() => setSelectedAdvisory(null)}
       />
 
-      <AdminLoginModal
-        open={showAdminLogin}
-        onClose={() => setShowAdminLogin(false)}
-        onSuccess={handleAdminLoginSuccess}
-      />
+      {showAdminLogin && (
+        <AdminLoginModal
+          open={showAdminLogin}
+          onClose={() => setShowAdminLogin(false)}
+          onSuccess={handleAdminLoginSuccess}
+        />
+      )}
     </Box>
   );
 };

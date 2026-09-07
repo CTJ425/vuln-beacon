@@ -58,7 +58,7 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
           <TableRow sx={{ bgcolor: 'action.hover' }}>
             {viewMode === 'advisory' ? (
               <>
-                <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '22%' }}>Red Hat Errata (RHSA)</TableCell>
+                <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '22%' }}>公告編號 (Advisory ID)</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '18%' }}>對應 CVE 弱點 (Target CVEs)</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>嚴重等級</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '28%' }}>公告主旨 (Synopsis)</TableCell>
@@ -68,7 +68,7 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
             ) : (
               <>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '22%' }}>CVE 漏洞編號</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '20%' }}>關聯官方 Errata (RHSA)</TableCell>
+                <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '20%' }}>關聯安全公告 (Advisory)</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>嚴重等級</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '26%' }}>受影響產品與元件</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>發布日期</TableCell>
@@ -119,7 +119,7 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
                         </Box>
                       ) : (
                         <Chip
-                          label="Errata 待發布"
+                          label="公告待發布"
                           size="small"
                           sx={{ fontSize: '0.725rem', fontWeight: 600, bgcolor: 'action.hover', color: 'text.secondary' }}
                         />
@@ -204,7 +204,7 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
                         </Box>
                       ) : (
                         <Chip
-                          label="Errata 待發布"
+                          label="公告待發布"
                           size="small"
                           sx={{
                             fontSize: '0.725rem',
