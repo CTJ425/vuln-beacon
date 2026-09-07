@@ -157,6 +157,13 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { action, vendorCode, advisories, cves, mappings, syncMeta } = body;
 
+    if (action === 'health_check') {
+      return new Response(
+        JSON.stringify({ success: true, status: 'ok', timestamp: new Date().toISOString() }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
     if (action === 'update_vendor_schedule') {
       return await handleUpdateVendorSchedule(supabaseClient, body);
     }
@@ -433,28 +440,32 @@ serve(async (req) => {
       );
     }
 
-    // Record sync log.
-    const { data: logRow, error: logError } = await supabaseClient
-      .from('vendor_sync_logs')
-      .insert({
-        vendor_id: vendorId,
-        vendor_code: vendorCode,
-        status: syncMeta.status,
-        items_fetched: syncMeta.itemsFetched ?? (advisories || []).length,
-        new_items_count: syncMeta.newItemsCount ?? (cves || []).length,
-        duration_ms: syncMeta.durationMs,
-        started_at: syncMeta.startedAt,
-        finished_at: new Date().toISOString(),
-        error_message: syncMeta.errorMessage ?? null,
-        details: syncMeta.details ?? {},
-      })
-      .select()
-      .single();
+    // Record sync log when syncMeta is provided (e.g. final chunk or single-chunk run)
+    let logRow: any = null;
+    if (syncMeta && syncMeta.status) {
+      const { data, error: logError } = await supabaseClient
+        .from('vendor_sync_logs')
+        .insert({
+          vendor_id: vendorId,
+          vendor_code: vendorCode,
+          status: syncMeta.status,
+          items_fetched: syncMeta.itemsFetched ?? (advisories || []).length,
+          new_items_count: syncMeta.newItemsCount ?? (cves || []).length,
+          duration_ms: syncMeta.durationMs,
+          started_at: syncMeta.startedAt,
+          finished_at: new Date().toISOString(),
+          error_message: syncMeta.errorMessage ?? null,
+          details: syncMeta.details ?? {},
+        })
+        .select()
+        .single();
 
-    if (logError) throw logError;
+      if (logError) throw logError;
+      logRow = data;
+    }
 
     return new Response(
-      JSON.stringify({ success: true, log: logRow }),
+      JSON.stringify({ success: true, ...(logRow ? { log: logRow } : {}) }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

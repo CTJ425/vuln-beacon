@@ -84,4 +84,11 @@ describe('AdminLogQuery Component', () => {
     expect(await screen.findByText(/Log Observability & Diagnostics/i)).toBeInTheDocument();
     expect(screen.getAllByText('Certificate expired').length).toBeGreaterThan(0);
   });
+
+  it('renders table pagination controls with correct total count', () => {
+    render(<AdminLogQuery logs={sampleLogs} onRefreshLogs={vi.fn()} />);
+
+    expect(screen.getByText(/每頁筆數/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 of 3/i)).toBeInTheDocument();
+  });
 });

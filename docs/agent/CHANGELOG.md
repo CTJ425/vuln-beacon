@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-dev.4 - 2026-09-07
+### Fixed
+- **Edge Function Intermediate Chunk Crash**: Wrapped `vendor_sync_logs` insertion in `if (syncMeta && syncMeta.status)` in `sync-cve`, preventing fatal `TypeError: Cannot read properties of undefined (reading 'status')` during multi-chunk ingestion payloads.
+- **Edge Function Health Check**: Added explicit `action === 'health_check'` response to `sync-cve` edge function and deployed to live Supabase Cloud runtime (`egofadbvftmbwodjneoy`).
+- **Health Diagnostics Reporting**: Updated `SystemHealthMonitor.tsx` to inspect invoke `{ data, error }`, preventing false-positive operational status, and added 6-second timeout to external feed checks.
+- **Admin UI Unmount & Tab Reset on Log Refresh**: Replaced root `loadData` with dedicated `handleRefreshLogs` callback and `isRefreshingLogs` spinner in `App.tsx`, preserving active tab state in backstage.
+- **Backstage Route Protection & Mid-Session Expiry**: Added route guard in `App.tsx` immediately redirecting unauthenticated users to the public dashboard if an admin session expires mid-session.
+- **Admin Login Feedback**: Handled null session scenarios (such as unconfirmed email) with descriptive user error alerts in `AdminLoginModal.tsx`.
+- **Admin Log Query Pagination**: Added MUI `TablePagination` (10, 25, 50, 100) to `AdminLogQuery.tsx` with automatic page reset on filter changes.
+- **Log Detail Copy Fallback**: Added document-based clipboard fallback in `LogDetailModal.tsx` for non-secure contexts.
+
 ## 1.0.0-dev.3 - 2026-09-07
 ### Added
 - **Log Observation Inspector & Field**: Added `details` JSONB column with GIN/btree indexes to `vendor_sync_logs` table (migration `20260907000000_add_sync_log_details.sql`).

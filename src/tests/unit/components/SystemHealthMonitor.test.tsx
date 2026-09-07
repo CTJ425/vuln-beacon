@@ -91,4 +91,17 @@ describe('SystemHealthMonitor Component', () => {
       expect(screen.getByText('DB Connection Timeout')).toBeInTheDocument();
     });
   });
+
+  it('handles and displays edge function error when edge check fails', async () => {
+    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+      data: null,
+      error: { message: 'Edge Function 500 error' },
+    } as any);
+
+    render(<SystemHealthMonitor />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Edge Function 500 error')).toBeInTheDocument();
+    });
+  });
 });

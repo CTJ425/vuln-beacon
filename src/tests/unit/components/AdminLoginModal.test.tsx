@@ -63,4 +63,20 @@ describe('AdminLoginModal Component', () => {
 
     expect(await screen.findByText('Invalid login credentials')).toBeInTheDocument();
   });
+
+  it('displays warning when session is null despite successful auth (e.g. email unconfirmed)', async () => {
+    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+      data: { user: { id: 'u-1', email: 'unconfirmed@user.com' }, session: null } as any,
+      error: null,
+    });
+
+    render(<AdminLoginModal open={true} onClose={vi.fn()} onSuccess={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'unconfirmed@user.com' } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'pass123' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /登入後台/i }));
+
+    expect(await screen.findByText(/登入未完成，帳號可能需要先完成信箱驗證/i)).toBeInTheDocument();
+  });
 });

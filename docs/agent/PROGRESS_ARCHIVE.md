@@ -1,3 +1,18 @@
+## 2026-09-05 09:17:00 Asia/Taipei - Adversarial Review Fixes: Chunking Timeout Optimization & Auth Robustness
+- **Fixed critical defect and robustness gaps identified during adversarial review**:
+  - **O(N) Incremental Chunk Byte Calculation in `syncService.ts`**:
+    - Replaced O(N^2) repeated `JSON.stringify` / `TextEncoder().encode()` of candidate chunks with incremental byte counting and WeakMap item size caching in `buildPersistChunks`.
+    - Eliminated Vitest 5000ms test timeouts where `tests/unit/services/syncServiceChunking.test.ts` previously timed out and failed 5 tests.
+  - **Auth Header Robustness in `functionAuth.ts` and `sync-cve`**:
+    - Avoided emitting malformed `Authorization: Bearer ` header when token/key is absent in `getFunctionHeaders()`.
+    - Added support for case-insensitive `bearer ` prefix in `sync-cve` edge function authentication handler.
+  - **Nested Error Object Extraction in `extractErrorMessage()`**:
+    - Supported nested `errorBody.error.message` structures in `extractErrorMessage()`.
+  - **Test Suite Completeness**:
+    - Added test coverage for empty token handling, nested error objects, and lowercase bearer authorization.
+    - Added `.order()` and `.range()` mock chaining to avoid noisy console warnings in unit tests.
+- **Verification**: Full test suite (`npm --prefix src test`) passes 100% (53 files, 300 tests); `npm --prefix src run build` passes cleanly.
+
 ## 2026-09-05 09:07:00 Asia/Taipei - Resolved Supabase Edge Function 401 Auth, Context Error Surfacing & Cloud Sync
 - **Resolved Supabase Edge Function 401 Authentication & Error Surfacing Defect**:
   - **`sync-cve` Edge Function Auth**:

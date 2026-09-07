@@ -168,4 +168,45 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
       expect(screen.getByText(/Security Intelligence Overview/i)).toBeInTheDocument();
     });
   });
+
+  it('immediately redirects to dashboard if admin session expires mid-session', async () => {
+    let authCallback: any = null;
+    vi.spyOn(supabase.auth, 'onAuthStateChange').mockImplementation(((callback: any) => {
+      authCallback = callback;
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    }) as any);
+
+    const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com' };
+    vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValue({
+      data: {
+        user: mockUser as any,
+        session: { user: mockUser, access_token: 'fake-jwt' } as any,
+      },
+      error: null,
+    });
+
+    render(<App />);
+    await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
+
+    // Open login modal and login
+    fireEvent.click(screen.getByText('Admin Console'));
+    expect(await screen.findByText(/後台系統身分驗證/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'admin@vulnbeacon.com' } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'SuperSecret123!' } });
+    fireEvent.click(screen.getByRole('button', { name: /登入後台/i }));
+
+    expect(await screen.findByText('後台管理系統', {}, { timeout: 4000 })).toBeInTheDocument();
+
+    // Now simulate mid-session token expiry (SIGNED_OUT event from Supabase)
+    if (authCallback) {
+      authCallback('SIGNED_OUT', null);
+    }
+
+    // Should immediately be redirected away from backstage to dashboard
+    await waitFor(() => {
+      expect(screen.getByText(/Security Intelligence Overview/i)).toBeInTheDocument();
+      expect(screen.queryByText('後台管理系統')).not.toBeInTheDocument();
+    });
+  });
 });

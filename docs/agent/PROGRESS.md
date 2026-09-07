@@ -1,5 +1,23 @@
 # Progress Log
 
+## 2026-09-07 15:30:00 Asia/Taipei - Adversarial Review Fixes: Edge Function Health Check, Chunk Guard, Backstage State & Session Redirection (1.0.0-dev.4)
+- **Resolved Critical Bugs & Quality Gaps in Backstage & Edge Runtime**:
+  - **Edge Function Crash on Intermediate Chunks (`sync-cve`)**:
+    - Wrapped `vendor_sync_logs` insertion in `if (syncMeta && syncMeta.status)` guard, preventing fatal unhandled `TypeError: Cannot read properties of undefined (reading 'status')` and HTTP 500 crashes during multi-chunk payload processing.
+  - **Live Edge Function Health Check & Diagnostics Reporting**:
+    - Added dedicated `action === 'health_check'` branch to `sync-cve` returning HTTP 200 `{ success: true, status: 'ok' }`.
+    - Deployed updated `sync-cve` edge function to live Supabase Cloud project (`egofadbvftmbwodjneoy`) and verified live HTTP 200 response.
+    - Fixed `SystemHealthMonitor.tsx` to inspect `{ data, error }` returned from `invoke`, preventing silent swallowing of Edge function HTTP errors and eliminating false-positive operational status.
+    - Added `AbortController` timeout safeguard (6s) to external feed diagnostic requests in `SystemHealthMonitor`.
+  - **Admin UI Backstage State & Usability**:
+    - Replaced full-page loader in `App.tsx` during backstage log refresh with dedicated `handleRefreshLogs` callback and `isRefreshingLogs` spinner indicator, eliminating unwanted `AdminPage` unmounting and active tab resets.
+    - Added MUI `TablePagination` (10, 25, 50, 100 rows per page) to `AdminLogQuery` with automatic page reset on filter changes, avoiding DOM overload on large log volumes.
+    - Added non-secure context fallback and styled word-break/scroll bounds in `LogDetailModal` for large JSON payloads.
+  - **Backstage Route Protection & Mid-Session Expiration**:
+    - Added automatic route guard in `App.tsx` redirecting active unauthenticated sessions back to the public dashboard if an admin token expires or is revoked mid-session.
+    - Handled null session state with user-facing warnings in `AdminLoginModal` when email confirmation is pending.
+- **Verification**: All 61 test files (331 tests) passed 100% across Unit, Smoke, and E2E layers; `npm --prefix src run build` compiled production bundle cleanly in 7.55s.
+
 ## 2026-09-07 15:15:00 Asia/Taipei - Log Observability & Supabase Auth Backstage System
 - **Completed Log Observability & Admin Backstage System**:
   - **Database Migration & Cloud Deployment**:
@@ -18,18 +36,3 @@
   - **UI Log Inspector**:
     - Implemented `LogDetailModal` and added "Log Details" column with "Inspect" trigger button to `SyncLogTable`.
 - **Verification**: All 61 test files (325 tests) passed 100% across Unit, Smoke, and E2E; `npm --prefix src run build` built cleanly in 7.20s.
-
-## 2026-09-05 09:17:00 Asia/Taipei - Adversarial Review Fixes: Chunking Timeout Optimization & Auth Robustness
-- **Fixed critical defect and robustness gaps identified during adversarial review**:
-  - **O(N) Incremental Chunk Byte Calculation in `syncService.ts`**:
-    - Replaced O(N^2) repeated `JSON.stringify` / `TextEncoder().encode()` of candidate chunks with incremental byte counting and WeakMap item size caching in `buildPersistChunks`.
-    - Eliminated Vitest 5000ms test timeouts where `tests/unit/services/syncServiceChunking.test.ts` previously timed out and failed 5 tests.
-  - **Auth Header Robustness in `functionAuth.ts` and `sync-cve`**:
-    - Avoided emitting malformed `Authorization: Bearer ` header when token/key is absent in `getFunctionHeaders()`.
-    - Added support for case-insensitive `bearer ` prefix in `sync-cve` edge function authentication handler.
-  - **Nested Error Object Extraction in `extractErrorMessage()`**:
-    - Supported nested `errorBody.error.message` structures in `extractErrorMessage()`.
-  - **Test Suite Completeness**:
-    - Added test coverage for empty token handling, nested error objects, and lowercase bearer authorization.
-    - Added `.order()` and `.range()` mock chaining to avoid noisy console warnings in unit tests.
-- **Verification**: Full test suite (`npm --prefix src test`) passes 100% (53 files, 300 tests); `npm --prefix src run build` passes cleanly.

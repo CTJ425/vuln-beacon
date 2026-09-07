@@ -48,11 +48,15 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ open, onClose,
         return;
       }
 
-      if (data.session) {
+      if (data?.session) {
         const loggedInUser = (data as any)?.user || data.session?.user || { email: email.trim() };
         setEmail('');
         setPassword('');
         onSuccess(loggedInUser);
+      } else if (data?.user) {
+        setErrorMessage('登入未完成，帳號可能需要先完成信箱驗證 (Email confirmation required)。');
+      } else {
+        setErrorMessage('登入失敗，未能建立有效連線 Session。');
       }
     } catch (err: any) {
       setErrorMessage(err?.message || '發生未預期的驗證錯誤');

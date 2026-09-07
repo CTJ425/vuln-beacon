@@ -36,6 +36,7 @@ export const AppContent: React.FC = () => {
   const [selectedAdvisory, setSelectedAdvisory] = useState<AdvisoryRowItem | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const taxonomy = useMemo(() => deriveTaxonomy(advisories), [advisories]);
@@ -67,9 +68,29 @@ export const AppContent: React.FC = () => {
     }
   }, [cveService, syncService, webhookConfigService, advisoryService]);
 
+  const handleRefreshLogs = useCallback(async () => {
+    try {
+      setIsRefreshingLogs(true);
+      const fetchedLogs = await syncService.fetchSyncLogs();
+      setSyncLogs(fetchedLogs);
+    } catch (err) {
+      console.error('Error refreshing sync logs:', err);
+    } finally {
+      setIsRefreshingLogs(false);
+    }
+  }, [syncService]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    // If user is viewing the admin section but the session expires/is revoked,
+    // immediately return to dashboard to protect backstage access.
+    if (currentNav.section === 'admin' && !currentUser && !isLoading) {
+      setCurrentNav({ section: 'dashboard' });
+    }
+  }, [currentNav.section, currentUser, isLoading]);
 
   useEffect(() => {
     // A slow or unreachable vendors query must never delay or block the rest
@@ -325,7 +346,8 @@ export const AppContent: React.FC = () => {
                   onDeleteWebhook={handleDeleteWebhook}
                   onTestWebhook={handleTestWebhook}
                   logs={syncLogs}
-                  onRefreshLogs={loadData}
+                  onRefreshLogs={handleRefreshLogs}
+                  isRefreshingLogs={isRefreshingLogs}
                   onSignOut={handleSignOut}
                 />
               )}

@@ -208,29 +208,40 @@ export const SystemHealthMonitor: React.FC = () => {
     // 4. Check Edge Functions
     const edgeStart = performance.now();
     try {
-      // Pinging edge function endpoint
-      await supabase.functions.invoke('sync-cve', {
+      const { data, error } = await supabase.functions.invoke('sync-cve', {
         body: { action: 'health_check' },
       });
       const latency = Math.round(performance.now() - edgeStart);
-      updatedServices.push({
-        id: 'edge',
-        name: 'Edge Functions Runtime',
-        category: 'supabase',
-        description: 'Deno Edge Functions (sync-cve / scheduled-sync)',
-        status: 'operational',
-        latencyMs: latency,
-        message: 'Edge Function 執行緒響應正常',
-      });
+      if (error || (data && !data.success)) {
+        updatedServices.push({
+          id: 'edge',
+          name: 'Edge Functions Runtime',
+          category: 'supabase',
+          description: 'Deno Edge Functions (sync-cve / scheduled-sync)',
+          status: 'degraded',
+          latencyMs: latency,
+          message: error?.message || data?.error || 'Edge 服務響應異常',
+        });
+      } else {
+        updatedServices.push({
+          id: 'edge',
+          name: 'Edge Functions Runtime',
+          category: 'supabase',
+          description: 'Deno Edge Functions (sync-cve / scheduled-sync)',
+          status: 'operational',
+          latencyMs: latency,
+          message: 'Edge Function 執行緒響應正常',
+        });
+      }
     } catch (err: any) {
       updatedServices.push({
         id: 'edge',
         name: 'Edge Functions Runtime',
         category: 'supabase',
         description: 'Deno Edge Functions (sync-cve / scheduled-sync)',
-        status: 'degraded',
+        status: 'outage',
         latencyMs: Math.round(performance.now() - edgeStart),
-        message: err?.message || 'Edge 服務響應異常',
+        message: err?.message || 'Edge 服務連線失敗',
       });
     }
 
@@ -253,7 +264,14 @@ export const SystemHealthMonitor: React.FC = () => {
     for (const feed of externalFeeds) {
       const feedStart = performance.now();
       try {
-        const res = await fetch(feed.endpoint, { method: 'HEAD', mode: 'no-cors' });
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
+        const res = await fetch(feed.endpoint, {
+          method: 'HEAD',
+          mode: 'no-cors',
+          signal: controller?.signal,
+        });
+        if (timeoutId) clearTimeout(timeoutId);
         const latency = Math.round(performance.now() - feedStart);
         updatedServices.push({
           id: feed.id,
@@ -274,7 +292,7 @@ export const SystemHealthMonitor: React.FC = () => {
           endpoint: feed.endpoint,
           status: 'degraded',
           latencyMs: Math.round(performance.now() - feedStart),
-          message: err?.message || '連線逾時或被遠端拒絕',
+          message: err?.name === 'AbortError' ? '連線逾時 (Timeout)' : err?.message || '連線逾時或被遠端拒絕',
         });
       }
     }

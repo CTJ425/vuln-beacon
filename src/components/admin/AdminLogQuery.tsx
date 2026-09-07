@@ -18,6 +18,7 @@ import {
   MenuItem,
   Stack,
   InputAdornment,
+  TablePagination,
 } from '@mui/material';
 import { Search, RefreshCw, Download, FileText } from 'lucide-react';
 import { VendorSyncLog } from '@/types';
@@ -40,6 +41,8 @@ export const AdminLogQuery: React.FC<AdminLogQueryProps> = ({
   const [vendorFilter, setVendorFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedLog, setSelectedLog] = useState<VendorSyncLog | null>(null);
+  const [page, setPage] = useState<number>(0);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(10);
 
   // Collect unique vendor codes
   const uniqueVendors = useMemo(() => {
@@ -64,7 +67,7 @@ export const AdminLogQuery: React.FC<AdminLogQueryProps> = ({
         const matchesVendor = log.vendor_code?.toLowerCase().includes(query) ?? false;
         const matchesError = log.error_message?.toLowerCase().includes(query) ?? false;
         const matchesDetails = JSON.stringify(log.details || {}).toLowerCase().includes(query);
-        const matchesId = log.id.toLowerCase().includes(query);
+        const matchesId = log.id?.toLowerCase().includes(query) ?? false;
         if (!matchesVendor && !matchesError && !matchesDetails && !matchesId) {
           return false;
         }
@@ -72,6 +75,10 @@ export const AdminLogQuery: React.FC<AdminLogQueryProps> = ({
       return true;
     });
   }, [logs, statusFilter, vendorFilter, searchQuery]);
+
+  const paginatedLogs = useMemo(() => {
+    return filteredLogs.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  }, [filteredLogs, page, rowsPerPage]);
 
   const handleExportJson = () => {
     const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(filteredLogs, null, 2));
@@ -129,7 +136,10 @@ export const AdminLogQuery: React.FC<AdminLogQueryProps> = ({
               id="status-filter-select"
               label="狀態篩選"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(0);
+              }}
               inputProps={{ 'aria-label': '狀態篩選' }}
             >
               <MenuItem value="ALL">全部狀態 (All)</MenuItem>
@@ -147,7 +157,10 @@ export const AdminLogQuery: React.FC<AdminLogQueryProps> = ({
               id="vendor-filter-select"
               label="廠商篩選"
               value={vendorFilter}
-              onChange={(e) => setVendorFilter(e.target.value)}
+              onChange={(e) => {
+                setVendorFilter(e.target.value);
+                setPage(0);
+              }}
               inputProps={{ 'aria-label': '廠商篩選' }}
             >
               <MenuItem value="ALL">全部廠商 (All)</MenuItem>
@@ -163,7 +176,10 @@ export const AdminLogQuery: React.FC<AdminLogQueryProps> = ({
             size="small"
             placeholder="搜尋錯誤訊息、廠商或 details..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(0);
+            }}
             sx={{ flexGrow: 1, minWidth: 240 }}
             InputProps={{
               startAdornment: (
@@ -203,7 +219,7 @@ export const AdminLogQuery: React.FC<AdminLogQueryProps> = ({
                 </TableCell>
               </TableRow>
             ) : (
-              filteredLogs.map((log) => (
+              paginatedLogs.map((log) => (
                 <TableRow key={log.id} hover>
                   <TableCell>
                     <VendorIcon vendorCode={log.vendor_code || ''} size={16} />
@@ -281,6 +297,19 @@ export const AdminLogQuery: React.FC<AdminLogQueryProps> = ({
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          component="div"
+          count={filteredLogs.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          labelRowsPerPage="每頁筆數:"
+        />
       </TableContainer>
 
       <LogDetailModal

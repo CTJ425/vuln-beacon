@@ -204,3 +204,14 @@
   - [x] Add unit and E2E test suites for Admin login, Admin page, Log query, Log modal, System health monitor, and migration schema.
   - **Verification**: 61 test files, 325 tests all passing (100%); build clean.
   - **Completed**: 2026-09-07 15:15:00 Asia/Taipei.
+
+- [x] **Task 19: Adversarial Review Fixes: Edge Function Health Check, Chunk Guard, Backstage State & Session Redirection (1.0.0-dev.4)**
+  - [x] Fix Edge Function crash on intermediate chunks: guard `vendor_sync_logs` write with `if (syncMeta && syncMeta.status)` in `sync-cve`.
+  - [x] Add `health_check` endpoint to `sync-cve` Edge Function, deploy to live Supabase Cloud runtime, and verify live HTTP 200 response via curl.
+  - [x] Fix `SystemHealthMonitor.tsx` to inspect invoke `{ data, error }`, preventing false-positive operational status, and enforce 6s timeout on external feed queries.
+  - [x] Replace `loadData` with dedicated `handleRefreshLogs` callback in `App.tsx`, preserving active backstage tab on log refresh.
+  - [x] Add route protection effect in `App.tsx` redirecting to dashboard if an admin session expires mid-session.
+  - [x] Add informative error messages in `AdminLoginModal.tsx` for pending email confirmation or null session states.
+  - [x] Add MUI `TablePagination` to `AdminLogQuery.tsx` and resilient clipboard copy fallback in `LogDetailModal.tsx`.
+  - **Verification**: 61 test files, 331 tests all passing (100%); build clean.
+  - **Completed**: 2026-09-07 15:30:00 Asia/Taipei.

@@ -31,11 +31,23 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({ open, log, onClo
 
   const handleCopyJson = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(log, null, 2));
+      const jsonStr = JSON.stringify(log, null, 2);
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(jsonStr);
+      } else if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = jsonStr;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback
+      // Fallback failed silently
     }
   };
 
@@ -207,8 +219,10 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({ open, log, onClo
               bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#0d1117' : '#f6f8fa'),
               color: 'text.primary',
               fontSize: '0.8125rem',
-              maxHeight: 260,
+              maxHeight: 320,
               overflowY: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
               fontFamily: 'monospace',
               m: 0,
             }}

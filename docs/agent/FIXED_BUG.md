@@ -2,6 +2,26 @@
 
 ---
 
+### BUG-010: Edge Function Chunk Crash, Missing Health Check, Admin Tab Reset & Session Invalidation — FIXED
+- **Date**: Opened 2026-09-07, fixed 2026-09-07 (1.0.0-dev.4)
+- **Severity**: HIGH
+- **Location**: `src/supabase/functions/sync-cve/index.ts`, `src/components/admin/SystemHealthMonitor.tsx`, `src/App.tsx`, `src/components/admin/AdminLogQuery.tsx`, `src/components/admin/AdminLoginModal.tsx`, `src/components/sync/LogDetailModal.tsx`
+- **Root Cause**:
+  1. `sync-cve/index.ts` blindly accessed `syncMeta.status` during chunked persistence without checking if `syncMeta` existed, causing `TypeError: Cannot read properties of undefined (reading 'status')` and HTTP 500 crashes on intermediate chunks.
+  2. `sync-cve` lacked an action branch for `health_check`, causing HTTP 400 'Unsupported action' rejections. Concurrently, `SystemHealthMonitor.tsx` did not check `{ data, error }` returned from `invoke`, resulting in false-positive operational status reporting.
+  3. `App.tsx` passed root `loadData` to `AdminPage.onRefreshLogs`, causing a full-page loading spinner to unmount the backstage portal and reset the user's active tab state on every log refresh.
+  4. `App.tsx` lacked an unauthenticated route guard effect on the `admin` nav state, allowing unauthenticated UI rendering if a session expired mid-session.
+  5. `AdminLoginModal.tsx` hung silently without displaying an error if authentication succeeded but `session` was null (e.g., unconfirmed email).
+  6. `AdminLogQuery.tsx` lacked table pagination, loading all logs into DOM at once.
+- **Fix**:
+  1. Added `if (syncMeta && syncMeta.status)` guard in `sync-cve` and deployed to Supabase Cloud runtime.
+  2. Added `action === 'health_check'` endpoint in `sync-cve` and updated `SystemHealthMonitor.tsx` to properly inspect invoke data/error and enforce request timeout.
+  3. Added dedicated `handleRefreshLogs` with `isRefreshingLogs` spinner in `App.tsx`, preserving admin tab state during background log refreshes.
+  4. Added route guard in `App.tsx` redirecting to dashboard when `currentNav.section === 'admin' && !currentUser`.
+  5. Added explicit error messages for null session scenarios in `AdminLoginModal.tsx`.
+  6. Added `TablePagination` to `AdminLogQuery.tsx` and resilient clipboard fallback in `LogDetailModal.tsx`.
+- **Status**: ✅ FIXED (2026-09-07)
+
 ### BUG-001: Webhook Alerting Never Dispatches in Production — FIXED
 - **Date**: Opened 2026-08-16, fixed 2026-09-05
 - **Severity**: HIGH

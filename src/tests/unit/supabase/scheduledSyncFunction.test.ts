@@ -157,6 +157,17 @@ describe('sync-cve edge function', () => {
     expect(src).toMatch(/hasApiKey/);
   });
 
+  it('supports health_check action', () => {
+    const src = read(syncCvePath);
+    expect(src).toContain("action === 'health_check'");
+    expect(src).toContain("status: 'ok'");
+  });
+
+  it('safely guards syncMeta on intermediate chunk ingestion without sync log crash', () => {
+    const src = read(syncCvePath);
+    expect(src).toContain('if (syncMeta && syncMeta.status)');
+  });
+
   it('still supports persist_ingestion and still rejects unknown actions', () => {
     const src = read(syncCvePath);
     expect(src).toContain('persist_ingestion');
