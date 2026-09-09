@@ -55,6 +55,13 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
   const impacts = item?.product_impacts || [];
+  const copyTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const handleCopy = async (text: string) => {
     try {
@@ -71,7 +78,11 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
         document.body.removeChild(ta);
       }
       setCopiedText(text);
-      setTimeout(() => setCopiedText(null), 2000);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        setCopiedText(null);
+        copyTimerRef.current = null;
+      }, 2000);
     } catch {}
   };
 

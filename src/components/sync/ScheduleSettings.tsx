@@ -95,6 +95,13 @@ export const VaultSecretsGuideBanner: React.FC<VaultSecretsGuideBannerProps> = (
   const [expanded, setExpanded] = useState(initialExpanded);
   const [copied, setCopied] = useState(false);
   const sqlText = useMemo(() => generateVaultSqlSnippet(), []);
+  const copyTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const handleCopySql = async () => {
     try {
@@ -111,7 +118,11 @@ export const VaultSecretsGuideBanner: React.FC<VaultSecretsGuideBannerProps> = (
         document.body.removeChild(ta);
       }
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        setCopied(false);
+        copyTimerRef.current = null;
+      }, 2000);
     } catch {}
   };
 

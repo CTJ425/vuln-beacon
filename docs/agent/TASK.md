@@ -284,3 +284,15 @@
     - Created E2E integration test suite: `src/tests/e2e/nutanix.e2e.test.tsx` (5 comprehensive scenarios: Ingestion pipeline, Dashboard metrics, CVE & Advisory Explorer, Drawer impact matrix with copyable remediation commands, and Admin Sync Monitor live feed status).
   - **Verification**: All 63 unit test files (392 tests), 3 smoke suites (13 tests), 11 E2E suites (101 tests) passing 100%; production build clean.
   - **Completed**: 2026-09-08 17:15:00 Asia/Taipei.
+
+- [x] **Task 24: Production Release 1.0.0 & Comprehensive Stability Remediation (1.0.0)**
+  - [x] **Scheduled Sync Concurrency Lock (BUG-020)**: Added `try_acquire_sync_lock` / `release_sync_lock` on lock id 7425001 to `scheduled-sync` Edge Function to ensure mutual exclusion with manual sync.
+  - [x] **Cross-Vendor knownCveIds Propagation (BUG-020)**: Ensured newly ingested CVE IDs update `knownCveIds` within the scheduled sync vendor loop, preventing duplicate webhook alerts on shared CVEs.
+  - [x] **PostgREST Join Defensive Unwrapping (BUG-020)**: Handled array-shaped `map.cves` in `advisoryService.ts`.
+  - [x] **Unmount Timer Cleanup (BUG-020)**: Managed copy confirmation timeouts with `useRef` and unmount cleanup across `CveDetailDrawer.tsx`, `LogDetailModal.tsx`, and `ScheduleSettings.tsx`.
+  - [x] **Rules of Hooks Invariant Resolution (BUG-019)**: Positioned hooks above conditional returns in `CveDetailDrawer.tsx`.
+  - [x] **App Notification Timer Leaks (BUG-019)**: Cleaned up auto-dismiss timers in `App.tsx`.
+  - [x] **Version 1.0.0 Formal Promotion**: Bumped version to `1.0.0` in `package.json`, `package-lock.json`, and `version.ts`.
+  - **Verification**: All 80 test files (533 tests) passed 100%; `npm --prefix src run build` clean.
+  - **Completed**: 2026-09-09 17:45:00 Asia/Taipei.
+

@@ -153,4 +153,42 @@ describe('CveService — one CVE lists every RHSA that fixes it', () => {
     // the impact matrix must merge rows from every mapping, not just mapping[0]
     expect(cve.product_impacts.map((p) => p.product_name).sort()).toEqual(['RHEL 8', 'RHEL 9']);
   });
+
+  it('handles PostgREST joined cves returned as single-element array', async () => {
+    mockFrom.mockReturnValue(
+      resolveWith([
+        {
+          id: 'adv-array-test',
+          advisory_id: 'RHSA-2026:9999',
+          title: 'Advisory with array-shaped joined cves',
+          severity: 'HIGH',
+          published_at: '2026-09-01T00:00:00Z',
+          url: 'https://access.redhat.com/errata/RHSA-2026:9999',
+          summary: 'array shape test',
+          vendor_id: 'redhat',
+          vendors: [{ code: 'redhat', name: 'Red Hat' }],
+          advisory_cve_map: [
+            {
+              affected_products: ['RHEL 9'],
+              fixed_versions: ['RHSA-2026:9999'],
+              cves: [
+                {
+                  cve_id: 'CVE-2026-9999',
+                  description: 'Array shape test CVE',
+                  cvss_v3_score: 8.5,
+                  severity: 'HIGH',
+                  is_known_exploited: false,
+                },
+              ],
+            },
+          ],
+        },
+      ])
+    );
+
+    const advisories = await new AdvisoryService().fetchAdvisories();
+    expect(advisories).toHaveLength(1);
+    expect(advisories[0].cves).toHaveLength(1);
+    expect(advisories[0].cves[0].cve_id).toBe('CVE-2026-9999');
+  });
 });

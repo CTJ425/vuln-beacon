@@ -29,6 +29,15 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({ open, log, onClo
   const [copied, setCopied] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const vaultSqlSnippet = React.useMemo(() => generateVaultSqlSnippet(), []);
+  const copySqlTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyJsonTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (copySqlTimerRef.current) clearTimeout(copySqlTimerRef.current);
+      if (copyJsonTimerRef.current) clearTimeout(copyJsonTimerRef.current);
+    };
+  }, []);
 
   if (!log) return null;
 
@@ -47,7 +56,11 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({ open, log, onClo
         document.body.removeChild(ta);
       }
       setCopiedSql(true);
-      setTimeout(() => setCopiedSql(false), 2000);
+      if (copySqlTimerRef.current) clearTimeout(copySqlTimerRef.current);
+      copySqlTimerRef.current = setTimeout(() => {
+        setCopiedSql(false);
+        copySqlTimerRef.current = null;
+      }, 2000);
     } catch {}
   };
 
@@ -67,7 +80,11 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({ open, log, onClo
         document.body.removeChild(textarea);
       }
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyJsonTimerRef.current) clearTimeout(copyJsonTimerRef.current);
+      copyJsonTimerRef.current = setTimeout(() => {
+        setCopied(false);
+        copyJsonTimerRef.current = null;
+      }, 2000);
     } catch {
       // Fallback failed silently
     }

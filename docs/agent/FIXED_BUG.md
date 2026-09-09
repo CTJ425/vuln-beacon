@@ -2,7 +2,25 @@
 
 ---
 
-### BUG-012: Rules-of-Hooks Latent Violation and Unhandled Clipboard/Mock Relation Crashes — FIXED
+### BUG-020: Scheduled Sync Concurrency Lock Gap, Stale knownCveIds Duplicate Alerts, and PostgREST Joined CVE Array Fragility — FIXED
+- **Date**: Opened 2026-09-09, fixed 2026-09-09 (1.0.0)
+- **Severity**: HIGH
+- **Location**: `src/supabase/functions/scheduled-sync/index.ts`, `src/services/advisoryService.ts`, `src/components/explorer/CveDetailDrawer.tsx`, `src/components/sync/LogDetailModal.tsx`, `src/components/sync/ScheduleSettings.tsx`
+- **Root Cause**:
+  1. `src/supabase/functions/scheduled-sync/index.ts` failed to acquire or release the mutual exclusion transactional lock (`try_acquire_sync_lock(7425001)`). Scheduled sync and admin manual sync (`sync-cve`) could execute concurrently, causing race conditions and conflicting sync log rows.
+  2. Inside the scheduled sync vendor loop, newly ingested CVEs were not appended to `knownCveIds`. When multiple vendors were due in the same tick and shared CVEs (e.g. Red Hat and Nutanix), subsequent vendors treated the shared CVE as newly discovered, erroneously inflating `new_items_count` and dispatching duplicate webhook alerts.
+  3. `src/services/advisoryService.ts` assumed `map.cves` was always an object (`const cve = map.cves;`), failing to extract CVEs when PostgREST returned single-element array joins.
+  4. Copy timeout confirmation handlers across drawers/modals (`CveDetailDrawer.tsx`, `LogDetailModal.tsx`, `ScheduleSettings.tsx`) used unmanaged `setTimeout`, risking unmount state updates.
+- **Fix**:
+  1. In `scheduled-sync/index.ts`, acquired `try_acquire_sync_lock(7425001)` before loop execution and released via `release_sync_lock(7425001)` in an outer `finally` block, guaranteeing mutual exclusion.
+  2. In `scheduled-sync/index.ts`, propagated newly ingested CVE IDs to `knownCveIds` after each vendor run.
+  3. In `advisoryService.ts`, unwrapped `cve = Array.isArray(map.cves) ? map.cves[0] : map.cves`.
+  4. Added `copyTimerRef` and `useEffect` cleanup across `CveDetailDrawer`, `LogDetailModal`, and `ScheduleSettings`.
+- **Status**: ✅ FIXED (2026-09-09 17:45:00 CST)
+
+---
+
+### BUG-019: Rules-of-Hooks Latent Violation and Unhandled Clipboard/Mock Relation Crashes — FIXED
 - **Date**: Opened 2026-09-09, fixed 2026-09-09 (1.0.0)
 - **Severity**: MEDIUM
 - **Location**: `src/components/explorer/CveDetailDrawer.tsx`, `src/App.tsx`, `src/services/syncService.ts`, `src/services/cveService.ts`, `src/components/sync/ScheduleSettings.tsx`

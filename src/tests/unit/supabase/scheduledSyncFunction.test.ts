@@ -115,6 +115,18 @@ describe('scheduled-sync edge function', () => {
     expect(src).toContain('failed.push(vendor.code)');
     expect(src).toMatch(/if\s*\(\s*ran\.includes\(vendor\.code\)\s*\)/);
   });
+
+  it('acquires and releases mutual exclusion sync lock using try_acquire_sync_lock and release_sync_lock', () => {
+    const src = read(scheduledSyncPath);
+    expect(src).toContain('try_acquire_sync_lock');
+    expect(src).toContain('release_sync_lock');
+    expect(src).toContain('7425001');
+  });
+
+  it('records newly ingested CVEs into knownCveIds so subsequent vendors do not duplicate alerts', () => {
+    const src = read(scheduledSyncPath);
+    expect(src).toMatch(/knownCveIds\s*\.\s*push\(\s*c\.cve_id\s*\)/);
+  });
 });
 
 describe('shared ingestion bundle', () => {

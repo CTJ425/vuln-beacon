@@ -60,7 +60,7 @@ export class AdvisoryService {
         const cves: AdvisoryRowItem['cves'] = [];
         const seenCveIds = new Set<string>();
         for (const map of mappings) {
-          const cve = map.cves;
+          const cve = Array.isArray(map.cves) ? map.cves[0] : map.cves;
           if (!cve) continue;
           if (seenCveIds.has(cve.cve_id)) continue;
           seenCveIds.add(cve.cve_id);

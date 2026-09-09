@@ -149,20 +149,37 @@ serve(async (req) => {
       }
     }
 
-    for (const vendor of dueVendors) {
-      // A fresh engine per vendor — IngestionEngine accumulates advisories,
-      // cves and mappings in instance Maps that are never cleared, so
-      // reusing one instance across vendors would leak vendor A's rows
-      // into vendor B's upsert and stamp them with vendor B's vendor_id.
-      const engine = new IngestionEngine({ knownCveIds, webhookService });
-      const startedAt = new Date().toISOString();
-      try {
-        const result = await engine.ingestVendor(vendor.code);
-        if (result.status === 'FAILED') {
-          throw new Error(result.errorMessage || `Ingestion failed for vendor ${vendor.code}`);
-        }
+    let lockAcquired = false;
+    try {
+      const { data: hasLock, error: lockErr } = await supabaseClient.rpc('try_acquire_sync_lock', { lock_id: 7425001 });
+      if (!lockErr && hasLock === false) {
+        return new Response(
+          JSON.stringify({ success: false, skipped: true, error: 'A threat feed synchronization is already in progress' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+      if (!lockErr && hasLock === true) {
+        lockAcquired = true;
+      }
+    } catch {
+      // Fall back gracefully if lock RPC does not exist
+    }
 
-        const advisories = engine.getAdvisories();
+    try {
+      for (const vendor of dueVendors) {
+        // A fresh engine per vendor — IngestionEngine accumulates advisories,
+        // cves and mappings in instance Maps that are never cleared, so
+        // reusing one instance across vendors would leak vendor A's rows
+        // into vendor B's upsert and stamp them with vendor B's vendor_id.
+        const engine = new IngestionEngine({ knownCveIds, webhookService });
+        const startedAt = new Date().toISOString();
+        try {
+          const result = await engine.ingestVendor(vendor.code);
+          if (result.status === 'FAILED') {
+            throw new Error(result.errorMessage || `Ingestion failed for vendor ${vendor.code}`);
+          }
+
+          const advisories = engine.getAdvisories();
         const cves = engine.getCves();
         const mappings = engine.getMappings();
 
@@ -322,6 +339,12 @@ serve(async (req) => {
 
         ran.push(vendor.code);
         logs.push(logRow);
+
+        for (const c of cves) {
+          if (!knownCveIds.includes(c.cve_id)) {
+            knownCveIds.push(c.cve_id);
+          }
+        }
       } catch (err: any) {
         // One vendor's failure must not stop the remaining vendors.
         const finishedAt = new Date().toISOString();
@@ -374,6 +397,13 @@ serve(async (req) => {
             stampFailures.push(vendor.code);
           }
         }
+      }
+    }
+    } finally {
+      if (lockAcquired) {
+        try {
+          await supabaseClient.rpc('release_sync_lock', { lock_id: 7425001 });
+        } catch {}
       }
     }
 
