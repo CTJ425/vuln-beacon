@@ -17,6 +17,7 @@ import { ChevronRight, Flame } from 'lucide-react';
 
 import { CveRecord, ProductImpactItem } from '@/types';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
+import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
 
 export interface CveTableRowItem extends CveRecord {
@@ -79,9 +80,17 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
         </TableHead>
         <TableBody>
           {items.map((item) => {
+            const isRedHat = item.vendor_code?.toLowerCase() === 'redhat';
+            const isAdvisoryFormat = (a: string) => {
+              if (!a || typeof a !== 'string') return false;
+              const trimmed = a.trim();
+              if (!trimmed || /^CVE-\d{4}-\d+$/i.test(trimmed)) return false;
+              return isRedHat ? /^RH[SBE]A-\d{4}:\d+$/i.test(trimmed) : true;
+            };
+
             const realAdvList = (item.all_advisories && item.all_advisories.length > 0)
-              ? item.all_advisories.filter((a) => /^RH[SBE]A-\d{4}:\d+$/i.test(a))
-              : (/^RH[SBE]A-\d{4}:\d+$/i.test(item.advisory_id) ? [item.advisory_id] : []);
+              ? item.all_advisories.filter(isAdvisoryFormat)
+              : (isAdvisoryFormat(item.advisory_id) ? [item.advisory_id] : []);
 
             const primaryAdv = realAdvList.length > 0 ? realAdvList[0] : null;
 
@@ -104,10 +113,13 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
               >
                 {viewMode === 'advisory' ? (
                   <>
-                    {/* RHSA ID */}
+                    {/* Advisory ID with Vendor Icon */}
                     <TableCell sx={{ fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'primary.main' }}>
                       {primaryAdv ? (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          {item.vendor_code && (
+                            <VendorIcon vendorCode={item.vendor_code} size={15} hideLabel />
+                          )}
                           <span>{primaryAdv}</span>
                           {realAdvList.length > 1 && (
                             <Chip
@@ -168,6 +180,9 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
                     {/* CVE ID */}
                     <TableCell sx={{ fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'text.primary' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {item.vendor_code && (
+                          <VendorIcon vendorCode={item.vendor_code} size={15} hideLabel />
+                        )}
                         <span>{item.cve_id}</span>
                         {item.is_known_exploited && (
                           <Tooltip title="CISA Known Exploited Vulnerability (KEV)">

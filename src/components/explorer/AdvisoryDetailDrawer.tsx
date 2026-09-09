@@ -20,6 +20,7 @@ import { X, ExternalLink, Copy, Check, Flame, Layers, Wrench } from 'lucide-reac
 
 import { AdvisoryRowItem } from '@/services/advisoryService';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
+import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
 
 interface AdvisoryDetailDrawerProps {
@@ -37,10 +38,23 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
 
   if (!item) return null;
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard?.writeText(text);
-    setCopiedText(text);
-    setTimeout(() => setCopiedText(null), 2000);
+  const handleCopy = async (text: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else if (typeof document !== 'undefined') {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedText(text);
+      setTimeout(() => setCopiedText(null), 2000);
+    } catch {}
   };
 
   const getStateBadge = (state: string) => {
@@ -140,6 +154,9 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2.5 }}>
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 0.5 }}>
+            {item.vendor_code && (
+              <VendorIcon vendorCode={item.vendor_code} name={item.vendor_name} size={18} hideLabel />
+            )}
             <Typography variant="h5" sx={{ fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'primary.main' }}>
               {item.advisory_id}
             </Typography>
@@ -294,18 +311,33 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
           {item.solution}
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
-          <span>$ dnf upgrade -y {firstComponent || 'package-name'}</span>
-          <Tooltip title={copiedText === `$ dnf upgrade -y ${firstComponent || 'package-name'}` ? '已複製指令！' : '複製升級指令'}>
-            <IconButton
-              size="small"
-              onClick={() => handleCopy(`$ dnf upgrade -y ${firstComponent || 'package-name'}`)}
-              sx={{ color: 'text.secondary' }}
-            >
-              {copiedText === `$ dnf upgrade -y ${firstComponent || 'package-name'}` ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
-            </IconButton>
-          </Tooltip>
-        </Box>
+        {item.vendor_code === 'redhat' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
+            <span>$ dnf upgrade -y {firstComponent || 'package-name'}</span>
+            <Tooltip title={copiedText === `$ dnf upgrade -y ${firstComponent || 'package-name'}` ? '已複製指令！' : '複製升級指令'}>
+              <IconButton
+                size="small"
+                onClick={() => handleCopy(`$ dnf upgrade -y ${firstComponent || 'package-name'}`)}
+                sx={{ color: 'text.secondary' }}
+              >
+                {copiedText === `$ dnf upgrade -y ${firstComponent || 'package-name'}` ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : item.vendor_code === 'nutanix' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
+            <span>Prism LCM Upgrade: {item.fixed_versions?.[0] || firstComponent || item.advisory_id}</span>
+            <Tooltip title={copiedText === (item.fixed_versions?.[0] || item.advisory_id) ? '已複製版本！' : '複製目標修復版本'}>
+              <IconButton
+                size="small"
+                onClick={() => handleCopy(item.fixed_versions?.[0] || item.advisory_id)}
+                sx={{ color: 'text.secondary' }}
+              >
+                {copiedText === (item.fixed_versions?.[0] || item.advisory_id) ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : null}
 
         {item.url && (
           <Box sx={{ mt: 1.5 }}>

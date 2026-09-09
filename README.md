@@ -62,8 +62,11 @@ VITE_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_URL=
 SUPABASE_SECRET_KEY=
 
-# Edge Functions receive SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY automatically
-# from the Supabase platform at runtime — do NOT set those here.
+# Edge Functions:
+# - Supabase Cloud: runtime automatically injects SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
+# - Self-Hosted (Docker): environment variables are NOT automatically injected;
+#   both SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY MUST be set in the edge-runtime
+#   container environment (e.g. in docker-compose.yml).
 ```
 
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` must be present in the
@@ -120,6 +123,44 @@ npm --prefix src run build   # outputs to src/dist/
 
 The build assumes it is served from the domain root (`/`). To serve it from a
 subpath instead, set `base` in `src/vite.config.ts`.
+
+### Self-Hosted Edge Functions Deployment
+
+When running self-hosted Supabase with Docker and `edge-runtime`:
+
+1. **Build shared edge bundle**:
+   Whenever vendor adapters, parsers, or engine code changes, compile the bundle:
+   ```bash
+   npm --prefix src run build:edge
+   ```
+   This outputs the bundled ingestion logic to `src/supabase/functions/_shared/ingest.bundle.js`.
+
+2. **Deploy function files to edge-runtime volume**:
+   Copy the `src/supabase/functions` directory directly into the mounted volume of your `edge-runtime` container (e.g. `/root/volumes/edge-runtime/functions`).
+
+3. **Configure container environment**:
+   Unlike Supabase Cloud, self-hosted `edge-runtime` containers do not automatically inject platform credentials. You must explicitly configure environment variables in `docker-compose.yml`:
+   ```yaml
+   edge-runtime:
+     environment:
+       - SUPABASE_URL=http://kong:8000
+       - SUPABASE_SERVICE_ROLE_KEY=<YOUR_SERVICE_ROLE_KEY>
+   ```
+
+4. **Restart edge-runtime service**:
+   ```bash
+   docker compose restart edge-runtime
+   ```
+
+### Network Topology & Ingress
+
+For non-public self-hosted deployments (e.g., accessed via Cloudflare Tunnel or Tailscale), use a single-origin reverse proxy (such as Caddy) with a `/supabase` path prefix:
+- Front-end SPA served at `/`
+- Supabase Kong gateway routed via `handle_path /supabase/* { reverse_proxy kong:8000 }`
+- Point `VITE_SUPABASE_URL` to `https://your-domain.example.com/supabase`
+
+See `docs/agent/specs/self-host-deployment-topology.md` for complete architecture diagrams and Caddyfile/Cloudflare Tunnel templates.
+
 
 ## Documentation
 

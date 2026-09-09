@@ -130,7 +130,15 @@ export class AdvisoryService {
           fixedVersions.some((v: string) => v.toLowerCase().includes('pending'));
 
         let solution = '';
-        if (!isFixPending) {
+        if (vendor?.code === 'nutanix') {
+          if (row.summary) {
+            solution = row.summary;
+          } else if (!isFixPending) {
+            solution = `請依據 Nutanix 官方公告 (${row.advisory_id}) 與修復版本 (${fixedVersions.join(', ') || '最新修復版'}) 執行系統升級。詳情請參閱官方公告指引。`;
+          } else {
+            solution = `官方目前針對該漏洞分析處置中，請參閱 Nutanix 公告 ${row.advisory_id} 密切關注後續更新。`;
+          }
+        } else if (!isFixPending) {
           solution = `請依據官方發佈之資安更新公告 (${fixedVersions.join(', ')}) 執行升級更新 (例如 dnf/yum update)。詳情請參閱官方指引：https://access.redhat.com/articles/11258`;
         } else {
           solution = `官方目前針對該漏洞分析處置中，請參閱公告 ${row.advisory_id} 密切關注後續 Errata 更新，並依資安指引採取適當網路隔離或緩解措施。`;

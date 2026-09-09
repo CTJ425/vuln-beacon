@@ -1,6 +1,6 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, Box, Chip, IconButton } from '@mui/material';
-import { ShieldAlert, Github, Terminal, Moon, Sun } from 'lucide-react';
+import { AppBar, Toolbar, Typography, Box, Chip, IconButton, Tooltip } from '@mui/material';
+import { ShieldAlert, Github, Terminal, Moon, Sun, PanelLeft } from 'lucide-react';
 import { useThemeMode } from '@/theme/ThemeContext';
 
 export interface HeaderProps {
@@ -8,9 +8,14 @@ export interface HeaderProps {
   onManualSync?: () => void;
   /** @deprecated Public manual sync is role-gated to Admin Console in M2 */
   isSyncing?: boolean;
+  onToggleSidebar?: () => void;
+  isSidebarCollapsed?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = () => {
+export const Header: React.FC<HeaderProps> = ({
+  onToggleSidebar,
+  isSidebarCollapsed = false,
+}) => {
   const { resolvedMode, setThemeMode } = useThemeMode();
   const isDark = resolvedMode === 'dark';
 
@@ -18,7 +23,9 @@ export const Header: React.FC<HeaderProps> = () => {
     <AppBar
       position="sticky"
       sx={{
-        bgcolor: 'background.paper',
+        bgcolor: (theme) =>
+          theme.palette.mode === 'dark' ? 'rgba(19, 27, 46, 0.90)' : 'rgba(255, 255, 255, 0.90)',
+        backdropFilter: 'blur(12px)',
         borderBottom: 1,
         borderColor: 'divider',
         boxShadow: 'none',
@@ -27,8 +34,27 @@ export const Header: React.FC<HeaderProps> = () => {
     >
       <Toolbar sx={{ justifyContent: 'space-between', minHeight: 64, px: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {onToggleSidebar && (
+            <Tooltip title={isSidebarCollapsed ? '展開側邊欄' : '收起側邊欄'}>
+              <IconButton
+                onClick={onToggleSidebar}
+                aria-label={isSidebarCollapsed ? '展開側邊欄' : '收起側邊欄'}
+                data-testid="header-sidebar-toggle"
+                size="small"
+                sx={{
+                  color: 'text.secondary',
+                  mr: 0.5,
+                  '&:hover': {
+                    color: 'text.primary',
+                  },
+                }}
+              >
+                <PanelLeft size={20} />
+              </IconButton>
+            </Tooltip>
+          )}
           <ShieldAlert size={28} color="#38bdf8" />
-          <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.02em', color: 'text.primary' }}>
+          <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '-0.025em', color: 'text.primary' }}>
             VulnBeacon
           </Typography>
           <Chip

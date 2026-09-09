@@ -69,6 +69,14 @@ export const MetricCards: React.FC<MetricCardsProps> = ({
               borderRadius: 2.5,
               position: 'relative',
               overflow: 'hidden',
+              transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: (theme) =>
+                  theme.palette.mode === 'dark'
+                    ? '0 10px 24px rgba(0, 0, 0, 0.35)'
+                    : '0 10px 24px rgba(0, 0, 0, 0.08)',
+              },
             }}
           >
             <CardContent sx={{ p: 2.5 }}>

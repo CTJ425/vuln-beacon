@@ -67,7 +67,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         <Grid container spacing={2}>
           {taxonomy.map((vendor) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={vendor.vendorCode}>
-              <Card sx={{ bgcolor: 'background.paper', borderRadius: 2.5, border: 1, borderColor: 'divider' }}>
+              <Card
+                sx={{
+                  bgcolor: 'background.paper',
+                  borderRadius: 2.5,
+                  border: 1,
+                  borderColor: 'divider',
+                  transition: 'all 0.2s ease-in-out',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  '&:hover': {
+                    transform: 'translateY(-3px)',
+                    borderColor: 'primary.main',
+                    boxShadow: (theme) =>
+                      theme.palette.mode === 'dark'
+                        ? '0 10px 25px rgba(0, 0, 0, 0.45)'
+                        : '0 10px 25px rgba(0, 0, 0, 0.08)',
+                  },
+                }}
+              >
                 <CardActionArea
                   onClick={() => onSelectVendor && onSelectVendor(vendor.vendorCode)}
                   sx={{ p: 2 }}
@@ -75,12 +93,19 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   <CardContent sx={{ p: 0 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <VendorIcon vendorCode={vendor.vendorCode} name={vendor.vendorName} size={18} />
+                      <ArrowRight size={15} color="gray" />
                     </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1.5 }}>
-                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
                         Advisories: {vendor.advisoryCount}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700 }}>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: vendor.criticalCount > 0 ? 'error.main' : 'text.secondary',
+                          fontWeight: 700,
+                        }}
+                      >
                         Critical: {vendor.criticalCount}
                       </Typography>
                     </Box>

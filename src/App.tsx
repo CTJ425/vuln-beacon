@@ -25,6 +25,8 @@ export const AppContent: React.FC = () => {
   const [currentNav, setCurrentNav] = useState<NavState>({ section: 'dashboard' });
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showAdminLogin, setShowAdminLogin] = useState<boolean>(false);
+  const [adminTab, setAdminTab] = useState<number>(0);
+  const [pendingAdminTab, setPendingAdminTab] = useState<number | null>(null);
   const [cves, setCves] = useState<CveTableRowItem[]>([]);
   const [advisories, setAdvisories] = useState<AdvisoryRowItem[]>([]);
   const [syncLogs, setSyncLogs] = useState<VendorSyncLog[]>([]);
@@ -36,6 +38,30 @@ export const AppContent: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem('vulnbeacon-sidebar-collapsed') === 'true';
+      }
+    } catch {
+      // Ignore localStorage access in non-browser or restricted environments
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('vulnbeacon-sidebar-collapsed', String(isSidebarCollapsed));
+      }
+    } catch {
+      // Ignore localStorage write errors
+    }
+  }, [isSidebarCollapsed]);
+
+  const handleToggleSidebar = useCallback(() => {
+    setIsSidebarCollapsed((prev) => !prev);
+  }, []);
 
   const taxonomy = useMemo(() => deriveTaxonomy(advisories), [advisories]);
 
@@ -103,6 +129,14 @@ export const AppContent: React.FC = () => {
   }, [currentNav]);
 
   useEffect(() => {
+    if (!syncMessage) return;
+    const timer = setTimeout(() => {
+      setSyncMessage(null);
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [syncMessage]);
+
+  useEffect(() => {
     if (supabase?.auth?.getSession) {
       supabase.auth.getSession().then(({ data }) => {
         if (data?.session?.user) {
@@ -122,9 +156,24 @@ export const AppContent: React.FC = () => {
   }, []);
 
   const handleSelectNav = (nav: NavState) => {
+    if (nav.section === 'sync' || nav.section === 'settings') {
+      const targetTab = nav.section === 'sync' ? 1 : 0;
+      if (!currentUser) {
+        setPendingAdminTab(targetTab);
+        setShowAdminLogin(true);
+        return;
+      }
+      setAdminTab(targetTab);
+      setCurrentNav({ section: 'admin' });
+      return;
+    }
     if (nav.section === 'admin' && !currentUser) {
+      setPendingAdminTab(0);
       setShowAdminLogin(true);
       return;
+    }
+    if (nav.section === 'admin') {
+      setAdminTab(0);
     }
     setCurrentNav(nav);
   };
@@ -139,6 +188,10 @@ export const AppContent: React.FC = () => {
           setCurrentUser(data.session.user);
         }
       }).catch(() => {});
+    }
+    if (pendingAdminTab !== null) {
+      setAdminTab(pendingAdminTab);
+      setPendingAdminTab(null);
     }
     setCurrentNav({ section: 'admin' });
   };
@@ -160,7 +213,7 @@ export const AppContent: React.FC = () => {
     setSyncMessage(null);
 
     try {
-      const result = await syncService.syncVendors();
+      const result = await syncService.syncVendors(undefined, { mode: currentUser ? 'server' : 'auto' });
       if (result.success) {
         setSyncMessage('Ingestion complete! Fetched and updated feeds in Supabase.');
       } else {
@@ -189,7 +242,6 @@ export const AppContent: React.FC = () => {
       setSyncMessage(`Sync failed: ${err.message || 'Unknown error'}`);
     } finally {
       setIsSyncing(false);
-      setTimeout(() => setSyncMessage(null), 5000);
     }
   };
 
@@ -199,7 +251,6 @@ export const AppContent: React.FC = () => {
       setWebhooks((prev) => [created, ...prev]);
     } else {
       setSyncMessage('Failed to add webhook. Please try again.');
-      setTimeout(() => setSyncMessage(null), 5000);
     }
   };
 
@@ -211,12 +262,10 @@ export const AppContent: React.FC = () => {
       if (!deleted) {
         setWebhooks(previousWebhooks);
         setSyncMessage('Failed to delete webhook. Please try again.');
-        setTimeout(() => setSyncMessage(null), 5000);
       }
     } catch {
       setWebhooks(previousWebhooks);
       setSyncMessage('Failed to delete webhook. Please try again.');
-      setTimeout(() => setSyncMessage(null), 5000);
     }
   };
 
@@ -236,7 +285,10 @@ export const AppContent: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Header />
+      <Header
+        onToggleSidebar={handleToggleSidebar}
+        isSidebarCollapsed={isSidebarCollapsed}
+      />
 
       <Box sx={{ display: 'flex', flexGrow: 1 }}>
         {/* Admin Console (backstage) has its own vendor-scoped panels; the public
@@ -247,6 +299,8 @@ export const AppContent: React.FC = () => {
           onSelectNav={handleSelectNav}
           taxonomy={currentNav.section === 'admin' ? [] : taxonomy}
           staticNavIds={['explorer', 'admin']}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={handleToggleSidebar}
         />
 
         <Box component="main" sx={{ flexGrow: 1, p: 3.5, overflowY: 'auto', bgcolor: 'background.default' }}>
@@ -344,7 +398,20 @@ export const AppContent: React.FC = () => {
                   onManualSync={handleManualSync}
                   isSyncing={isSyncing}
                   onSaveSchedule={handleSaveSchedule}
+                  activeTab={adminTab}
+                  onTabChange={setAdminTab}
                 />
+              )}
+
+              {!['dashboard', 'explorer', 'vendor', 'admin'].includes(currentNav.section) && (
+                <Box sx={{ p: 4, textAlign: 'center' }} data-testid="nav-fallback-container">
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    Page Not Found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    The requested section is not recognized or has moved to the Admin Console.
+                  </Typography>
+                </Box>
               )}
             </>
           )}

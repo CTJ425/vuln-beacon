@@ -1,17 +1,28 @@
 import React from 'react';
 import { Box, Avatar } from '@mui/material';
-import { Server, Shield, Layers, HardDrive, Cpu, Cloud, Database, Box as BoxIcon } from 'lucide-react';
+import {
+  RedHatLogo,
+  NetAppLogo,
+  VmwareLogo,
+  NutanixLogo,
+  DellLogo,
+  HpeLogo,
+  VeeamLogo,
+  CohesityLogo,
+  DefaultVendorLogo,
+} from '@/components/icons/VendorLogos';
 
-interface VendorIconProps {
+export interface VendorIconProps {
   vendorCode: string;
   name?: string;
   size?: number;
+  hideLabel?: boolean;
 }
 
 export const VENDOR_COLORS: Record<string, string> = {
   redhat: '#ee0000',
   vmware: '#0095d9',
-  nutanix: '#7b1fa2',
+  nutanix: '#024da1',
   dell: '#007db8',
   hpe: '#01a982',
   netapp: '#0067c5',
@@ -30,40 +41,53 @@ export const VENDOR_NAMES: Record<string, string> = {
   cohesity: 'Cohesity',
 };
 
-export const VendorIcon: React.FC<VendorIconProps> = ({ vendorCode, name: nameProp, size = 20 }) => {
+export const VendorIcon: React.FC<VendorIconProps> = ({
+  vendorCode,
+  name: nameProp,
+  size = 20,
+  hideLabel = false,
+}) => {
   const code = (vendorCode || '').toLowerCase();
   const color = VENDOR_COLORS[code] || '#38bdf8';
   const name = nameProp || VENDOR_NAMES[code] || vendorCode;
 
   const renderIcon = () => {
     switch (code) {
-      case 'redhat': return <Shield size={size} color={color} />;
-      case 'vmware': return <Layers size={size} color={color} />;
-      case 'nutanix': return <Cloud size={size} color={color} />;
-      case 'dell': return <Server size={size} color={color} />;
-      case 'hpe': return <Cpu size={size} color={color} />;
-      case 'netapp': return <Database size={size} color={color} />;
-      case 'veeam': return <HardDrive size={size} color={color} />;
-      case 'cohesity': return <BoxIcon size={size} color={color} />;
-      default: return <Server size={size} color={color} />;
+      case 'redhat': return <RedHatLogo size={size} color={color} />;
+      case 'netapp': return <NetAppLogo size={size} color={color} />;
+      case 'vmware': return <VmwareLogo size={size} color={color} />;
+      case 'nutanix': return <NutanixLogo size={size} color={color} />;
+      case 'dell': return <DellLogo size={size} color={color} />;
+      case 'hpe': return <HpeLogo size={size} color={color} />;
+      case 'veeam': return <VeeamLogo size={size} color={color} />;
+      case 'cohesity': return <CohesityLogo size={size} color={color} />;
+      default: return <DefaultVendorLogo size={size} color={color} />;
     }
   };
 
   return (
-    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: hideLabel ? 0 : 1 }}>
       <Avatar
+        aria-label={hideLabel ? name : undefined}
         sx={{
           width: size + 10,
           height: size + 10,
-          bgcolor: `${color}18`,
+          bgcolor: `${color}14`,
           border: `1px solid ${color}33`,
+          boxShadow: `0 2px 8px ${color}12`,
+          transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+          '&:hover': {
+            boxShadow: `0 4px 12px ${color}28`,
+          },
         }}
       >
         {renderIcon()}
       </Avatar>
-      <Box component="span" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
-        {name}
-      </Box>
+      {!hideLabel && (
+        <Box component="span" sx={{ fontWeight: 600, fontSize: '0.875rem', color: 'inherit' }}>
+          {name}
+        </Box>
+      )}
     </Box>
   );
 };

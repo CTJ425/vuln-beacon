@@ -113,4 +113,37 @@ describe('CveDetailDrawer Component', () => {
     expect(screen.getByText('firefox')).toBeInTheDocument();
     expect(screen.queryByText('opentelemetry-collector')).not.toBeInTheDocument();
   });
+
+  it('should not violate Rules of Hooks when transitioning item between null and defined', () => {
+    const handleClose = vi.fn();
+
+    const { rerender } = render(
+      <CveDetailDrawer
+        open={true}
+        item={mockItem}
+        onClose={handleClose}
+      />
+    );
+    expect(screen.getByText('CVE-2026-73086')).toBeInTheDocument();
+
+    // Transition item to null while component remains mounted in App
+    rerender(
+      <CveDetailDrawer
+        open={false}
+        item={null}
+        onClose={handleClose}
+      />
+    );
+
+    // Transition back to mockItem
+    rerender(
+      <CveDetailDrawer
+        open={true}
+        item={mockItem}
+        onClose={handleClose}
+      />
+    );
+    expect(screen.getByText('CVE-2026-73086')).toBeInTheDocument();
+  });
 });
+

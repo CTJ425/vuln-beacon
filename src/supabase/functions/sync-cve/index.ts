@@ -1,10 +1,39 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { IngestionEngine, WebhookService } from "../_shared/ingest.bundle.js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const DB_BATCH_SIZE = 1000;
+const SUPABASE_PAGE_SIZE = 1000;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+
+async function fetchAllCveIds(supabaseClient: any): Promise<string[]> {
+  const ids: string[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabaseClient
+      .from('cves')
+      .select('cve_id')
+      .range(from, from + SUPABASE_PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+
+    for (const row of data) ids.push(row.cve_id);
+    if (data.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+  return ids;
+}
 
 const ADVISORY_BUCKET = 'advisory-documents';
 
@@ -162,6 +191,296 @@ serve(async (req) => {
         JSON.stringify({ success: true, status: 'ok', timestamp: new Date().toISOString() }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
+    }
+
+    if (action === 'trigger_manual_sync') {
+      const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? '';
+      const token = authHeader.replace(/^bearer\s+/i, '').trim();
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+
+      // D2: Role-Gated Admin Authorization
+      let isAuthorized = false;
+      if (serviceRoleKey && token === serviceRoleKey) {
+        isAuthorized = true;
+      } else if (token) {
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+        if (!userError && user) {
+          isAuthorized = true;
+        }
+      }
+
+      if (!isAuthorized) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Unauthorized: Admin authentication required for manual sync' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+        );
+      }
+
+      // D3: Mutual Exclusion & Concurrency Protection
+      let lockAcquired = false;
+      try {
+        const { data: hasLock, error: lockErr } = await supabaseClient.rpc('try_acquire_sync_lock', { lock_id: 7425001 });
+        if (!lockErr && hasLock === false) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'A threat feed synchronization is already in progress' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 409 }
+          );
+        }
+        if (!lockErr && hasLock === true) {
+          lockAcquired = true;
+        }
+      } catch {
+        // Fall back gracefully if lock RPC does not exist
+      }
+
+      try {
+        const targetVendors: string[] = Array.isArray(body.vendorCodes) && body.vendorCodes.length > 0
+          ? body.vendorCodes
+          : ['redhat', 'nutanix'];
+
+        let knownCveIds: string[] = [];
+        try {
+          knownCveIds = await fetchAllCveIds(supabaseClient);
+        } catch (knownIdsErr) {
+          console.warn('Failed to fetch known CVE ids for de-duplication:', knownIdsErr);
+        }
+
+        const webhookService = new WebhookService();
+        const { data: webhookConfigs, error: webhookConfigsError } = await supabaseClient
+          .from('webhook_configs')
+          .select('*')
+          .eq('is_active', true);
+
+        if (webhookConfigsError) {
+          console.warn('Failed to load webhook configs for manual sync:', webhookConfigsError);
+        } else {
+          for (const config of webhookConfigs || []) {
+            webhookService.registerWebhook(config);
+          }
+        }
+
+        const ran: string[] = [];
+        const failed: string[] = [];
+        const logs: any[] = [];
+        const errors: string[] = [];
+        let allSucceeded = true;
+
+        for (const code of targetVendors) {
+          const { data: vendor, error: vendorError } = await supabaseClient
+            .from('vendors')
+            .select('*')
+            .eq('code', code)
+            .single();
+
+          if (vendorError || !vendor) {
+            allSucceeded = false;
+            failed.push(code);
+            errors.push(`Unknown vendor code: ${code}`);
+            continue;
+          }
+
+          const engine = new IngestionEngine({ knownCveIds, webhookService });
+          const startedAt = new Date().toISOString();
+
+          try {
+            const result = await engine.ingestVendor(code);
+            if (result.status === 'FAILED') {
+              throw new Error(result.errorMessage || `Ingestion failed for vendor ${code}`);
+            }
+
+            const advisories = engine.getAdvisories().filter((a: any) => a.vendor_id === code);
+            const cves = engine.getCves();
+            const mappings = engine.getMappings();
+
+            const cveIdMap = new Map<string, string>();
+            for (const batch of chunk(cves, DB_BATCH_SIZE)) {
+              const { data: insertedCves, error: cveError } = await supabaseClient
+                .from('cves')
+                .upsert(
+                  batch.map((c: any) => ({
+                    cve_id: c.cve_id,
+                    description: c.description,
+                    cvss_v3_score: c.cvss_v3_score,
+                    cvss_v3_vector: c.cvss_v3_vector,
+                    severity: c.severity,
+                    is_known_exploited: c.is_known_exploited,
+                    published_date: c.published_date,
+                  })),
+                  { onConflict: 'cve_id' }
+                )
+                .select('id, cve_id');
+
+              if (cveError) throw cveError;
+              for (const row of insertedCves || []) {
+                const original = batch.find((c: any) => c.cve_id === row.cve_id);
+                if (original) cveIdMap.set(original.id, row.id);
+              }
+            }
+
+            const rawPayloadPaths = new Map<string, string>();
+            const advisoryIdMap = new Map<string, string>();
+            for (const batch of chunk(advisories, DB_BATCH_SIZE)) {
+              for (const adv of batch as any[]) {
+                const hasPayload = adv.raw_payload && Object.keys(adv.raw_payload).length > 0;
+                if (!hasPayload) continue;
+                const path = `${code}/${sanitiseAdvisoryKey(adv.advisory_id)}.json`;
+                try {
+                  const { error: uploadError } = await supabaseClient.storage
+                    .from(ADVISORY_BUCKET)
+                    .upload(path, JSON.stringify(adv.raw_payload), {
+                      contentType: 'application/json',
+                      upsert: true,
+                    });
+                  if (uploadError) throw uploadError;
+                  rawPayloadPaths.set(adv.advisory_id, path);
+                } catch (uploadErr: any) {
+                  console.error(
+                    `Failed to upload raw payload for advisory ${adv.advisory_id} (vendor ${code}):`,
+                    uploadErr
+                  );
+                }
+              }
+
+              const { data: insertedAdvisories, error: advError } = await supabaseClient
+                .from('advisories')
+                .upsert(
+                  batch.map((adv: any) => ({
+                    vendor_id: vendor.id,
+                    advisory_id: adv.advisory_id,
+                    title: adv.title,
+                    severity: adv.severity,
+                    published_at: adv.published_at,
+                    url: adv.url,
+                    summary: adv.summary,
+                    raw_payload: {},
+                    raw_payload_path: rawPayloadPaths.get(adv.advisory_id) ?? null,
+                  })),
+                  { onConflict: 'vendor_id, advisory_id' }
+                )
+                .select('id, advisory_id');
+
+              if (advError) {
+                const batchPaths = batch
+                  .map((adv: any) => rawPayloadPaths.get(adv.advisory_id))
+                  .filter((path): path is string => !!path);
+                if (batchPaths.length > 0) {
+                  try {
+                    await supabaseClient.storage
+                      .from(ADVISORY_BUCKET)
+                      .remove(batchPaths);
+                  } catch {}
+                }
+                throw advError;
+              }
+
+              for (const row of insertedAdvisories || []) {
+                const original = batch.find((a: any) => a.advisory_id === row.advisory_id);
+                if (original) advisoryIdMap.set(original.id, row.id);
+              }
+            }
+
+            const mappingRows = mappings
+              .map((m: any) => {
+                const realAdvisoryId = advisoryIdMap.get(m.advisory_id);
+                const realCveId = cveIdMap.get(m.cve_id);
+                if (!realAdvisoryId || !realCveId) return null;
+                return {
+                  advisory_id: realAdvisoryId,
+                  cve_id: realCveId,
+                  affected_products: (m.product_impacts && m.product_impacts.length > 0)
+                    ? m.product_impacts
+                    : m.affected_products,
+                  fixed_versions: m.fixed_versions,
+                };
+              })
+              .filter((m: any) => m !== null);
+
+            for (const batch of chunk(mappingRows, DB_BATCH_SIZE)) {
+              const { error: mapError } = await supabaseClient
+                .from('advisory_cve_map')
+                .upsert(batch, { onConflict: 'advisory_id, cve_id' });
+              if (mapError) throw mapError;
+            }
+
+            const finishedAt = new Date().toISOString();
+            const { data: logRow, error: logError } = await supabaseClient
+              .from('vendor_sync_logs')
+              .insert({
+                vendor_id: vendor.id,
+                vendor_code: code,
+                status: result.status,
+                items_fetched: result.advisoriesCount,
+                new_items_count: result.newCvesCount,
+                duration_ms: result.durationMs,
+                started_at: startedAt,
+                finished_at: finishedAt,
+                error_message: result.errorMessage ?? null,
+                details: result.details ?? {},
+              })
+              .select()
+              .single();
+
+            if (logError) throw logError;
+
+            ran.push(code);
+            logs.push(logRow);
+
+            for (const c of cves) {
+              if (!knownCveIds.includes(c.cve_id)) {
+                knownCveIds.push(c.cve_id);
+              }
+            }
+          } catch (err: any) {
+            allSucceeded = false;
+            failed.push(code);
+            const finishedAt = new Date().toISOString();
+            const errMsg = err?.message ?? `Unknown error syncing vendor ${code}`;
+            errors.push(errMsg);
+
+            const { data: logRow } = await supabaseClient
+              .from('vendor_sync_logs')
+              .insert({
+                vendor_id: vendor.id,
+                vendor_code: code,
+                status: 'FAILED',
+                items_fetched: 0,
+                new_items_count: 0,
+                duration_ms: null,
+                started_at: startedAt,
+                finished_at: finishedAt,
+                error_message: errMsg,
+                details: {
+                  error_message: errMsg,
+                  error_stack: err?.stack,
+                  failed_at: finishedAt,
+                },
+              })
+              .select()
+              .single();
+
+            if (logRow) {
+              logs.push(logRow);
+            }
+          }
+        }
+
+        return new Response(
+          JSON.stringify({
+            success: allSucceeded,
+            ran,
+            failed,
+            logs,
+            errors,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      } finally {
+        if (lockAcquired) {
+          try {
+            await supabaseClient.rpc('release_sync_lock', { lock_id: 7425001 });
+          } catch {}
+        }
+      }
     }
 
     if (action === 'update_vendor_schedule') {

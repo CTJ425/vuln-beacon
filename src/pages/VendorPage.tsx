@@ -5,6 +5,7 @@ import { ExplorerPage } from '@/pages/ExplorerPage';
 import { AdvisoryRowItem } from '@/services/advisoryService';
 import { CveTableRowItem } from '@/components/explorer/CveTable';
 import { VendorNode } from '@/services/productTaxonomy';
+import { VendorIcon, VENDOR_NAMES } from '@/components/common/VendorIcon';
 
 interface VendorPageProps {
   vendorCode: string;
@@ -40,8 +41,14 @@ export const VendorPage: React.FC<VendorPageProps> = ({
   );
 
   const scopedCves = useMemo(
-    () => cves.filter((c) => scopedAdvisoryIds.has(c.advisory_id) || (c.all_advisories || []).some((id) => scopedAdvisoryIds.has(id))),
-    [cves, scopedAdvisoryIds]
+    () =>
+      cves.filter(
+        (c) =>
+          c.vendor_code === vendorCode ||
+          scopedAdvisoryIds.has(c.advisory_id) ||
+          (c.all_advisories || []).some((id) => scopedAdvisoryIds.has(id))
+      ),
+    [cves, scopedAdvisoryIds, vendorCode]
   );
 
   const criticalCount = scopedAdvisories.filter((a) => a.severity === 'CRITICAL').length;
@@ -51,11 +58,12 @@ export const VendorPage: React.FC<VendorPageProps> = ({
     totalImpactedComponents += a.product_impacts ? a.product_impacts.length : 0;
   });
 
-  const vendorName = vendor?.vendorName ?? vendorCode;
+  const vendorName = vendor?.vendorName ?? VENDOR_NAMES[vendorCode.toLowerCase()] ?? vendorCode;
 
   return (
     <Stack spacing={3.5}>
-      <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <VendorIcon vendorCode={vendorCode} name={vendorName} size={28} hideLabel />
         <Typography variant="h4" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.02em' }}>
           {vendorName}
         </Typography>

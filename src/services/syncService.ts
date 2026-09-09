@@ -28,10 +28,11 @@ import { WebhookConfigService } from '@/services/webhookConfigService';
 import { fetchAllRows } from '@/lib/fetchAllRows';
 import { getAdapterByCode } from '@/adapters';
 import { RedHatCsafAdapter } from '@/adapters/redhat-csaf';
+import { NutanixAdapter } from '@/adapters/nutanix';
 
 // The vendors SyncService actually contacts today. Kept as the single source
 // of truth so the UI can state sync coverage truthfully instead of guessing.
-export const SYNCED_VENDOR_CODES = ['redhat'] as const;
+export const SYNCED_VENDOR_CODES = ['redhat', 'nutanix'] as const;
 
 // BUG-003: a full vendor run can build a functions.invoke body of tens of MB,
 // which the self-hosted Edge Runtime supervisor kills. Bound the size of each
@@ -159,16 +160,16 @@ export class SyncService {
       configs = await this.webhookConfigService.fetchWebhooks();
     } catch (err) {
       console.warn('Failed to load webhook configs:', err);
-      this.webhookService.clearWebhooks();
+      this.webhookService?.clearWebhooks?.();
       return 0;
     }
 
-    this.webhookService.clearWebhooks();
+    this.webhookService?.clearWebhooks?.();
 
     let registered = 0;
     for (const config of configs) {
       if (!config.is_active) continue;
-      this.webhookService.registerWebhook(config);
+      this.webhookService?.registerWebhook?.(config);
       registered++;
     }
 
@@ -228,24 +229,86 @@ export class SyncService {
     }
   }
 
-  async syncVendors(): Promise<{ success: boolean; newLogs: VendorSyncLog[]; errors?: string[] }> {
+  async syncVendors(
+    vendorCodes?: string[],
+    options?: { mode?: 'auto' | 'server' | 'client' }
+  ): Promise<{ success: boolean; newLogs: VendorSyncLog[]; errors?: string[] }> {
+    const mode = options?.mode ?? 'auto';
+    const targets = vendorCodes && vendorCodes.length > 0 ? vendorCodes : SYNCED_VENDOR_CODES;
+
+    let canAttemptServer = mode === 'server';
+    if (mode === 'auto') {
+      try {
+        const session = await supabase?.auth?.getSession?.();
+        if (session?.data?.session?.access_token && session?.data?.session?.user) {
+          canAttemptServer = true;
+        }
+      } catch {
+        // Fall back to client
+      }
+    }
+
+    if (canAttemptServer) {
+      try {
+        const headers = await getFunctionHeaders();
+        const { data, error } = await supabase.functions.invoke('sync-cve', {
+          headers,
+          body: {
+            action: 'trigger_manual_sync',
+            vendorCodes: targets,
+          },
+        });
+
+        if (error) {
+          const errorMsg = await extractErrorMessage(error);
+          if (mode === 'auto' && (errorMsg.includes('Unsupported action') || errorMsg.includes('404'))) {
+            console.warn('Server-side manual sync unsupported; falling back to client execution:', errorMsg);
+          } else {
+            return {
+              success: false,
+              newLogs: (data?.logs ?? []) as VendorSyncLog[],
+              errors: [errorMsg],
+            };
+          }
+        } else if (data) {
+          return {
+            success: Boolean(data.success),
+            newLogs: (data.logs ?? []) as VendorSyncLog[],
+            errors: (data.errors ?? []) as string[],
+          };
+        }
+      } catch (invokeErr: any) {
+        if (mode === 'server') {
+          const errorMsg = await extractErrorMessage(invokeErr);
+          return {
+            success: false,
+            newLogs: [],
+            errors: [errorMsg],
+          };
+        }
+      }
+    }
+
     // Register active webhooks before ingestion so alerts actually go out. A
     // load failure must not abort the sync — loadWebhooks never throws.
     await this.loadWebhooks();
 
     const knownCveIds = await this.fetchKnownCveIds();
+    const knownCveIdSet = new Set(knownCveIds);
 
-    const engine = new IngestionEngine({ webhookService: this.webhookService, knownCveIds });
     const newLogs: VendorSyncLog[] = [];
     const errors: string[] = [];
     let allSucceeded = true;
-
-    for (const code of SYNCED_VENDOR_CODES) {
+    for (const code of targets) {
       const startTime = Date.now();
       // Per-iteration guard: at most one entry in `errors` per vendor. The
       // ingest failure reason is the root cause and wins over any transport
       // error that follows it in the same iteration.
       let recordedError = false;
+
+      // Instantiate a fresh IngestionEngine per vendor to prevent accumulating
+      // advisories, CVEs, and mappings across vendors (matching scheduled-sync architecture).
+      const engine = new IngestionEngine({ webhookService: this.webhookService, knownCveIds: knownCveIdSet });
 
       try {
         const result = await engine.ingestVendor(code);
@@ -317,6 +380,11 @@ export class SyncService {
         if (data?.log) {
           newLogs.push(data.log as VendorSyncLog);
         }
+
+        // Record newly ingested CVEs so subsequent vendors in the same run do not re-count or re-alert them.
+        for (const c of cves) {
+          knownCveIdSet.add(c.cve_id);
+        }
       } catch (err: any) {
         allSucceeded = false;
         const duration = Date.now() - startTime;
@@ -362,49 +430,113 @@ export class SyncService {
       }
     }
 
+    const uniqueErrors = Array.from(new Set(errors));
     return {
       success: allSucceeded,
       newLogs,
-      errors,
+      errors: uniqueErrors,
     };
   }
 
   async fetchAndIngestQuery(query: string): Promise<boolean> {
     const q = query.trim().toUpperCase();
-    const adapter = getAdapterByCode('redhat') as RedHatCsafAdapter;
+    let vendorCode = 'redhat';
+    const redhatAdapter = getAdapterByCode('redhat') as RedHatCsafAdapter;
+    const nutanixAdapter = getAdapterByCode('nutanix') as NutanixAdapter | undefined;
 
     try {
       const detailDocuments: unknown[] = [];
 
       if (q.startsWith('RHSA-') || q.startsWith('RHBA-') || q.startsWith('RHEA-')) {
-        const res = await fetch(adapter.advisoryDetailUrl(q));
+        vendorCode = 'redhat';
+        const res = await fetch(redhatAdapter.advisoryDetailUrl(q));
         if (!res.ok) return false;
         detailDocuments.push(await res.json());
+      } else if (q.startsWith('NXSA-')) {
+        if (!nutanixAdapter) return false;
+        vendorCode = 'nutanix';
+        const res = await fetch(nutanixAdapter.advisoryDetailUrl(q));
+        if (!res.ok) return false;
+        const doc = await res.json();
+        if (doc) detailDocuments.push(doc);
       } else {
-        const listRes = await fetch(adapter.cveLookupUrl(q));
-        if (!listRes.ok) return false;
-        const list = (await listRes.json()) as { RHSA?: string }[];
-        if (!Array.isArray(list) || list.length === 0) return false;
-
-        const BATCH_SIZE = 5;
-        for (let i = 0; i < list.length; i += BATCH_SIZE) {
-          const batch = list.slice(i, i + BATCH_SIZE);
-          const batchDocs = await Promise.all(
-            batch.map(async (entry) => {
-              if (!entry.RHSA) return null;
-              try {
-                const detailRes = await fetch(adapter.advisoryDetailUrl(entry.RHSA));
-                if (detailRes.ok) {
-                  return await detailRes.json();
-                }
-              } catch {
-                // Skip this advisory rather than failing the whole batch.
+        // Try Red Hat reverse lookup first
+        const listRes = await fetch(redhatAdapter.cveLookupUrl(q));
+        let foundRedhat = false;
+        if (listRes.ok) {
+          const list = (await listRes.json()) as { RHSA?: string }[];
+          if (Array.isArray(list) && list.length > 0) {
+            foundRedhat = true;
+            vendorCode = 'redhat';
+            const BATCH_SIZE = 5;
+            for (let i = 0; i < list.length; i += BATCH_SIZE) {
+              const batch = list.slice(i, i + BATCH_SIZE);
+              const batchDocs = await Promise.all(
+                batch.map(async (entry) => {
+                  if (!entry.RHSA) return null;
+                  try {
+                    const detailRes = await fetch(redhatAdapter.advisoryDetailUrl(entry.RHSA));
+                    if (detailRes.ok) {
+                      return await detailRes.json();
+                    }
+                  } catch {
+                    // Skip this advisory rather than failing the whole batch.
+                  }
+                  return null;
+                })
+              );
+              for (const doc of batchDocs) {
+                if (doc !== null) detailDocuments.push(doc);
               }
-              return null;
-            })
-          );
-          for (const doc of batchDocs) {
-            if (doc !== null) detailDocuments.push(doc);
+            }
+          }
+        }
+
+        // If not found in Red Hat, check Nutanix vulnerability search
+        if (!foundRedhat && nutanixAdapter) {
+          try {
+            const nutanixRes = await fetch(nutanixAdapter.vulnerabilityLookupUrl(), {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ searchQuery: q, page: 1, pageSize: 10 }),
+            });
+            if (nutanixRes.ok) {
+              const nutanixData = (await nutanixRes.json()) as { vulnerabilities?: any[] };
+              const vulns = Array.isArray(nutanixData?.vulnerabilities) ? nutanixData.vulnerabilities : [];
+              const targetAdvisoryIds = new Set<string>();
+              for (const v of vulns) {
+                const prod = v.productName === 'Prism' ? 'PC' : (v.productName || 'AOS');
+                if (Array.isArray(v.fixedReleases)) {
+                  for (const rel of v.fixedReleases) {
+                    const cleanRel = String(rel).replace(/^(pc\.|ahv[-.]|aos[-.]|afs[-.])/i, '');
+                    targetAdvisoryIds.add(`NXSA-${prod}-${cleanRel}`);
+                    if (String(rel).toUpperCase().startsWith('NXSA-')) {
+                      targetAdvisoryIds.add(String(rel));
+                    } else {
+                      targetAdvisoryIds.add(`NXSA-${prod}-${rel}`);
+                    }
+                  }
+                }
+              }
+
+              for (const advId of targetAdvisoryIds) {
+                try {
+                  const detailRes = await fetch(nutanixAdapter.advisoryDetailUrl(advId));
+                  if (detailRes.ok) {
+                    const doc = await detailRes.json();
+                    if (doc && doc.advisory_id) {
+                      detailDocuments.push(doc);
+                      vendorCode = 'nutanix';
+                      break;
+                    }
+                  }
+                } catch {
+                  // Skip failed detail fetch
+                }
+              }
+            }
+          } catch {
+            // Ignore Nutanix lookup error
           }
         }
       }
@@ -421,7 +553,7 @@ export class SyncService {
       });
       const startTime = Date.now();
       const startedAt = new Date(startTime).toISOString();
-      const result = await engine.ingestVendor('redhat', detailDocuments);
+      const result = await engine.ingestVendor(vendorCode, detailDocuments);
       const durationMs = Date.now() - startTime;
 
       const advisories = engine.getAdvisories();
@@ -442,7 +574,7 @@ export class SyncService {
         details: result.details ?? {},
       };
 
-      const chunks = buildPersistChunks(advisories, engine.getCves(), engine.getMappings(), 'redhat');
+      const chunks = buildPersistChunks(advisories, engine.getCves(), engine.getMappings(), vendorCode);
       const headers = await getFunctionHeaders();
       if (chunks.length === 1) {
         const chunk = chunks[0];
@@ -450,7 +582,7 @@ export class SyncService {
           headers,
           body: {
             action: 'persist_ingestion',
-            vendorCode: 'redhat',
+            vendorCode,
             advisories: chunk.advisories,
             cves: chunk.cves,
             mappings: chunk.mappings,
@@ -468,7 +600,7 @@ export class SyncService {
             headers,
             body: {
               action: 'persist_ingestion',
-              vendorCode: 'redhat',
+              vendorCode,
               advisories: chunk.advisories,
               cves: chunk.cves,
               mappings: chunk.mappings,
@@ -485,7 +617,7 @@ export class SyncService {
           headers,
           body: {
             action: 'persist_ingestion',
-            vendorCode: 'redhat',
+            vendorCode,
             advisories: [],
             cves: [],
             mappings: [],

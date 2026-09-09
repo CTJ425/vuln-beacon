@@ -1,6 +1,6 @@
 {
   "name": "vuln-beacon",
-  "version": "1.0.0-dev.5",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {

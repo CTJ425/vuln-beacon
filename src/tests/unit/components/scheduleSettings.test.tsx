@@ -74,4 +74,31 @@ describe('ScheduleSettings', () => {
     render(<ScheduleSettings vendors={[]} onSave={vi.fn(ok)} />);
     expect(screen.getByText('No vendor records loaded.')).toBeInTheDocument();
   });
+
+  it('renders Vault secrets setup guide banner and can toggle instructions', async () => {
+    render(<ScheduleSettings vendors={[vendor()]} onSave={vi.fn(ok)} />);
+    expect(screen.getByText('排程同步與 Supabase Vault 憑證指引')).toBeInTheDocument();
+    
+    const toggleButton = screen.getByRole('button', { name: '查看設定指令' });
+    expect(toggleButton).toBeInTheDocument();
+    await userEvent.click(toggleButton);
+
+    expect(screen.getByText('收合指引')).toBeInTheDocument();
+    expect(screen.getByText('複製 SQL 範本')).toBeInTheDocument();
+    expect(screen.getAllByText(/scheduled_sync_url/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('displays warning chip when hasVaultError is true', () => {
+    render(<ScheduleSettings vendors={[vendor()]} onSave={vi.fn(ok)} hasVaultError={true} />);
+    expect(screen.getByText('排程同步與 Supabase Vault 憑證指引')).toBeInTheDocument();
+    expect(screen.getByText('Missing Vault Secrets')).toBeInTheDocument();
+  });
+
+  it('renders with initialExpanded={true} to display instructions immediately', () => {
+    render(<ScheduleSettings vendors={[vendor()]} onSave={vi.fn(ok)} initialExpanded={true} />);
+    expect(screen.getByText('收合指引')).toBeInTheDocument();
+    expect(screen.getByText('複製 SQL 範本')).toBeInTheDocument();
+    expect(screen.getAllByText(/scheduled_sync_url/).length).toBeGreaterThanOrEqual(1);
+  });
 });
+

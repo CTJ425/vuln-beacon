@@ -64,19 +64,40 @@ export const SyncMonitorPage: React.FC<SyncMonitorPageProps> = ({
         <FeedSourceTable vendors={vendors} logs={logs} />
       </Box>
 
-      {onSaveSchedule && (
-        <Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
-              Schedule
-            </Typography>
-            <Button size="small" onClick={() => setScheduleOpen((prev) => !prev)}>
-              {scheduleOpen ? 'Hide Schedule Settings' : 'Show Schedule Settings'}
-            </Button>
+      {onSaveSchedule && (() => {
+        const hasVaultError = logs.some(
+          (l) =>
+            l.error_message?.includes('Missing vault secrets') ||
+            l.error_message?.includes('scheduled_sync_url') ||
+            l.error_message?.includes('scheduled_sync_key')
+        );
+        return (
+          <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  Schedule
+                </Typography>
+                {hasVaultError && (
+                  <Typography variant="caption" sx={{ color: 'warning.main', fontWeight: 700 }}>
+                    (⚠️ Missing Vault Secrets)
+                  </Typography>
+                )}
+              </Box>
+              <Button size="small" onClick={() => setScheduleOpen((prev) => !prev)}>
+                {scheduleOpen ? 'Hide Schedule Settings' : 'Show Schedule Settings'}
+              </Button>
+            </Box>
+            {scheduleOpen && (
+              <ScheduleSettings
+                vendors={vendors}
+                onSave={onSaveSchedule}
+                hasVaultError={hasVaultError}
+              />
+            )}
           </Box>
-          {scheduleOpen && <ScheduleSettings vendors={vendors} onSave={onSaveSchedule} />}
-        </Box>
-      )}
+        );
+      })()}
 
       <Box>
         <Typography variant="h6" sx={{ fontWeight: 700, color: 'text.primary', mb: 1.5 }}>

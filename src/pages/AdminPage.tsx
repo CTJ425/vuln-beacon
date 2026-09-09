@@ -40,6 +40,8 @@ interface AdminPageProps {
     vendorCode: string,
     schedule: { enabled: boolean; times: string[]; timezone: string }
   ) => Promise<{ success: boolean; error?: string }>;
+  activeTab?: number;
+  onTabChange?: (tab: number) => void;
 }
 
 export const AdminPage: React.FC<AdminPageProps> = ({
@@ -56,11 +58,17 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   onManualSync = () => {},
   isSyncing = false,
   onSaveSchedule,
+  activeTab: controlledTab,
+  onTabChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<number>(0);
+  const [internalTab, setInternalTab] = useState<number>(0);
+  const activeTab = controlledTab !== undefined ? controlledTab : internalTab;
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
+    if (onTabChange) {
+      onTabChange(newValue);
+    }
+    setInternalTab(newValue);
   };
 
   return (

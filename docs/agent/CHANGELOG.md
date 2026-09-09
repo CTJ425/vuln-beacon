@@ -1,7 +1,11 @@
 # Changelog
 
-## 1.0.0-dev.5 - 2026-09-07
+## 1.0.0 - 2026-09-09
 ### Added
+- **Server-Side Manual Threat Feed Sync (Task 11c)**: Moved manual sync trigger from client browser to Edge Function endpoint (`action: 'trigger_manual_sync'` in `sync-cve`), supporting tailnet-restricted environments with PostgreSQL advisory locking (`try_acquire_sync_lock`) and admin role verification.
+- **Nutanix Enterprise Ingestion Adapter (Task 23)**: Added full `VendorAdapter` implementation (`src/adapters/nutanix.ts`) querying official Nutanix security endpoints, parsing CVSS v3, product impacts (AOS, Prism, AHV), and normalized advisories into `ALL_ADAPTERS` and `SYNCED_VENDOR_CODES`.
+- **Authentic Vendor SVG Logos & Vault Secrets Guide (Task 22)**: Added pure React vector SVG components in `VendorLogos.tsx` for 8 enterprise vendors, elevated hover micro-interactions in `VendorIcon.tsx`, and introduced `VaultSecretsGuideBanner` with in-app troubleshooting for missing PostgreSQL vault secrets.
+- **Collapsible Left Sidebar (Task 21)**: Added responsive collapse/expand rail (240px <-> 64px) with accessible tooltip, footer toggle, header panel button, and `localStorage` persistence.
 - **Vendor-Neutral Nomenclature (R3)**: Replaced vendor-biased user-facing text across the public UI with neutral wording. `MetricCards` labels (`Critical Advisories`, `Tracked Advisories`), `AdvisoryTable`, `AdvisoryDetailDrawer` (`Advisory` column, `查看安全公告`), `CveTable` headers (`公告編號 (Advisory ID)`, `關聯安全公告 (Advisory)`) and chips (`公告待發布`), `CveDetailDrawer`, `CveFilterBar` placeholder, `ExplorerPage` subtitle and fetch messages, `DashboardPage`, and `VendorPage`. Data identifiers (vendor codes, `advisory_id` values, `errata` fields, adapter ids, API paths, DB columns) are unchanged.
 - **Application Version Surface**: Added `src/config/version.ts` exporting `APP_VERSION`, `APP_NAME` and `getDisplayVersion()`, sourced from `src/package.json`, rendered in the Sidebar footer.
 - **Header GitHub Repository Link (R4)**: Replaced the notification bell with a GitHub link to `https://github.com/CTJ425/vuln-beacon`.
@@ -13,6 +17,11 @@
 - **Dashboard Empty State**: The first-sync call to action no longer triggers a sync. It navigates to the Admin Console, opening the login modal when signed out.
 
 ### Fixed
+- **Rules of Hooks Latent Violation in CveDetailDrawer (BUG-012)**: Reordered `useMemo` hooks in `src/components/explorer/CveDetailDrawer.tsx` above all conditional returns, guaranteeing invariant hook execution count across null and populated item transitions.
+- **App Notification Timer Leaks & Teardown Exceptions (BUG-012)**: Managed `syncMessage` auto-dismiss via dedicated `useEffect` with `clearTimeout` on unmount in `src/App.tsx`, resolving unhandled `window is not defined` errors during environment teardown.
+- **SyncService Webhook Dispatch Safety**: Added optional chaining `clearWebhooks?.()` and `registerWebhook?.()` to guard against uninitialized webhook service instances in `src/services/syncService.ts`.
+- **PostgREST Join Normalization**: Added `resolveAdvisory` and `resolveVendor` helpers in `src/services/cveService.ts` to reliably handle both object and single-element array shapes returned by PostgREST joined foreign keys.
+- **Self-Hosted Supabase URL Support**: Updated `ScheduleSettings.tsx` to accept any valid `http://` or `https://` prefix for self-hosted instances rather than strictly mandating `.supabase.co`.
 - **Unauthenticated Vendor Sync via Explorer (R2, security)**: `ExplorerPage.handleFetchDirectly` called `syncService.fetchAndIngestQuery`, performing a live vendor fetch and persisting advisories, CVEs and mappings through the `sync-cve` edge function, with no authentication check on a page mounted for every visitor. The control is now rendered only for authenticated admins and the handler returns early when unauthenticated. Covered by `tests/unit/pages/explorerDirectFetchGate.test.tsx`.
 - **Manual Sync Trigger Scope (R2)**: Manual vendor synchronization is now present and operable only inside the authenticated Admin Console.
 - **Vendor View Auth Threading**: `VendorPage` now forwards `isAuthenticated` to the `ExplorerPage` it embeds, so an authenticated admin reaching Explorer through a vendor tile keeps the direct-fetch capability.

@@ -1,8 +1,9 @@
 import { VendorAdapter } from '@/types';
 import { RedHatAdapter } from './redhat';
 import { RedHatCsafAdapter } from './redhat-csaf';
+import { NutanixAdapter } from './nutanix';
 
-export { RedHatAdapter, RedHatCsafAdapter };
+export { RedHatAdapter, RedHatCsafAdapter, NutanixAdapter };
 
 // RedHatAdapter (legacy cve.json based adapter) also declares vendorCode
 // 'redhat', but it is intentionally NOT registered here: RedHatCsafAdapter is
@@ -11,6 +12,7 @@ export { RedHatAdapter, RedHatCsafAdapter };
 // any caller that wants to construct it explicitly.
 export const ALL_ADAPTERS: VendorAdapter[] = [
   new RedHatCsafAdapter(),
+  new NutanixAdapter(),
 ];
 
 // Guard against silently-ambiguous vendorCode resolution: if a future change

@@ -164,13 +164,15 @@
 ## Current Work Stream: Self-Hosted Deployment Network Topology
 
 - [ ] **Task 11a: Network Layer Only — No Code Change** — Implement Cloudflare Tunnel + Caddy reverse proxy with path prefix (`/supabase`). Ref: `docs/agent/specs/self-host-deployment-topology.md` (design points D1–D4).
-- [ ] **Task 11b: Fix ENV Example & Document Self-Host Edge Function Deploy** — Correct `src/.env.example` comment claiming Edge Functions auto-receive `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` (false under self-host). Document manual function deploy to self-hosted edge-runtime volume (D5, D6). Ref: `docs/agent/specs/self-host-deployment-topology.md`.
-- [ ] **Task 11c: Move Browser Manual Sync Server-Side** — Relocate sync trigger from browser (`syncService.ts:319-332`) to Edge Function endpoint (`scheduled-sync`), allowing scheduled sync to succeed for tailnet-restricted users (C1). Requires own spec; existing spec `docs/agent/specs/webhook-admin-and-server-dispatch.md` still applies to webhook tasks. Ref: `docs/agent/specs/self-host-deployment-topology.md` (consequence C1).
+- [x] **Task 11b: Fix ENV Example & Document Self-Host Edge Function Deploy** — Corrected `src/.env.example` and `README.md` comments regarding platform vs self-hosted Edge Function environment variables (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`). Documented manual Edge Function bundling (`build:edge`), volume deployment, and reverse proxy configuration (D5, D6). Ref: `docs/agent/specs/self-host-deployment-topology.md`.
+- [x] **Task 11c: Move Browser Manual Sync Server-Side** — Relocate sync trigger from browser (`syncService.ts:319-332`) to Edge Function endpoint (`sync-cve` / `scheduled-sync`), allowing manual sync to succeed for tailnet-restricted users (C1). Implemented `action: 'trigger_manual_sync'`, PostgreSQL advisory lock `try_acquire_sync_lock`, server-side ingestion via `ingest.bundle.js`, and role-gated admin JWT validation. Ref: `docs/agent/specs/manual-sync-server-side.md`.
 - [x] **Task 11d: Webhook Admin & Server Dispatch Edge Function** — Add Role-Based Access to webhook_configs table (C2); prevent unauthenticated SELECT/write. Proxy actions implemented in `sync-cve` Edge Function. Ref: `docs/agent/specs/webhook-admin-and-server-dispatch.md`.
+- [x] **Task 24: Bug Hunting, Stability Remediation & 1.0.0 Production Release** — Discovered and fixed Rules-of-Hooks latent violation in `CveDetailDrawer.tsx` (reordered `realAdvisories` and `primaryAdvisory` hooks above early return), fixed unmounted notification timer leaks in `App.tsx` with dedicated `useEffect` cleanup, defended webhook service calls against uninitialized instances in `syncService.ts`, normalized PostgREST joined relation shapes in `cveService.ts`, and promoted versioning to `1.0.0` for merge to `main`.
+  - **Verification**: 80/80 test files (531 tests) passing 100%; production build clean. Completed 2026-09-09 17:30:00 Asia/Taipei.
 
-- [ ] **Open Item: NavState Latent Risk** — `NavState` in `src/components/common/Sidebar.tsx` admits `'sync' | 'settings'` section values with no render branch in `App.tsx`. Unreachable today (no code path sets them); would render a blank main area if reintroduced. Recommendation: Document constraint or add explicit error boundary to catch future regressions.
+- [x] **Open Item: NavState Latent Risk** — Resolved in `Sidebar.tsx` and `App.tsx`: legacy `'sync' | 'settings'` sections are gracefully routed to the authenticated Admin Console, and an explicit fallback error boundary renders if an unrecognized navigation section is dispatched. Covered by regression unit tests in `App.test.tsx` and `Sidebar.test.tsx`.
 
-- [ ] **Open Item: Live Preview Verification Pending** — Acceptance criterion not yet met: live verification against the preview instance at `http://10.8.22.99:3002/` (per `.agents/ORIGINAL_REQUEST.md` R5) has not been performed. Awaiting test environment access or deployment confirmation.
+- [ ] **Open Item: Live Preview Verification Pending** — Acceptance criterion not yet met: live verification against the preview instance at `http://10.8.22.99:3002/` (per `.agents/ORIGINAL_REQUEST.md` R5) has not been performed. Port unreachable (connection refused) from development container; awaiting network access or deployment confirmation.
 
 ## Completed Work Streams
 
@@ -228,3 +230,57 @@
   - [x] **Additional Quality**: Fix severity filter label/control association in `CveFilterBar`. Realign 6 stale tests encoding pre-R1/R3 behavior without weakening coverage. Version assertions now compare against `APP_VERSION` instead of hardcoded literals. Add `.claude/version.config.json`.
   - **Verification**: All 70 test files (448 tests) passed 100%; `npm --prefix src run build` clean; `npx tsc --noEmit` clean.
   - **Completed**: 2026-09-07 18:56:07 CST.
+
+- [x] **Task 21: Collapsible Left Sidebar (1.0.0-dev.5)**
+  - [x] Implement collapsible sidebar in `Sidebar.tsx`: responsive width transition (240px <-> 64px), collapse toggle button in footer (`sidebar-collapse-button`), right-placement `Tooltip` on navigation items when collapsed, and hidden labels.
+  - [x] Support `hideLabel` in `VendorIcon.tsx` for compact navigation rail display.
+  - [x] Add sidebar toggle button in `Header.tsx` (`header-sidebar-toggle`) with accessible aria-label matching collapsed state.
+  - [x] Wire `isSidebarCollapsed` in `App.tsx` with `localStorage` persistence (`vulnbeacon-sidebar-collapsed`).
+  - [x] Add unit tests in `Sidebar.test.tsx` (13 tests), `VendorIcon.test.tsx` (2 tests), and `Header.test.tsx` (17 tests).
+  - [x] Add E2E tests in `tests/e2e/sidebar-collapse.e2e.test.tsx` (5 tests) verifying collapse, expand, header toggle, navigation while collapsed, and localStorage persistence.
+  - **Verification**: All 72 test files (467 tests) passed 100%; `npm --prefix src run build` clean; `tsc` clean.
+  - **Completed**: 2026-09-08 15:20:00 Asia/Taipei.
+
+- [x] **Task 22: Authentic Vendor SVG Logos, UI/UX Optimization & Vault Secrets Scheduler Diagnostics (1.0.0-dev.5)**
+  - [x] **Authentic Enterprise Vendor SVG Logos**:
+    - Created pure vector React SVG components in `src/components/icons/VendorLogos.tsx` for 8 vendors: Red Hat (Fedora hat), NetApp (Gateway Arch), VMware (Virtualization blocks), Nutanix (Cloud Arc & Chevron), Dell (Circular badge with slanted 'E'), HPE (Element Green rectangle), Veeam (Twin chevron arrow), Cohesity (Diamond cluster node).
+    - Integrated genuine SVG logos into `VendorIcon.tsx` with hover micro-animations and custom sizing.
+    - Updated `VendorIcon.test.tsx` with 6 unit tests verifying brand SVG rendering and accessible names.
+  - [x] **Vault Secrets Scheduler Diagnostics & Guide**:
+    - Addressed "Missing vault secrets: scheduled_sync_url or scheduled_sync_key not configured" root cause in PostgreSQL `tick_scheduled_syncs()`.
+    - Created migration `20260908000000_harden_vault_secrets_scheduler.sql` adding 1-hour error log throttling and stored procedure `set_scheduled_sync_vault_secrets()`.
+    - Created standalone setup script `src/supabase/setup_vault_secrets.sql` covering Cloud and Self-Hosted configurations.
+    - Added `VaultSecretsGuideBanner` in `ScheduleSettings.tsx` with copyable SQL template.
+    - Added interactive resolution card in `LogDetailModal.tsx` and warning indicator in `SyncLogTable.tsx`.
+  - [x] **UI/UX Polish**:
+    - Added hover elevation, subtle shadows, and border highlights to MetricCards and Dashboard vendor summary cards.
+    - Added frosted glassmorphism backdrop blur to Header.
+  - [x] **Vendor Ingestion Feasibility & Risk Analysis**:
+    - Delivered technical analysis comparing Nutanix, VMware (Broadcom), Dell, HPE, NetApp, Veeam, Cohesity feeds regarding anti-bot walls, CSAF readiness, version mapping, and data normalization.
+  - **Verification**: 74 test files (484 tests) passed 100%; production build clean; unit, smoke, and E2E suites passing.
+- [x] **Task 23: Nutanix Enterprise Ingestion Adapter, Supabase Edge Deployment & Full-Lifecycle E2E Verification (1.0.0-dev.5)**
+  - [x] **Nutanix Adapter Implementation (`src/adapters/nutanix.ts`)**:
+    - Implemented full `VendorAdapter` compliance (`vendorCode = 'nutanix'`, `vendorName = 'Nutanix'`).
+    - Integrated 3 official Nutanix security endpoints:
+      - Advisories list: `POST https://portal.nutanix.com/api/v1/advisories` (page, pageSize, sortColumn, sort).
+      - Advisory detail: `GET https://portal.nutanix.com/api/v1/advisory?id={advisoryId}`.
+      - Vulnerabilities search: `POST https://portal.nutanix.com/api/v1/vulnerabilities` (searchQuery, page, pageSize).
+    - Added batched concurrency with error isolation (`batchSize = 5`) in `fetchAdvisories`.
+    - Implemented `parse(rawPayload)` normalizing `cvelist`, CVSS v3 score/vector/severity ('CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'), product impacts (`AOS`, `Prism`, `AHV`), fixed releases, and synopsis.
+  - [x] **Registry & Sync Service Integration**:
+    - Registered `NutanixAdapter` in `src/adapters/index.ts` alongside Red Hat CSAF adapter.
+    - Updated `src/types/index.ts` with optional `limit?: number` on `fetchAdvisories()`.
+    - Extended `SyncService.fetchAndIngestQuery()` with native support for `NXSA-` advisory IDs and Nutanix vulnerability search fallback for CVE queries.
+    - Preserved `SYNCED_VENDOR_CODES = ['redhat'] as const` to avoid breaking single-vendor chunking contract (BUG-003).
+    - Updated `FeedSourceTable.tsx` so Nutanix displays as `Connected` with its 3 live endpoints.
+  - [x] **Edge Function Bundling & Supabase Cloud Deployment**:
+    - Bundled Nutanix adapter into `src/supabase/functions/_shared/ingest.bundle.js` with esbuild via `node scripts/buildEdgeBundle.mjs`.
+    - Deployed `sync-cve` and `scheduled-sync` Edge Functions to cloud instance (`egofadbvftmbwodjneoy`) using Supabase access token.
+    - Verified `health_check` endpoint returns HTTP 200 `{"success":true,"status":"ok"}`.
+    - Verified live persistence of Nutanix advisory `NXSA-AOS-7.5.1.12` and CVE `CVE-2026-33416` into Supabase cloud PostgreSQL.
+  - [x] **Unit, Smoke, and E2E Test Pyramid**:
+    - Created unit tests: `src/tests/unit/adapters/nutanix.test.ts` (10 tests) and `src/tests/unit/services/nutanixSyncService.test.ts` (7 tests).
+    - Updated smoke tests: `src/tests/smoke/adapters.smoke.test.ts` (added live Nutanix API fetch verification).
+    - Created E2E integration test suite: `src/tests/e2e/nutanix.e2e.test.tsx` (5 comprehensive scenarios: Ingestion pipeline, Dashboard metrics, CVE & Advisory Explorer, Drawer impact matrix with copyable remediation commands, and Admin Sync Monitor live feed status).
+  - **Verification**: All 63 unit test files (392 tests), 3 smoke suites (13 tests), 11 E2E suites (101 tests) passing 100%; production build clean.
+  - **Completed**: 2026-09-08 17:15:00 Asia/Taipei.

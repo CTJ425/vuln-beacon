@@ -13,10 +13,11 @@ import {
   Paper,
   IconButton,
 } from '@mui/material';
-import { Copy, Check, X, Terminal, Clock, FileText } from 'lucide-react';
+import { Copy, Check, X, Terminal, Clock, FileText, Key } from 'lucide-react';
 import { VendorSyncLog } from '@/types';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
+import { generateVaultSqlSnippet } from '@/components/sync/ScheduleSettings';
 
 interface LogDetailModalProps {
   open: boolean;
@@ -26,8 +27,29 @@ interface LogDetailModalProps {
 
 export const LogDetailModal: React.FC<LogDetailModalProps> = ({ open, log, onClose }) => {
   const [copied, setCopied] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const vaultSqlSnippet = React.useMemo(() => generateVaultSqlSnippet(), []);
 
   if (!log) return null;
+
+  const handleCopyVaultSql = async () => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(vaultSqlSnippet);
+      } else if (typeof document !== 'undefined') {
+        const ta = document.createElement('textarea');
+        ta.value = vaultSqlSnippet;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedSql(true);
+      setTimeout(() => setCopiedSql(false), 2000);
+    } catch {}
+  };
 
   const handleCopyJson = async () => {
     try {
@@ -192,6 +214,61 @@ export const LogDetailModal: React.FC<LogDetailModalProps> = ({ open, log, onClo
               </Box>
             )}
           </Alert>
+        )}
+
+        {/* Vault Secrets Resolution Hint */}
+        {Boolean(
+          log.error_message &&
+            (log.error_message.toLowerCase().includes('vault secrets') ||
+              log.error_message.toLowerCase().includes('scheduled_sync_url') ||
+              log.error_message.toLowerCase().includes('scheduled_sync_key'))
+        ) && (
+          <Paper
+            variant="outlined"
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              bgcolor: (theme) =>
+                theme.palette.mode === 'dark' ? 'rgba(56, 189, 248, 0.05)' : 'rgba(2, 132, 199, 0.05)',
+              borderColor: 'primary.main',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography
+                variant="subtitle2"
+                sx={{ fontWeight: 700, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1 }}
+              >
+                <Key size={16} /> 排程密鑰未配置排除指引 (Vault Secrets Resolution)
+              </Typography>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={copiedSql ? <Check size={14} /> : <Copy size={14} />}
+                onClick={handleCopyVaultSql}
+                sx={{ py: 0.25, px: 1, fontSize: '0.75rem' }}
+              >
+                {copiedSql ? '已複製 SQL' : '複製修復指令'}
+              </Button>
+            </Box>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
+              此問題因 Supabase Vault 尚未配置 <code>scheduled_sync_url</code> 或 <code>scheduled_sync_key</code>。請在 Supabase SQL Editor 執行：
+            </Typography>
+            <Box
+              component="pre"
+              sx={{
+                p: 1.5,
+                bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#0d1322' : '#f8fafc'),
+                borderRadius: 1.5,
+                fontSize: '0.75rem',
+                overflowX: 'auto',
+                fontFamily: 'monospace',
+                color: 'text.primary',
+                m: 0,
+              }}
+            >
+              {vaultSqlSnippet}
+            </Box>
+          </Paper>
         )}
 
         {/* Structured Observability Payload Field */}

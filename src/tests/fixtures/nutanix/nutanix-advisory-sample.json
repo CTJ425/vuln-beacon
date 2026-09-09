@@ -1,0 +1,31 @@
+{
+  "advisory_id": "NXSA-AOS-7.5.1.12",
+  "cvelist": [
+    {
+      "cve_id": "CVE-2026-33416",
+      "description": "LIBPNG heap buffer aliasing vulnerability leading to memory corruption.",
+      "cvss": "7.5",
+      "cvss_scoring_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "advisory_url": "https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=NXSA-AOS-7.5.1.12",
+      "severity": "High"
+    },
+    {
+      "cve_id": "CVE-2026-48962",
+      "description": "IO::Compress decompression vulnerability causing denial of service.",
+      "cvss": "7.5",
+      "cvss_scoring_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "advisory_url": "https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=NXSA-AOS-7.5.1.12",
+      "severity": "High"
+    }
+  ],
+  "release": "7.5.1.12",
+  "solution": "Upgrade to AOS 7.5.1.12 or later.",
+  "product": "AOS",
+  "affected_version": "All versions prior to 7.5.1.12",
+  "cpe": "cpe:2.3:a:nutanix:aos:*:*:*:*:*:*:*:*",
+  "overallCVSS": "7.5",
+  "lastModified": "2026-09-07T06:58:50.096392",
+  "severity": "High",
+  "fixedRelease": "AOS 7.5.1.12",
+  "advisoryPublicationDate": "2026-08-24T19:53:27.498236"
+}

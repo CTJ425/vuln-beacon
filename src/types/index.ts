@@ -168,7 +168,7 @@ export interface VendorAdapter {
   readonly vendorCode: string;
   readonly vendorName: string;
   readonly endpoints: VendorEndpoint[];
-  fetchAdvisories(): Promise<NormalizedAdvisoryItem[]>;
+  fetchAdvisories(limit?: number): Promise<NormalizedAdvisoryItem[]>;
   parse(rawPayload: unknown): NormalizedAdvisoryItem[];
 }
 

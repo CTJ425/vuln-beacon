@@ -75,4 +75,39 @@ describe('VendorPage', () => {
     expect(screen.getByText('RHSA-2026:2000')).toBeInTheDocument();
     expect(screen.queryByText('VMSA-2026:0001')).not.toBeInTheDocument();
   });
+
+  it('renders authentic vendor SVG logo in the vendor page title header', () => {
+    render(
+      <VendorPage
+        vendorCode="redhat"
+        advisories={[]}
+        cves={[]}
+        taxonomy={taxonomy}
+        onSelectCve={() => {}}
+        onSelectAdvisory={() => {}}
+      />
+    );
+
+    const logo = screen.getByLabelText('Red Hat logo');
+    expect(logo).toBeInTheDocument();
+    expect(logo.tagName.toLowerCase()).toBe('svg');
+  });
+
+  it('falls back to VENDOR_NAMES when vendor is not found in taxonomy', () => {
+    render(
+      <VendorPage
+        vendorCode="vmware"
+        advisories={[]}
+        cves={[]}
+        taxonomy={[]}
+        onSelectCve={() => {}}
+        onSelectAdvisory={() => {}}
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: 'VMware' })).toBeInTheDocument();
+    const logo = screen.getByLabelText('VMware logo');
+    expect(logo).toBeInTheDocument();
+    expect(logo.tagName.toLowerCase()).toBe('svg');
+  });
 });

@@ -2,6 +2,26 @@
 
 ---
 
+### BUG-012: Rules-of-Hooks Latent Violation and Unhandled Clipboard/Mock Relation Crashes — FIXED
+- **Date**: Opened 2026-09-09, fixed 2026-09-09 (1.0.0)
+- **Severity**: MEDIUM
+- **Location**: `src/components/explorer/CveDetailDrawer.tsx`, `src/App.tsx`, `src/services/syncService.ts`, `src/services/cveService.ts`, `src/components/sync/ScheduleSettings.tsx`
+- **Root Cause**:
+  1. `CveDetailDrawer.tsx` had `realAdvisories` `useMemo` placed after early return `if (!item) return null;`, violating React Rules of Hooks when transitioning between null and selected items ("Rendered more hooks than during previous render" / "Rendered fewer hooks than expected").
+  2. `App.tsx` invoked `setTimeout(() => setSyncMessage(null), 5000)` without tracking timers or clearing them on unmount. During test teardown or component unmount, the timer fired on the Node.js event loop after JSDOM was torn down, causing `ReferenceError: window is not defined` uncaught exceptions.
+  3. `syncService.ts` called `this.webhookService.clearWebhooks()` in `loadWebhooks()` without optional chaining or null checking, throwing unhandled exceptions if the service was not initialized.
+  4. `cveService.ts` assumed joined foreign key `m.advisories` was always an object, but PostgREST can return either a single object or an array when multiple joins occur.
+  5. `ScheduleSettings.tsx` strictly required `supabase.co` in `getScheduledSyncUrl()`, breaking self-hosted Supabase instances.
+- **Fix**:
+  1. In `CveDetailDrawer.tsx`, moved all hooks (`realAdvisories`, `primaryAdvisory`) above any conditional returns, guaranteeing invariant hook execution count across null and populated item transitions.
+  2. In `App.tsx`, managed `syncMessage` auto-dismiss via a `useEffect` with `clearTimeout` on unmount, removing unhandled timer leaks.
+  3. In `syncService.ts`, added optional chaining `this.webhookService?.clearWebhooks?.()`.
+  4. In `cveService.ts`, normalized joined relations with robust unwrapping helpers (`resolveAdvisory`, `resolveVendor`).
+  5. In `ScheduleSettings.tsx`, accepted any valid `http://` or `https://` prefix for self-hosted instances.
+- **Status**: ✅ FIXED (2026-09-09 17:25:00 CST)
+
+---
+
 ### BUG-011: Unauthenticated Direct Vendor Fetch via Explorer Page — FIXED
 - **Date**: Opened 2026-09-07, fixed 2026-09-07 (1.0.0-dev.5)
 - **Severity**: HIGH

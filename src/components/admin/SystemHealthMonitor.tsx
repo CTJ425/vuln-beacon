@@ -84,6 +84,14 @@ export const SystemHealthMonitor: React.FC = () => {
       endpoint: 'https://access.redhat.com/hydra/rest/securitydata/cve.json',
       status: 'checking',
     },
+    {
+      id: 'nutanix_advisories',
+      name: 'Nutanix Security Advisories API',
+      category: 'external',
+      description: 'Nutanix Portal 官方資安公告來源',
+      endpoint: 'https://portal.nutanix.com/api/v1/advisories',
+      status: 'checking',
+    },
   ]);
 
   const runDiagnostics = useCallback(async () => {
@@ -258,6 +266,12 @@ export const SystemHealthMonitor: React.FC = () => {
         name: 'Red Hat Security Data API',
         description: 'Red Hat CVE Lookup API',
         endpoint: 'https://access.redhat.com/hydra/rest/securitydata/cve.json',
+      },
+      {
+        id: 'nutanix_advisories',
+        name: 'Nutanix Security Advisories API',
+        description: 'Nutanix Portal 官方資安公告來源',
+        endpoint: 'https://portal.nutanix.com/api/v1/advisories',
       },
     ];
 

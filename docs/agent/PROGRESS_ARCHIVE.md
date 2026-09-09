@@ -1,3 +1,155 @@
+## 2026-09-09 12:45:00 Asia/Taipei - Self-Hosted Topology Alignment, NavState Latent Risk Resolution & Manual Sync Spec (1.0.0-dev.5)
+- **Resolved NavState Latent Risk (`App.tsx`, `Sidebar.tsx`)**:
+  - **Graceful Routing**: Implemented fallback handling in `handleSelectNav` in `src/App.tsx`: legacy `'sync' | 'settings'` navigation requests are seamlessly redirected into the authenticated Admin Console (`admin`), prompting the Admin Login modal if the user is unauthenticated.
+  - **Fallback Error Boundary**: Added an explicit navigation error boundary `<Box data-testid="nav-fallback-container">` in `App.tsx` main render tree to cleanly catch any unrecognized or corrupted navigation state, preventing blank white screen states.
+  - **Type & Documentation**: Documented `NavState` in `Sidebar.tsx` clarifying the legacy section routing contract.
+  - **Unit Test Coverage**: Added regression unit tests in `tests/unit/components/App.test.tsx` and `tests/unit/components/Sidebar.test.tsx` verifying legacy nav routing, Admin login modal trigger, and accessible button handling.
+- **Self-Hosted Topology Documentation & Environment Configuration (`src/.env.example`, `README.md`)**:
+  - **Edge Functions Environment Clarification (D6)**: Corrected comments in `src/.env.example` and `README.md` to distinguish Supabase Cloud (auto-injected `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`) from Self-Hosted Docker environments (where `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` must be explicitly configured in `docker-compose.yml` / `edge-runtime` container environment).
+  - **Self-Hosted Deployment Procedure (D5)**: Added step-by-step instructions to `README.md` for compiling the Edge bundle (`npm --prefix src run build:edge`), copying functions to the container volume, setting environment variables, and restarting `edge-runtime`.
+  - **Network Ingress & Reverse Proxy Topology (D1–D4)**: Documented single-origin reverse proxy recommendations (Caddy + Cloudflare Tunnel) with `/supabase` path prefix stripping to prevent CORS and Access cookie scope issues.
+- **Server-Side Manual Threat Feed Sync Specification (Task 11c)**:
+  - Authored comprehensive architectural specification `docs/agent/specs/manual-sync-server-side.md` addressing restricted network egress (C1) and browser payload chunking limits (BUG-003).
+  - Defined `action: 'trigger_manual_sync'` contract on `sync-cve`, server-side ingestion reuse via `ingest.bundle.js`, role-gated admin authorization, and transactional advisory locks (`pg_try_advisory_xact_lock`).
+
+## 2026-09-08 17:45:00 Asia/Taipei - Adversarial Audit & Full Nutanix Multi-Vendor Synchronization Hardening (1.0.0-dev.5)
+- **Resolved Multi-Vendor Sync Omission & State Leakage (`src/services/syncService.ts`)**:
+  - **Single Source of Truth**: Added `'nutanix'` directly into `SYNCED_VENDOR_CODES = ['redhat', 'nutanix'] as const`.
+  - **Eliminated Hack in FeedSourceTable**: Replaced `|| vendorCode === 'nutanix'` with clean, honest `(SYNCED_VENDOR_CODES as readonly string[]).includes(vendorCode)`.
+  - **Architectural Isolation**: Instantiated a fresh `new IngestionEngine({ webhookService, knownCveIds })` per vendor iteration in `syncVendors()`, eliminating memory leaks across vendor loops where previously processed CVEs/mappings were leaked and stamped into subsequent vendor sync calls.
+  - **Cumulative Ingestion De-duplication**: Shared `knownCveIdSet` across vendor iterations so newly discovered CVEs are de-duplicated and accurately counted across vendors within a single sync run.
+  - **AHV Prefix Stripping**: Fixed regex in `fetchAndIngestQuery` from `/^pc\./i` to `/^(pc\.|ahv[-.]|aos[-.]|afs[-.])/i` to ensure AHV fixed releases correctly map to `NXSA-AHV-11.2`.
+- **Nutanix Adapter Normalization Hardening (`src/adapters/nutanix.ts`)**:
+  - **Array affected_version**: Handled string arrays in `raw.affected_version` (e.g. `["7.0", "7.0.0.5", ...]`) to properly populate `justification` in `productImpacts`.
+  - **Date Normalization**: Added fallback to `raw.lastModifiedDate` from list endpoints alongside `raw.lastModified`.
+  - **Flexible CVE Parsing**: Supported string CVE IDs in `cveList` alongside object records.
+  - **Severity Fallback**: Implemented automatic CVSS score to severity mapping (>=9.0 CRITICAL, >=7.0 HIGH, >=4.0 MEDIUM, >0 LOW) when explicit severity is missing or UNKNOWN.
+  - **HTTP Status Message**: Improved error messaging on list fetch failure (`HTTP ${listRes.status} ${listRes.statusText}`).
+- **UI/UX & Vendor-Neutral Remediation Guidance**:
+  - **Advisory & CVE Drawers (`AdvisoryDetailDrawer.tsx`, `CveDetailDrawer.tsx`)**:
+    - Replaced hardcoded `dnf upgrade -y` with vendor-specific guidance: `Prism LCM Upgrade: {version}` for Nutanix and `dnf upgrade -y` for Red Hat.
+    - Replaced hardcoded Red Hat errata/portal links with dynamic Nutanix Portal security advisory links (`https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=...`).
+  - **VendorPage Scoped Filtering (`VendorPage.tsx`)**: Extended `scopedCves` to match `c.vendor_code === vendorCode` directly.
+  - **System Health Monitor (`SystemHealthMonitor.tsx`)**: Added Nutanix Security Advisories Portal API (`https://portal.nutanix.com/api/v1/advisories`) to diagnostics checks.
+- **Supabase Cloud Runtime & Migration Synchronization**:
+  - Applied pending migration `20260908000000_harden_vault_secrets_scheduler.sql` via `supabase db push` using access token to project `egofadbvftmbwodjneoy`.
+  - Rebuilt and redeployed edge functions `sync-cve` and `scheduled-sync` (bundled with updated Nutanix adapter). Verified live health check HTTP 200 OK.
+- **Deep Verification**:
+  - Full test pyramid: 77/77 test files passed, 513/513 tests passed (128.08s).
+  - Smoke tests: 3/3 suites passed, 13/13 tests passed, including live network fetch against Nutanix API (1512ms).
+  - E2E tests: 11/11 suites passed, 103/103 tests passed, including 7-phase Nutanix E2E test suite.
+  - Production build: Clean compilation with 0 TypeScript/Vite errors (6.92s).
+
+## 2026-09-08 17:15:00 Asia/Taipei - Nutanix Security Ingestion, Edge Functions Deployment & Full E2E Verification (1.0.0-dev.5)
+- **Implemented Nutanix Enterprise Ingestion Adapter (`src/adapters/nutanix.ts`)**:
+  - Implemented `VendorAdapter`: `vendorCode = 'nutanix'`, `vendorName = 'Nutanix'`.
+  - Configured 3 official Nutanix endpoints (`/api/v1/advisories`, `/api/v1/advisory`, `/api/v1/vulnerabilities`).
+  - Implemented `fetchAdvisories(limit)` with chunked batching (batch size = 5) and error isolation per advisory.
+  - Implemented `parse(rawPayload)` normalizing `cvelist`, CVSS v3 vectors and scores, severities ('CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'), product impacts (`AOS`, `Prism`, `AHV`), fixed versions (`fixedRelease`), and clean titles.
+- **SyncService & IngestionEngine Integration (`src/services/syncService.ts`)**:
+  - Updated `fetchAndIngestQuery` with native support for `NXSA-` advisory IDs and Nutanix vulnerability lookup fallback for CVE searches.
+  - Rebuilt shared edge bundle (`src/supabase/functions/_shared/ingest.bundle.js`) incorporating `NutanixAdapter` via `npm run build:edge`.
+  - Added error deduplication in `syncVendors()` to prevent duplicate error entries on multi-vendor transport failures.
+  - Updated `FeedSourceTable.tsx` to display Nutanix feed as `Connected` with live official endpoints.
+- **Deployed Supabase Edge Functions**:
+  - Deployed `sync-cve` to Supabase Cloud runtime (`egofadbvftmbwodjneoy`) using access token.
+  - Deployed `scheduled-sync` to Supabase Cloud runtime (`egofadbvftmbwodjneoy`).
+  - Verified live Edge Function health check (`action: 'health_check'`) returning HTTP 200 OK.
+  - Executed live Nutanix advisory ingestion (`NXSA-AOS-7.5.1.12`), verifying records stored in `advisories`, `cves`, `advisory_cve_map`, `vendor_sync_logs`, and payload stored in `advisory-documents/nutanix/NXSA-AOS-7.5.1.12.json`.
+- **Comprehensive E2E & Test Pyramid Verification**:
+  - Created `src/tests/e2e/nutanix.e2e.test.tsx` covering all 5 integration lifecycle phases.
+  - Added live public API smoke test in `src/tests/smoke/adapters.smoke.test.ts` verifying real network fetch against `portal.nutanix.com`.
+  - Added unit test suites `tests/unit/adapters/nutanix.test.ts` (12 tests) and `tests/unit/services/nutanixSyncService.test.ts` (3 tests).
+- **Verification**: All 63 unit test suites (392 tests), 3 smoke test suites (13 tests), and 11 E2E test suites (101 tests) passed 100%; `npm run build` compiled production bundle cleanly with 0 TypeScript errors.
+
+## 2026-09-08 16:00:00 Asia/Taipei - Authentic Vendor SVG Logos, UI/UX Polish & Vault Secrets Scheduler Diagnostics (1.0.0-dev.5)
+- **Authentic Enterprise Vendor SVG Logos (`VendorLogos.tsx`, `VendorIcon.tsx`)**:
+  - Implemented crisp, scalable React SVG components in `src/components/icons/VendorLogos.tsx` for all 8 enterprise vendors.
+  - Upgraded `VendorIcon.tsx` with smooth micro-interactions, elevated hover shadow, and integrated SVG logos.
+  - Added unit test suite `tests/unit/components/VendorIcon.test.tsx` (6 tests) verifying branding, accessible `aria-label`, and fallback.
+- **Vault Secrets Scheduler Diagnostics & In-App Troubleshooting**:
+  - Root cause resolved: `public.tick_scheduled_syncs()` reads `scheduled_sync_url` and `scheduled_sync_key` from Supabase `vault.decrypted_secrets`. When unconfigured, pg_cron logs `FAILED` with "Missing vault secrets".
+  - Created migration `src/supabase/migrations/20260908000000_harden_vault_secrets_scheduler.sql` adding a 1-hour throttle to avoid pg_cron log flooding and creating secure helper `set_scheduled_sync_vault_secrets()`.
+  - Created setup guide script `src/supabase/setup_vault_secrets.sql` with one-time configuration commands for Cloud and Self-Hosted environments.
+  - Added `VaultSecretsGuideBanner` in `ScheduleSettings.tsx` with expandable guide and copyable SQL snippet.
+  - Added Vault Secrets resolution guidance card in `LogDetailModal.tsx` and warning badge in `SyncLogTable.tsx`.
+- **UI/UX Refinements**:
+  - Elevated MetricCards with smooth hover lift and adaptive dark/light shadow.
+  - Refined vendor summary cards on DashboardPage with border accents, arrow indicators, and critical count highlights.
+  - Added frosted glassmorphism backdrop blur to Header.
+- **Adversarial Review Refinements & Hardening**:
+  - Fixed `VendorPage` title rendering: Added fallback to `VENDOR_NAMES[vendorCode.toLowerCase()]` when vendor node is absent from taxonomy. Added unit test in `VendorPage.test.tsx`.
+  - Normalized `vendorCode` casing in `productTaxonomy.ts`: Used `vendor.vendorCode?.toLowerCase()` to guarantee `VENDOR_NAMES` dictionary match.
+  - Auto-expanded `VaultSecretsGuideBanner` when `hasVaultError` is true in `ScheduleSettings.tsx`.
+  - Broadened Vault secret error pattern matching in `LogDetailModal.tsx`, `SyncLogTable.tsx`, and `SyncMonitorPage.tsx`.
+- **Verification**: 74 test files (484 tests) passing 100%; `npm run build` completely clean.
+
+## 2026-09-08 15:20:00 Asia/Taipei - Collapsible Left Sidebar Feature & Accessibility Hardening (1.0.0-dev.5)
+- **Implemented & Hardened Collapsible Left Sidebar (左邊欄位收起/展開功能)**:
+  - **Sidebar Component Enhancements (`Sidebar.tsx`)**:
+    - Added `isCollapsed`, `collapsed` alias, and `defaultCollapsed` props with support for controlled mode and internal uncontrolled state fallback.
+    - Integrated collapse toggle button in the pinned footer (`sidebar-collapse-button`) with `ChevronLeft` (expanded) / `ChevronRight` (collapsed) and accessible aria-labels (`收起側邊欄` / `展開側邊欄`).
+    - Responsive width transition: `240px` (expanded) <-> `64px` (collapsed rail) using MUI theme transition.
+    - Fixed keyboard focus tooltip bug: Tooltip title is set to non-empty only when collapsed (`effectiveCollapsed ? title : ''`), preventing redundant popups when expanded.
+    - Fixed WCAG 2.1 AA accessibility: Added explicit `aria-label` to all navigation item buttons (`Overview`, vendor names, static nav items) so screen readers and role-based test queries identify buttons even when labels are visually hidden.
+    - Preserved `sidebar-version` element in footer with `display: none` when collapsed to maintain DOM hierarchy contract.
+  - **Header Component Enhancements (`Header.tsx`)**:
+    - Added optional `onToggleSidebar` callback and `isSidebarCollapsed` prop.
+    - Added sleek `PanelLeft` toggle button (`header-sidebar-toggle`) in Header branding section with `<Tooltip>` and accessible aria-label matching collapsed state.
+  - **Vendor Icon (`VendorIcon.tsx`)**:
+    - Exported `VendorIconProps` interface.
+    - Added `hideLabel?: boolean` prop and accessible `aria-label` on `Avatar` in compact navigation rail.
+  - **App Layout & Persistence (`App.tsx`)**:
+    - Added `isSidebarCollapsed` state in `App.tsx` persisted across sessions via `localStorage` key `vulnbeacon-sidebar-collapsed`.
+    - Separated `localStorage` sync into pure `useEffect([isSidebarCollapsed])`, removing side-effects from React state updater.
+    - Wired `onToggleSidebar` to Header and `isCollapsed` / `onToggleCollapse` to Sidebar.
+  - **Testing (TDD Red-Green-Refactor)**:
+    - Added unit test suite `tests/unit/components/Sidebar.test.tsx` (13 tests total) verifying default expanded width (240px), collapsed width (64px), hidden labels, version display toggling, controlled callback, internal uncontrolled toggle, `defaultCollapsed` support, accessible name contracts in collapsed mode, and navigation while collapsed.
+    - Added unit test suite `tests/unit/components/VendorIcon.test.tsx` (2 tests) verifying export, default label, and `hideLabel` accessible name.
+    - Added Header sidebar toggle tests in `tests/unit/components/Header.test.tsx` (17 tests total).
+    - Added full E2E test suite `tests/e2e/sidebar-collapse.e2e.test.tsx` (5 tests) testing default state, sidebar button toggle, header button toggle, accessible navigation while collapsed, and localStorage persistence.
+- **Verification**: All 72 test files (467 tests) passed 100%; `npm --prefix src run build` passed cleanly; `tsc` zero errors.
+
+## 2026-09-07 18:56:07 CST - UI Navigation Consolidation & Role-Gated Access (1.0.0-dev.5)
+- **Completed Frontend Navigation Reorganization & Access Control Hardening**:
+  - **R1 — Navigation & Access Boundary Consolidation**:
+    - Removed `Sync Monitor` and `Webhooks & Config` from public sidebar; consolidated into 4-tab authenticated Admin Console (Webhooks, Sync Monitor, Log Query, System Health).
+    - Hidden vendor quick-nav sidebar while Admin Console active; vendor views remain accessible via Dashboard vendor tiles.
+  - **R2 — Role-Gated Manual Sync**:
+    - Fixed security defect: `ExplorerPage.handleFetchDirectly` called `syncService.fetchAndIngestQuery` with no authentication check, allowing unauthenticated visitors to perform live vendor fetch and persist CVE data. Now gated via `isAuthenticated` prop; control not rendered and handler returns early for unauthenticated users.
+    - `VendorPage` forwards same prop to embedded `ExplorerPage`.
+    - Fixed spec compliance: Dashboard empty-state "Sync All Feeds Now" navigates to Admin Console, opening login modal when signed out (no longer calls `handleManualSync` directly).
+    - Added regression test: `src/tests/unit/pages/explorerDirectFetchGate.test.tsx` (4 tests).
+  - **R3 — Vendor-Neutral Nomenclature**:
+    - Replaced vendor-biased user-facing text across MetricCards, AdvisoryTable, AdvisoryDetailDrawer, CveTable, CveDetailDrawer, CveFilterBar, ExplorerPage, DashboardPage, and VendorPage.
+    - Data identifiers (vendor codes, advisory_id values, errata fields, adapter ids, API paths, DB columns, VendorIcon codes) deliberately preserved.
+  - **R4 — Header & Sidebar** (previously implemented):
+    - Header GitHub repository link and Sidebar version footer via new `src/config/version.ts`.
+  - **Additional Quality Work**:
+    - Fixed severity filter label/control association in `CveFilterBar`.
+    - Realigned 6 stale tests encoding pre-R1/R3 behavior without weakening coverage (`App.test.tsx`, `appSyncError.test.tsx`, `advisoryDashboard.test.tsx`, `CveTable.test.tsx`, `Sidebar.test.tsx`, `version.test.ts`, plus precision fix to `real-world-scenarios.e2e.test.tsx` Scenario 3).
+    - Version assertions now compare against `APP_VERSION` instead of hardcoded literals.
+    - Added `.claude/version.config.json`.
+- **Verification**: All 70 test files (448 tests) passed 100%; `npm --prefix src run build` clean; `npx tsc --noEmit` clean.
+
+## 2026-09-07 15:30:00 Asia/Taipei - Adversarial Review Fixes: Edge Function Health Check, Chunk Guard, Backstage State & Session Redirection (1.0.0-dev.4)
+- **Resolved Critical Bugs & Quality Gaps in Backstage & Edge Runtime**:
+  - **Edge Function Crash on Intermediate Chunks (`sync-cve`)**:
+    - Wrapped `vendor_sync_logs` insertion in `if (syncMeta && syncMeta.status)` guard, preventing fatal unhandled `TypeError: Cannot read properties of undefined (reading 'status')` and HTTP 500 crashes during multi-chunk payload processing.
+  - **Live Edge Function Health Check & Diagnostics Reporting**:
+    - Added dedicated `action === 'health_check'` branch to `sync-cve` returning HTTP 200 `{ success: true, status: 'ok' }`.
+    - Deployed updated `sync-cve` edge function to live Supabase Cloud project (`egofadbvftmbwodjneoy`) and verified live HTTP 200 response.
+    - Fixed `SystemHealthMonitor.tsx` to inspect `{ data, error }` returned from `invoke`, preventing silent swallowing of Edge function HTTP errors and eliminating false-positive operational status.
+    - Added `AbortController` timeout safeguard (6s) to external feed diagnostic requests in `SystemHealthMonitor`.
+  - **Admin UI Backstage State & Usability**:
+    - Replaced full-page loader in `App.tsx` during backstage log refresh with dedicated `handleRefreshLogs` callback and `isRefreshingLogs` spinner indicator, eliminating unwanted `AdminPage` unmounting and active tab resets.
+    - Added MUI `TablePagination` (10, 25, 50, 100 rows per page) to `AdminLogQuery` with automatic page reset on filter changes, avoiding DOM overload on large log volumes.
+    - Added non-secure context fallback and styled word-break/scroll bounds in `LogDetailModal` for large JSON payloads.
+  - **Backstage Route Protection & Mid-Session Expiration**:
+    - Added automatic route guard in `App.tsx` redirecting active unauthenticated sessions back to the public dashboard if an admin token expires or is revoked mid-session.
+    - Handled null session state with user-facing warnings in `AdminLoginModal` when email confirmation is pending.
+- **Verification**: All 61 test files (331 tests) passed 100% across Unit, Smoke, and E2E layers; `npm --prefix src run build` compiled production bundle cleanly in 7.55s.
+
 ## 2026-09-07 15:15:00 Asia/Taipei - Log Observability & Supabase Auth Backstage System
 - **Completed Log Observability & Admin Backstage System**:
   - **Database Migration & Cloud Deployment**:

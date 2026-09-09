@@ -9,6 +9,7 @@ import {
   Paper,
   Chip,
   Button,
+  Tooltip,
 } from '@mui/material';
 import { Search } from 'lucide-react';
 import { VendorSyncLog } from '@/types';
@@ -85,8 +86,28 @@ export const SyncLogTable: React.FC<SyncLogTableProps> = ({ logs }) => {
                 <TableCell sx={{ color: 'text.secondary', fontSize: '0.8125rem' }}>
                   {formatDate(log.started_at, 'yyyy-MM-dd HH:mm:ss')}
                 </TableCell>
-                <TableCell sx={{ color: 'error.main', fontSize: '0.8125rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {log.error_message || '-'}
+                <TableCell sx={{ color: 'error.main', fontSize: '0.8125rem', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {log.error_message ? (
+                    (log.error_message.includes('Missing vault secrets') ||
+                      log.error_message.includes('scheduled_sync_url') ||
+                      log.error_message.includes('scheduled_sync_key')) ? (
+                      <Tooltip title={log.error_message}>
+                        <Chip
+                          size="small"
+                          label="Missing Vault Secrets"
+                          color="warning"
+                          variant="outlined"
+                          sx={{ fontSize: '0.65rem', height: 20, fontWeight: 700 }}
+                        />
+                      </Tooltip>
+                    ) : (
+                      <Tooltip title={log.error_message}>
+                        <span>{log.error_message}</span>
+                      </Tooltip>
+                    )
+                  ) : (
+                    '-'
+                  )}
                 </TableCell>
                 <TableCell align="center">
                   <Button

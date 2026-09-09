@@ -46,9 +46,13 @@ describe('RedHatCsafAdapter describes its own endpoints', () => {
   });
 
   it('is reachable through the registry by vendor code', () => {
-    const found = getAdapterByCode('redhat');
-    expect(found).toBeDefined();
-    expect(found!.endpoints).toHaveLength(3);
+    const foundRedhat = getAdapterByCode('redhat');
+    expect(foundRedhat).toBeDefined();
+    expect(foundRedhat!.endpoints).toHaveLength(3);
+
+    const foundNutanix = getAdapterByCode('nutanix');
+    expect(foundNutanix).toBeDefined();
+    expect(foundNutanix!.endpoints).toHaveLength(3);
   });
 
   it('gives every registered adapter an endpoints list', () => {

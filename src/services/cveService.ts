@@ -52,22 +52,25 @@ export class CveService {
         // advisory_id ascending here to make the canonical advisory (mappings[0])
         // deterministic across identical fetches.
         const mappings: any[] = Array.isArray(row.advisory_cve_map) ? row.advisory_cve_map : [];
+        const resolveAdvisory = (m: any) => (Array.isArray(m?.advisories) ? m.advisories[0] : m?.advisories);
+        const resolveVendor = (adv: any) => (Array.isArray(adv?.vendors) ? adv.vendors[0] : adv?.vendors);
+
         mappings.sort((a: any, b: any) => {
-          const idA = a?.advisories?.advisory_id ?? '';
-          const idB = b?.advisories?.advisory_id ?? '';
+          const idA = resolveAdvisory(a)?.advisory_id ?? '';
+          const idB = resolveAdvisory(b)?.advisory_id ?? '';
           return idA < idB ? -1 : idA > idB ? 1 : 0;
         });
         const firstMap = mappings[0];
-        const advisory = firstMap?.advisories;
-        const vendor = advisory?.vendors;
+        const advisory = resolveAdvisory(firstMap);
+        const vendor = resolveVendor(advisory);
 
         // Parse structured product_impacts across every mapping (not just the first).
         const productImpacts: ProductImpactItem[] = [];
 
         for (const map of mappings) {
           const rawImpacts = map?.affected_products;
-          const mapAdvisory = map?.advisories;
-          const mapVendor = mapAdvisory?.vendors;
+          const mapAdvisory = resolveAdvisory(map);
+          const mapVendor = resolveVendor(mapAdvisory);
           if (!Array.isArray(rawImpacts) || rawImpacts.length === 0) continue;
           for (const item of rawImpacts) {
             if (typeof item === 'object' && item !== null && (item.product_name || item.component)) {
@@ -141,7 +144,7 @@ export class CveService {
             .map((p) => p.errata!);
           if (releasedErrata.length > 0) {
             fixedVersions = Array.from(new Set(releasedErrata));
-          } else if (advisory?.advisory_id && advisory.advisory_id.startsWith('RHSA-')) {
+          } else if (advisory?.advisory_id && (advisory.advisory_id.startsWith('RHSA-') || advisory.advisory_id.startsWith('NXSA-'))) {
             fixedVersions = [`Released in ${advisory.advisory_id}`];
           }
         }
@@ -150,8 +153,18 @@ export class CveService {
           fixedVersions.length === 0 ||
           fixedVersions.some((v) => v.toLowerCase().includes('pending'));
 
+        const vendorCode = vendor?.code || (advisory?.advisory_id?.startsWith('NXSA-') ? 'nutanix' : 'redhat');
+
         let solution = '';
-        if (!isFixPending) {
+        if (vendorCode === 'nutanix') {
+          if (advisory?.summary) {
+            solution = advisory.summary;
+          } else if (!isFixPending) {
+            solution = `請依據 Nutanix 官方公告 (${advisory?.advisory_id || 'NXSA'}) 與修復版本 (${fixedVersions.join(', ') || '最新修復版'}) 執行系統升級。詳情請參閱官方公告指引。`;
+          } else {
+            solution = `官方目前針對該漏洞分析處置中，請參閱 Nutanix 公告 ${advisory?.advisory_id || 'NXSA'} 密切關注後續更新。`;
+          }
+        } else if (!isFixPending) {
           solution = `請依據官方發佈之資安更新公告 (${fixedVersions.join(', ')}) 執行升級更新 (例如 dnf/yum update)。詳情請參閱官方指引：https://access.redhat.com/articles/11258`;
         } else if (advisory?.advisory_id && advisory.advisory_id !== 'N/A') {
           solution = `官方目前針對該漏洞分析處置中，請參閱公告 ${advisory.advisory_id} 密切關注後續 Errata 更新，並依資安指引採取適當網路隔離或緩解措施。`;
@@ -162,7 +175,7 @@ export class CveService {
         const mappedAdvisoryIds = Array.from(
           new Set(
             mappings
-              .map((map: any) => map?.advisories?.advisory_id)
+              .map((map: any) => resolveAdvisory(map)?.advisory_id)
               .filter((id: string | undefined): id is string => Boolean(id) && id !== 'N/A')
           )
         );
@@ -180,7 +193,7 @@ export class CveService {
           published_date: row.published_date || row.created_at,
           last_modified_date: row.last_modified_date,
           created_at: row.created_at,
-          vendor_code: vendor?.code || 'redhat',
+          vendor_code: vendorCode,
           advisory_id: advisory?.advisory_id || 'N/A',
           advisory_title: advisory?.title || row.description || row.cve_id,
           advisory_url: advisory?.url || undefined,

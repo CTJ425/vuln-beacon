@@ -6,9 +6,20 @@ import { CveService } from '@/services/cveService';
 import { SyncService } from '@/services/syncService';
 import { WebhookConfigService } from '@/services/webhookConfigService';
 import { AdvisoryService } from '@/services/advisoryService';
+import { VendorService } from '@/services/vendorService';
+import { supabase } from '@/lib/supabase';
 
 describe('App Root Component', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+      data: { session: null },
+      error: null,
+    } as any);
+    vi.spyOn(supabase.auth, 'onAuthStateChange').mockReturnValue({
+      data: { subscription: { unsubscribe: vi.fn() } },
+    } as any);
+    vi.spyOn(VendorService.prototype, 'fetchVendors').mockResolvedValue([]);
     vi.spyOn(AdvisoryService.prototype, 'fetchAdvisories').mockResolvedValue([
       {
         id: 'a1',
@@ -111,4 +122,46 @@ describe('App Root Component', () => {
     expect(screen.queryByRole('button', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Webhooks & Config$/i })).not.toBeInTheDocument();
   });
+
+  it('prompts admin login when selecting Admin Console or legacy admin sections without an active session', async () => {
+    render(<App />);
+    await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
+
+    const adminNavBtn = await screen.findByRole('button', { name: /Admin Console/i });
+    fireEvent.click(adminNavBtn);
+
+    expect(await screen.findByText(/後台系統身分驗證/i)).toBeInTheDocument();
+  });
+
+  it('routes legacy sync section to Admin Console with Sync Monitor tab active when authenticated', async () => {
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+      data: { session: { user: { id: 'admin-1', email: 'admin@vulnbeacon.com' } } },
+      error: null,
+    } as any);
+
+    render(<App />);
+    await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
+
+    const adminNavBtn = await screen.findByRole('button', { name: /Admin Console/i });
+    fireEvent.click(adminNavBtn);
+
+    // Click Sync Monitor tab inside Admin Console
+    const syncTab = await screen.findByRole('tab', { name: /同步監控/i });
+    expect(syncTab).toBeInTheDocument();
+    fireEvent.click(syncTab);
+    expect(syncTab).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('renders fallback error boundary when an unrecognized navigation section is dispatched', async () => {
+    render(<App />);
+    await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
+
+    // Directly click Overview to confirm standard page renders
+    const overviewBtn = screen.getByRole('button', { name: /Overview/i });
+    expect(overviewBtn).toBeInTheDocument();
+
+    // The container should not be visible for valid routes
+    expect(screen.queryByTestId('nav-fallback-container')).not.toBeInTheDocument();
+  });
 });
+

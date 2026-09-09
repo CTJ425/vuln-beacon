@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ThemeProvider } from '@/theme/ThemeContext';
 import { Header, HeaderProps } from '@/components/common/Header';
 
@@ -96,4 +96,35 @@ describe('Header Component (TDD - R4 / R2)', () => {
       expect(() => renderHeader({ onManualSync: () => {}, isSyncing: false })).not.toThrow();
     });
   });
+
+  describe('Sidebar Toggle Button Support', () => {
+    it('does NOT render sidebar toggle button when onToggleSidebar is not provided', () => {
+      renderHeader();
+      expect(screen.queryByTestId('header-sidebar-toggle')).not.toBeInTheDocument();
+    });
+
+    it('renders sidebar toggle button when onToggleSidebar is provided', () => {
+      const handleToggle = vi.fn();
+      renderHeader({ onToggleSidebar: handleToggle, isSidebarCollapsed: false });
+      const toggleBtn = screen.getByTestId('header-sidebar-toggle');
+      expect(toggleBtn).toBeInTheDocument();
+      expect(toggleBtn).toHaveAttribute('aria-label', expect.stringMatching(/收起|collapse/i));
+    });
+
+    it('updates aria-label when isSidebarCollapsed is true', () => {
+      const handleToggle = vi.fn();
+      renderHeader({ onToggleSidebar: handleToggle, isSidebarCollapsed: true });
+      const toggleBtn = screen.getByTestId('header-sidebar-toggle');
+      expect(toggleBtn).toHaveAttribute('aria-label', expect.stringMatching(/展開|expand/i));
+    });
+
+    it('calls onToggleSidebar when toggle button is clicked', () => {
+      const handleToggle = vi.fn();
+      renderHeader({ onToggleSidebar: handleToggle });
+      const toggleBtn = screen.getByTestId('header-sidebar-toggle');
+      fireEvent.click(toggleBtn);
+      expect(handleToggle).toHaveBeenCalledTimes(1);
+    });
+  });
 });
+

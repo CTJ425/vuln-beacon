@@ -36,6 +36,7 @@ import {
 
 import { CveTableRowItem } from './CveTable';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
+import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
 
 interface CveDetailDrawerProps {
@@ -49,18 +50,29 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
   item,
   onClose,
 }) => {
-  if (!item) return null;
-
   const [searchTerm, setSearchTerm] = useState('');
   const [impactFilter, setImpactFilter] = useState<'ALL' | 'AFFECTED' | 'NOT_AFFECTED' | 'FIX_DEFERRED'>('ALL');
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
-  const impacts = item.product_impacts || [];
+  const impacts = item?.product_impacts || [];
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard?.writeText(text);
-    setCopiedText(text);
-    setTimeout(() => setCopiedText(null), 2000);
+  const handleCopy = async (text: string) => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else if (typeof document !== 'undefined') {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopiedText(text);
+      setTimeout(() => setCopiedText(null), 2000);
+    } catch {}
   };
 
   // Group into Affected vs Not Affected vs Fix Deferred
@@ -107,6 +119,29 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
 
     return list;
   }, [impacts, impactFilter, affectedList, notAffectedList, deferredList, searchTerm]);
+
+  const realAdvisories = useMemo(() => {
+    if (!item) return [];
+    const isRedHat = item.vendor_code?.toLowerCase() === 'redhat';
+    const isAdvisoryFormat = (a: string) => {
+      if (!a || typeof a !== 'string') return false;
+      const trimmed = a.trim();
+      if (!trimmed || /^CVE-\d{4}-\d+$/i.test(trimmed)) return false;
+      return isRedHat ? /^RH[SBE]A-\d{4}:\d+$/i.test(trimmed) : true;
+    };
+
+    if (item.all_advisories && item.all_advisories.length > 0) {
+      return item.all_advisories.filter(isAdvisoryFormat);
+    }
+    if (item.advisory_id && isAdvisoryFormat(item.advisory_id)) {
+      return [item.advisory_id];
+    }
+    return [];
+  }, [item]);
+
+  const primaryAdvisory = realAdvisories.length > 0 ? realAdvisories[0] : null;
+
+  if (!item) return null;
 
   const getStateBadge = (state: string) => {
     const s = state.toLowerCase();
@@ -184,18 +219,6 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
     );
   };
 
-  const realAdvisories = useMemo(() => {
-    if (item.all_advisories && item.all_advisories.length > 0) {
-      return item.all_advisories.filter((a) => /^RH[SBE]A-\d{4}:\d+$/i.test(a));
-    }
-    if (/^RH[SBE]A-\d{4}:\d+$/i.test(item.advisory_id)) {
-      return [item.advisory_id];
-    }
-    return [];
-  }, [item]);
-
-  const primaryAdvisory = realAdvisories.length > 0 ? realAdvisories[0] : null;
-
   return (
     <Drawer
       anchor="right"
@@ -215,6 +238,9 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2.5 }}>
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 0.5 }}>
+            {item.vendor_code && (
+              <VendorIcon vendorCode={item.vendor_code} size={20} hideLabel />
+            )}
             <Typography variant="h5" sx={{ fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'primary.main' }}>
               {primaryAdvisory || item.cve_id}
             </Typography>
@@ -285,7 +311,15 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
             size="small"
             variant="outlined"
             component="a"
-            href={`https://access.redhat.com/security/cve/${item.cve_id}`}
+            href={
+              item.vendor_code === 'nutanix'
+                ? item.advisory_url && item.advisory_url.startsWith('http')
+                  ? item.advisory_url
+                  : item.advisory_id
+                  ? `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(item.advisory_id)}`
+                  : 'https://portal.nutanix.com/page/documents/security-advisories'
+                : `https://access.redhat.com/security/cve/${item.cve_id}`
+            }
             target="_blank"
             rel="noopener noreferrer"
             endIcon={<ExternalLink size={14} />}
@@ -312,7 +346,11 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                   label={adv}
                   size="small"
                   component="a"
-                  href={`https://access.redhat.com/errata/${adv}`}
+                  href={
+                    adv.startsWith('NXSA-') || item.vendor_code === 'nutanix'
+                      ? `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(adv)}`
+                      : `https://access.redhat.com/errata/${adv}`
+                  }
                   target="_blank"
                   clickable
                   sx={{ fontFamily: 'JetBrains Mono', fontWeight: 600, fontSize: '0.75rem' }}
@@ -450,7 +488,11 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                     <TableCell sx={{ fontFamily: 'JetBrains Mono', fontSize: '0.775rem' }}>
                       {imp.errata && imp.errata !== '-' ? (
                         <Link
-                          href={`https://access.redhat.com/errata/${imp.errata}`}
+                          href={
+                            imp.errata.startsWith('NXSA-') || item.vendor_code === 'nutanix'
+                              ? `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(imp.errata)}`
+                              : `https://access.redhat.com/errata/${imp.errata}`
+                          }
                           target="_blank"
                           rel="noopener noreferrer"
                           sx={{ color: 'primary.main', fontWeight: 600 }}
@@ -489,18 +531,33 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
           {item.solution}
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
-          <span>$ dnf upgrade -y {impacts[0]?.component || 'package-name'}</span>
-          <Tooltip title={copiedText === `$ dnf upgrade -y ${impacts[0]?.component || 'package-name'}` ? '已複製指令！' : '複製升級指令'}>
-            <IconButton
-              size="small"
-              onClick={() => handleCopy(`$ dnf upgrade -y ${impacts[0]?.component || 'package-name'}`)}
-              sx={{ color: 'text.secondary' }}
-            >
-              {copiedText === `$ dnf upgrade -y ${impacts[0]?.component || 'package-name'}` ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
-            </IconButton>
-          </Tooltip>
-        </Box>
+        {item.vendor_code === 'redhat' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
+            <span>$ dnf upgrade -y {impacts[0]?.component || 'package-name'}</span>
+            <Tooltip title={copiedText === `$ dnf upgrade -y ${impacts[0]?.component || 'package-name'}` ? '已複製指令！' : '複製升級指令'}>
+              <IconButton
+                size="small"
+                onClick={() => handleCopy(`$ dnf upgrade -y ${impacts[0]?.component || 'package-name'}`)}
+                sx={{ color: 'text.secondary' }}
+              >
+                {copiedText === `$ dnf upgrade -y ${impacts[0]?.component || 'package-name'}` ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : item.vendor_code === 'nutanix' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
+            <span>Prism LCM Upgrade: {item.fixed_versions?.[0] || impacts[0]?.errata || item.advisory_id}</span>
+            <Tooltip title={copiedText === (item.fixed_versions?.[0] || item.advisory_id) ? '已複製版本！' : '複製目標修復版本'}>
+              <IconButton
+                size="small"
+                onClick={() => handleCopy(item.fixed_versions?.[0] || item.advisory_id)}
+                sx={{ color: 'text.secondary' }}
+              >
+                {copiedText === (item.fixed_versions?.[0] || item.advisory_id) ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : null}
       </Paper>
     </Drawer>
   );

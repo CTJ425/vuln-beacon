@@ -140,7 +140,7 @@ export function deriveTaxonomy(
 
     return {
       vendorCode: vendor.vendorCode,
-      vendorName: vendor.vendorName || VENDOR_NAMES[vendor.vendorCode] || vendor.vendorCode,
+      vendorName: vendor.vendorName || VENDOR_NAMES[vendor.vendorCode?.toLowerCase()] || vendor.vendorCode,
       advisoryCount: vendor.advisoryCount,
       criticalCount: vendor.criticalCount,
       products,

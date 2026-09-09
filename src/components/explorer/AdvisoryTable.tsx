@@ -17,6 +17,7 @@ import { ChevronRight } from 'lucide-react';
 
 import { AdvisoryRowItem } from '@/services/advisoryService';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
+import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
 
 interface AdvisoryTableProps {
@@ -70,9 +71,14 @@ export const AdvisoryTable: React.FC<AdvisoryTableProps> = ({ items, onSelectRow
                   },
                 }}
               >
-                {/* RHSA ID */}
+                {/* Advisory ID with authentic Vendor Icon */}
                 <TableCell sx={{ fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'primary.main' }}>
-                  {item.advisory_id}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {item.vendor_code && (
+                      <VendorIcon vendorCode={item.vendor_code} name={item.vendor_name} size={15} hideLabel />
+                    )}
+                    <span>{item.advisory_id}</span>
+                  </Box>
                 </TableCell>
 
                 {/* Fixed CVEs */}

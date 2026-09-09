@@ -11,7 +11,10 @@ vi.mock('@/lib/supabase', () => ({
 }));
 
 vi.mock('@/services/webhook', () => ({
-  WebhookService: vi.fn().mockImplementation(() => ({})),
+  WebhookService: vi.fn().mockImplementation(() => ({
+    clearWebhooks: vi.fn(),
+    registerWebhook: vi.fn(),
+  })),
 }));
 
 import { SyncService, SYNCED_VENDOR_CODES } from '@/services/syncService';
@@ -27,16 +30,18 @@ describe('SyncService builds its request URLs from the adapter', () => {
   beforeEach(() => {
     mockInvoke.mockReset().mockResolvedValue({ data: { success: true, log: null }, error: null });
     mockFrom.mockReset().mockImplementation(() => ({
-      select: () =>
-        Object.assign(Promise.resolve({ data: [], error: null }), {
-          range: () => Promise.resolve({ data: [], error: null }),
-          eq: () => Promise.resolve({ data: [], error: null }),
-        }),
+      select: () => {
+        const query: any = Promise.resolve({ data: [], error: null });
+        query.range = () => query;
+        query.eq = () => query;
+        query.order = () => query;
+        return query;
+      },
     }));
   });
 
   it('publishes the vendor codes it actually syncs', () => {
-    expect([...SYNCED_VENDOR_CODES]).toEqual(['redhat']);
+    expect([...SYNCED_VENDOR_CODES]).toEqual(['redhat', 'nutanix']);
   });
 
   it('looks a CVE up through the adapter reverse-lookup url', async () => {
@@ -71,7 +76,23 @@ describe('SyncService builds its request URLs from the adapter', () => {
     vi.unstubAllGlobals();
   });
 
-  it('leaves no hardcoded Red Hat url literal in the service source', async () => {
+  it('fetches a Nutanix NXSA advisory through the Nutanix adapter detail url', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: any) => {
+        seen.push(String(url));
+        return { ok: true, json: async () => ({ advisory_id: 'NXSA-AOS-1.0', cvelist: [{ cve_id: 'CVE-2026-1' }] }) };
+      })
+    );
+
+    await new SyncService().fetchAndIngestQuery('NXSA-AOS-1.0');
+
+    expect(seen[0]).toBe('https://portal.nutanix.com/api/v1/advisory?id=NXSA-AOS-1.0');
+    vi.unstubAllGlobals();
+  });
+
+  it('leaves no hardcoded Red Hat or Nutanix url literals in the service source', async () => {
     const fs = await import('node:fs/promises');
     const path = await import('node:path');
     // cwd differs between `npm --prefix src test` (src/) and a repo-root vitest run.
@@ -87,5 +108,6 @@ describe('SyncService builds its request URLs from the adapter', () => {
     }
     expect(src.length).toBeGreaterThan(0);
     expect(src).not.toContain('https://access.redhat.com');
+    expect(src).not.toContain('https://portal.nutanix.com');
   });
 });

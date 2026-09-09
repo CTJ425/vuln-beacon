@@ -71,6 +71,33 @@ describe('LogDetailModal Component', () => {
     expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('log-123'));
   });
 
+  it('displays Vault Secrets resolution guide and allows copying fix SQL when missing vault secrets', () => {
+    const vaultErrorLog: VendorSyncLog = {
+      id: 'log-vault-err',
+      vendor_code: 'redhat',
+      status: 'FAILED',
+      items_fetched: 0,
+      new_items_count: 0,
+      duration_ms: 5,
+      started_at: '2026-09-08T08:00:00.000Z',
+      finished_at: '2026-09-08T08:00:00.005Z',
+      error_message: 'Missing vault secrets: scheduled_sync_url or scheduled_sync_key not configured',
+    };
+
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: writeTextMock } });
+
+    render(<LogDetailModal open={true} log={vaultErrorLog} onClose={vi.fn()} />);
+
+    expect(screen.getByText(/排程密鑰未配置排除指引/)).toBeInTheDocument();
+    expect(screen.getAllByText(/scheduled_sync_url/).length).toBeGreaterThanOrEqual(1);
+
+    const copyFixBtn = screen.getByRole('button', { name: /複製修復指令/i });
+    fireEvent.click(copyFixBtn);
+
+    expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining('vault.create_secret'));
+  });
+
   it('calls onClose when close button is clicked', () => {
     const handleClose = vi.fn();
     render(<LogDetailModal open={true} log={sampleLog} onClose={handleClose} />);

@@ -174,6 +174,17 @@ describe('sync-cve edge function', () => {
     expect(src).toContain('Unsupported action');
   });
 
+  it('supports trigger_manual_sync action with lock and server-side IngestionEngine (Task 11c)', () => {
+    const src = read(syncCvePath);
+    expect(src).toContain("action === 'trigger_manual_sync'");
+    expect(src).toContain('try_acquire_sync_lock');
+    expect(src).toContain('release_sync_lock');
+    expect(src).toContain('IngestionEngine');
+    expect(src).toContain('ingestVendor');
+    expect(src).toContain('409');
+    expect(src).toContain('A threat feed synchronization is already in progress');
+  });
+
   describe('sync-cve auth verification logic matches implementation', () => {
     function verifyAuth(headers: Record<string, string>): { authorized: boolean; status: number; error?: string } {
       const reqHeaders = new Headers(headers);
