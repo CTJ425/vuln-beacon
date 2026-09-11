@@ -1,5 +1,22 @@
 # Progress Log
 
+## 2026-09-11 09:25:00 Asia/Taipei - Production Edge Function & Schema Synchronization (1.0.0)
+- **Resolved Production Edge Function 404 & Schema Desync (BUG-021)**:
+  - **Applied All Missing Migrations to Production**: Executed `supabase db push --include-all` to production project (`baizoisgkgwqccqjwnxg`), provisioning all 8 migrations (`vendors`, `cves`, `advisories`, `advisory_cve_map`, and `advisory-documents` bucket).
+  - **Supabase Vault Secrets**: Configured `scheduled_sync_url` and `scheduled_sync_key` on production database via `set_scheduled_sync_vault_secrets`.
+  - **Edge Functions Deployment**: Deployed `sync-cve` and `scheduled-sync` Edge Functions to production (`baizoisgkgwqccqjwnxg`) and development (`egofadbvftmbwodjneoy`) projects with `--no-verify-jwt`.
+  - **PostgreSQL `ON CONFLICT DO UPDATE` Batch Collision Resolution**:
+    - Deduplicated CVE IDs per advisory in `src/adapters/nutanix.ts`.
+    - Deduplicated mappings and CVE tracking in `src/engine/ingestion.ts`.
+    - Deduplicated batch arrays (`uniqueCves`, `uniqueAdvisories`, `dedupedMappings`) in `src/supabase/functions/sync-cve/index.ts` and `src/supabase/functions/scheduled-sync/index.ts`.
+  - **Transport Fallback Robustness**: Extended `src/services/syncService.ts` error matching in `mode: 'auto'` to catch `FunctionsFetchError`, `Failed to fetch`, and `Failed to send a request`, falling back gracefully to client ingestion and direct chunk persistence.
+- **Deep Verification**:
+  - Live production manual sync verified: Red Hat and Nutanix synced successfully (903 CVEs, 70 advisories, all logs `SUCCESS`).
+  - Unit tests: 65/65 files passed (417/417 tests).
+  - Smoke tests: 3/3 files passed (13/13 tests).
+  - E2E tests: 12/12 files passed (106/106 tests).
+  - Production build: `npm run build` clean (8.2s).
+
 ## 2026-09-09 17:30:00 Asia/Taipei - Production Release 1.0.0 & Stability Remediation (1.0.0)
 - **Resolved Latent Quality and Stability Bugs (BUG-019 & BUG-020)**:
   - **Scheduled Sync Concurrency Lock (`scheduled-sync/index.ts`) (BUG-020)**: Added PostgreSQL mutual exclusion advisory locking (`try_acquire_sync_lock` / `release_sync_lock` on lock id 7425001) to `scheduled-sync` Edge Function, preventing collisions with admin manual sync.
@@ -17,32 +34,3 @@
 - **Deep Verification**:
   - All 80 test files (533 tests) passed 100% (0 failures, 0 unhandled errors).
   - Production build (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
-
-## 2026-09-09 13:10:00 Asia/Taipei - Task 11c: Move Browser Manual Sync Server-Side (1.0.0)
-- **Implemented Server-Side Manual Threat Feed Sync (`sync-cve`, `SyncService`, `App.tsx`)**:
-  - **Edge Function `action: 'trigger_manual_sync'` (`src/supabase/functions/sync-cve/index.ts`)**:
-    - Restricted to authenticated administrative users (`getUser` JWT token verification returning 401 on unauthenticated invocation, D2).
-    - Added PostgreSQL advisory lock concurrency guard via `try_acquire_sync_lock(7425001)` returning HTTP 409 Conflict when an ingestion is already running (D3).
-    - Executed server-side ingestion using `IngestionEngine` and `WebhookService` imported from `../_shared/ingest.bundle.js` (D1).
-    - Implemented server-side batched upserts for CVEs, Advisories, Mappings, raw storage document archiving in `advisory-documents`, registered webhook dispatch, and `vendor_sync_logs` record emission.
-  - **Database Migration (`src/supabase/migrations/20260909000000_server_side_sync_lock.sql`)**:
-    - Created `public.try_acquire_sync_lock(p_lock_id bigint)` and `public.release_sync_lock(p_lock_id bigint)` stored procedures for transaction-safe advisory locking.
-  - **Frontend SyncService & App Integration (`src/services/syncService.ts`, `src/App.tsx`)**:
-    - Extended `syncVendors(vendorCodes, { mode: 'auto' | 'server' | 'client' })`: automatically uses server-side trigger when authenticated or explicit `server` mode, with transparent fallback for test/offline environments.
-    - Updated `AdminPage.tsx` with controlled `activeTab` and `onTabChange` props; updated `App.tsx` with `adminTab` and `pendingAdminTab` routing so legacy `'sync'` navigation directly opens Admin Console Tab 1 (Sync Monitor).
-- **Adversarial Audit & Test Fixes**:
-  - Identified root cause of E2E failure in `src/tests/e2e/manual-sync-server-side.e2e.test.tsx`: `@supabase/supabase-js` defines `client.functions` as a dynamic getter creating new `FunctionsClient` instances on every access; spying on instance methods failed to intercept subsequent calls. Resolved by spying on `supabase.functions.constructor.prototype.invoke`.
-  - Removed temporary debug logs in `src/App.tsx` and `src/services/syncService.ts`.
-- **Deep Verification**:
-  - Unit tests: 65/65 test files passed, 416/416 tests passed.
-  - Smoke tests: 3/3 suites passed, 13/13 tests passed.
-  - E2E tests: 12/12 suites passed, 106/106 tests passed, including `manual-sync-server-side.e2e.test.tsx` (Phase 1 server sync, Phase 2 HTTP 409 conflict, Phase 3 auth barrier).
-  - Total test pyramid: 80/80 test files passed, 530/530 tests passed (136.99s).
-  - Production build: `npm --prefix src run build` (`build:edge` -> `tsc` -> `vite build`) completed cleanly in 7.60s.
-- **Self-Hosted Topology Documentation & Environment Configuration (`src/.env.example`, `README.md`)**:
-  - **Edge Functions Environment Clarification (D6)**: Corrected comments in `src/.env.example` and `README.md` to distinguish Supabase Cloud (auto-injected `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY`) from Self-Hosted Docker environments (where `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` must be explicitly configured in `docker-compose.yml` / `edge-runtime` container environment).
-  - **Self-Hosted Deployment Procedure (D5)**: Added step-by-step instructions to `README.md` for compiling the Edge bundle (`npm --prefix src run build:edge`), copying functions to the container volume, setting environment variables, and restarting `edge-runtime`.
-  - **Network Ingress & Reverse Proxy Topology (D1–D4)**: Documented single-origin reverse proxy recommendations (Caddy + Cloudflare Tunnel) with `/supabase` path prefix stripping to prevent CORS and Access cookie scope issues.
-- **Server-Side Manual Threat Feed Sync Specification (Task 11c)**:
-  - Authored comprehensive architectural specification `docs/agent/specs/manual-sync-server-side.md` addressing restricted network egress (C1) and browser payload chunking limits (BUG-003).
-  - Defined `action: 'trigger_manual_sync'` contract on `sync-cve`, server-side ingestion reuse via `ingest.bundle.js`, role-gated admin authorization, and transactional advisory locks (`pg_try_advisory_xact_lock`).

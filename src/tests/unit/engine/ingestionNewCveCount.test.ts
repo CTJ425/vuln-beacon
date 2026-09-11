@@ -68,4 +68,15 @@ describe('IngestionEngine new CVE counting', () => {
     expect(result.cvesCount).toBe(2);
     expect(result.newCvesCount).toBe(1);
   });
+
+  it('deduplicates mappings when an advisory payload contains the same CVE twice', async () => {
+    const engine = new IngestionEngine();
+    await engine.ingestVendor('redhat', [
+      item('RHSA-1', ['CVE-2026-0001', 'CVE-2026-0001']),
+    ]);
+
+    const mappings = engine.getMappings();
+    expect(mappings).toHaveLength(1);
+    expect(mappings[0].cve_id).toBe('cve-CVE-2026-0001');
+  });
 });

@@ -151,12 +151,14 @@ export class NutanixAdapter implements VendorAdapter {
 
       const fixedVersions = fixedRelease ? [fixedRelease] : [];
 
+      const seenCveIdsInAdv = new Set<string>();
       for (const c of rawCveList) {
         if (!c) continue;
         const cveId = typeof c === 'string'
           ? c.trim().toUpperCase()
           : (typeof c?.cve_id === 'string' ? c.cve_id.trim().toUpperCase() : '');
-        if (!CVE_ID_REGEX.test(cveId)) continue;
+        if (!CVE_ID_REGEX.test(cveId) || seenCveIdsInAdv.has(cveId)) continue;
+        seenCveIdsInAdv.add(cveId);
 
         let cvssScore: number | undefined;
         const rawScore = typeof c === 'object' ? c.cvss : undefined;

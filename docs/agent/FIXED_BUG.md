@@ -2,6 +2,24 @@
 
 ---
 
+### BUG-021: Production Sync Failure Due to Missing Edge Functions, Unapplied Migrations, and ON CONFLICT DO UPDATE Batch Collision — FIXED
+- **Date**: Opened 2026-09-11, fixed 2026-09-11 (1.0.0)
+- **Severity**: CRITICAL
+- **Location**: `src/supabase/functions/sync-cve/index.ts`, `src/supabase/functions/scheduled-sync/index.ts`, `src/adapters/nutanix.ts`, `src/engine/ingestion.ts`, `src/services/syncService.ts`
+- **Root Cause**:
+  1. **Missing Edge Functions on Prod Project**: Production Supabase project (`baizoisgkgwqccqjwnxg`) had zero Edge Functions deployed. When the frontend triggered sync, `POST /functions/v1/sync-cve` preflight returned 404 with CORS failure, throwing `FunctionsFetchError: Failed to send a request to the Edge Function`.
+  2. **Unapplied Production Migrations**: All 8 database migrations had never been pushed to `baizoisgkgwqccqjwnxg` (missing `vendors`, `cves`, `advisories`, `advisory_cve_map`, and `advisory-documents` bucket).
+  3. **Batch Collision in ON CONFLICT DO UPDATE**: Upstream Nutanix vendor feeds contain multiple CVE entries for the same CVE ID within a single advisory payload. When batch upserting into `advisory_cve_map`, PostgreSQL threw `ERROR: ON CONFLICT DO UPDATE command cannot affect row a second time` because identical `(advisory_id, cve_id)` pairs existed in the same batch statement.
+- **Fix**:
+  1. Applied all 8 database migrations to production via `supabase db push --include-all`. Configured Supabase Vault secrets (`scheduled_sync_url`, `scheduled_sync_key`).
+  2. Deployed both `sync-cve` and `scheduled-sync` Edge Functions to production and dev Supabase projects.
+  3. Deduplicated CVE entries per advisory in `nutanix.ts`, deduplicated mappings and CVEs in `ingestion.ts`, and deduplicated batch upsert entities (`uniqueCves`, `uniqueAdvisories`, `dedupedMappings`) in both `sync-cve/index.ts` and `scheduled-sync/index.ts`.
+  4. Enhanced transport error fallback detection in `syncService.ts` (`mode: 'auto'`).
+  5. Added regression unit tests in `nutanix.test.ts` and `ingestionNewCveCount.test.ts`.
+- **Status**: ✅ FIXED (2026-09-11 09:25:00 CST)
+
+---
+
 ### BUG-020: Scheduled Sync Concurrency Lock Gap, Stale knownCveIds Duplicate Alerts, and PostgREST Joined CVE Array Fragility — FIXED
 - **Date**: Opened 2026-09-09, fixed 2026-09-09 (1.0.0)
 - **Severity**: HIGH

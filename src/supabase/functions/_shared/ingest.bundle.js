@@ -350,10 +350,12 @@ var NutanixAdapter = class {
         });
       }
       const fixedVersions = fixedRelease ? [fixedRelease] : [];
+      const seenCveIdsInAdv = /* @__PURE__ */ new Set();
       for (const c of rawCveList) {
         if (!c) continue;
         const cveId = typeof c === "string" ? c.trim().toUpperCase() : typeof c?.cve_id === "string" ? c.cve_id.trim().toUpperCase() : "";
-        if (!CVE_ID_REGEX.test(cveId)) continue;
+        if (!CVE_ID_REGEX.test(cveId) || seenCveIdsInAdv.has(cveId)) continue;
+        seenCveIdsInAdv.add(cveId);
         let cvssScore;
         const rawScore = typeof c === "object" ? c.cvss : void 0;
         if (typeof rawScore === "number" && !isNaN(rawScore)) {
@@ -494,9 +496,12 @@ var IngestionEngine = class {
           created_at: (/* @__PURE__ */ new Date()).toISOString()
         };
         this.advisories.set(advKey, advisoryRecord);
+        const seenAdvCves = /* @__PURE__ */ new Set();
         for (const cve of item.cves) {
-          totalCves++;
           const cveKey = cve.cveId;
+          if (seenAdvCves.has(cveKey)) continue;
+          seenAdvCves.add(cveKey);
+          totalCves++;
           const isNew = !this.cves.has(cveKey);
           const isTrulyNew = isNew && !this.knownCveIds.has(cveKey);
           if (isTrulyNew) newCvesCount++;
@@ -512,15 +517,30 @@ var IngestionEngine = class {
             created_at: (/* @__PURE__ */ new Date()).toISOString()
           };
           this.cves.set(cveKey, cveRecord);
-          this.mappings.push({
-            id: `map-${advKey}-${cveKey}`,
-            advisory_id: advisoryRecord.id,
-            cve_id: cveRecord.id,
-            affected_products: cve.affectedProducts || [],
-            product_impacts: cve.productImpacts || [],
-            fixed_versions: cve.fixedVersions || [],
-            created_at: (/* @__PURE__ */ new Date()).toISOString()
-          });
+          const mapId = `map-${advKey}-${cveKey}`;
+          const existingMapIndex = this.mappings.findIndex((m) => m.id === mapId);
+          if (existingMapIndex >= 0) {
+            const existing = this.mappings[existingMapIndex];
+            const mergedProducts = Array.from(/* @__PURE__ */ new Set([...existing.affected_products || [], ...cve.affectedProducts || []]));
+            const mergedImpacts = [...existing.product_impacts || [], ...cve.productImpacts || []];
+            const mergedVersions = Array.from(/* @__PURE__ */ new Set([...existing.fixed_versions || [], ...cve.fixedVersions || []]));
+            this.mappings[existingMapIndex] = {
+              ...existing,
+              affected_products: mergedProducts,
+              product_impacts: mergedImpacts,
+              fixed_versions: mergedVersions
+            };
+          } else {
+            this.mappings.push({
+              id: mapId,
+              advisory_id: advisoryRecord.id,
+              cve_id: cveRecord.id,
+              affected_products: cve.affectedProducts || [],
+              product_impacts: cve.productImpacts || [],
+              fixed_versions: cve.fixedVersions || [],
+              created_at: (/* @__PURE__ */ new Date()).toISOString()
+            });
+          }
           if (this.webhookService && isTrulyNew && (cveRecord.severity === "CRITICAL" || cveRecord.severity === "HIGH")) {
             pendingAlerts.push({
               vendorName: adapter.vendorName,

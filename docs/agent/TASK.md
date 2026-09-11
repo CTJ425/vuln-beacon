@@ -296,3 +296,15 @@
   - **Verification**: All 80 test files (533 tests) passed 100%; `npm --prefix src run build` clean.
   - **Completed**: 2026-09-09 17:45:00 Asia/Taipei.
 
+- [x] **Task 25: Production Deployment Synchronization & Ingestion Deduplication (BUG-021)**
+  - [x] Apply all 8 database migrations to Supabase Cloud production project (`baizoisgkgwqccqjwnxg`).
+  - [x] Configure Supabase Vault secrets (`scheduled_sync_url`, `scheduled_sync_key`).
+  - [x] Deduplicate CVE IDs within advisories in `NutanixAdapter` (`nutanix.ts`).
+  - [x] Deduplicate mappings and CVE counts in `IngestionEngine` (`ingestion.ts`).
+  - [x] Deduplicate batch upsert rows (`uniqueCves`, `uniqueAdvisories`, `dedupedMappings`) in `sync-cve` and `scheduled-sync` Edge Functions.
+  - [x] Recompile Edge bundle via `npm run build:edge` and deploy both Edge Functions to production and dev.
+  - [x] Add regression tests in `nutanix.test.ts` and `ingestionNewCveCount.test.ts`.
+  - [x] Verify complete test pyramid: 65 unit files (417 tests), 3 smoke files (13 tests), 12 E2E files (106 tests), and production build clean.
+  - **Verification**: Live manual sync against production project succeeded HTTP 200 with 903 CVEs, 70 advisories, and SUCCESS logs.
+  - **Completed**: 2026-09-11 09:25:00 Asia/Taipei.
+

@@ -179,48 +179,50 @@ serve(async (req) => {
             throw new Error(result.errorMessage || `Ingestion failed for vendor ${vendor.code}`);
           }
 
-          const advisories = engine.getAdvisories();
-        const cves = engine.getCves();
-        const mappings = engine.getMappings();
+          const rawAdvisories = engine.getAdvisories();
+          const advisories = Array.from(new Map(rawAdvisories.map((a: any) => [a.advisory_id, a])).values());
+          const cves = engine.getCves();
+          const mappings = engine.getMappings();
 
-        const cveIdMap = new Map<string, string>();
-        for (const batch of chunk(cves, DB_BATCH_SIZE)) {
-          const { data: insertedCves, error: cveError } = await supabaseClient
-            .from('cves')
-            .upsert(
-              batch.map((c: any) => ({
-                cve_id: c.cve_id,
-                description: c.description,
-                cvss_v3_score: c.cvss_v3_score,
-                cvss_v3_vector: c.cvss_v3_vector,
-                severity: c.severity,
-                is_known_exploited: c.is_known_exploited,
-                published_date: c.published_date,
-              })),
-              { onConflict: 'cve_id' }
-            )
-            .select('id, cve_id');
+          const uniqueCves = Array.from(new Map(cves.map((c: any) => [c.cve_id, c])).values());
+          const cveIdMap = new Map<string, string>();
+          for (const batch of chunk(uniqueCves, DB_BATCH_SIZE)) {
+            const { data: insertedCves, error: cveError } = await supabaseClient
+              .from('cves')
+              .upsert(
+                batch.map((c: any) => ({
+                  cve_id: c.cve_id,
+                  description: c.description,
+                  cvss_v3_score: c.cvss_v3_score,
+                  cvss_v3_vector: c.cvss_v3_vector,
+                  severity: c.severity,
+                  is_known_exploited: c.is_known_exploited,
+                  published_date: c.published_date,
+                })),
+                { onConflict: 'cve_id' }
+              )
+              .select('id, cve_id');
 
-          if (cveError) throw cveError;
-          for (const row of insertedCves || []) {
-            const original = batch.find((c: any) => c.cve_id === row.cve_id);
-            if (original) cveIdMap.set(original.id, row.id);
+            if (cveError) throw cveError;
+            for (const row of insertedCves || []) {
+              const original = batch.find((c: any) => c.cve_id === row.cve_id);
+              if (original) cveIdMap.set(original.id, row.id);
+            }
           }
-        }
 
-        // Upload the raw document the same way sync-cve/index.ts does, so an
-        // advisory that only ever arrives through the scheduler still gets a
-        // raw_payload_path. A storage failure for one advisory must not
-        // abort the vendor's run — log it and leave that advisory's path
-        // null rather than throwing.
-        //
-        // Uploads happen per batch, immediately before that batch's upsert,
-        // rather than for every advisory up front. Uploading everything up
-        // front would leave later, never-attempted batches' objects orphaned
-        // in the bucket if an earlier batch's upsert fails.
-        const rawPayloadPaths = new Map<string, string>();
-        const advisoryIdMap = new Map<string, string>();
-        for (const batch of chunk(advisories, DB_BATCH_SIZE)) {
+          // Upload the raw document the same way sync-cve/index.ts does, so an
+          // advisory that only ever arrives through the scheduler still gets a
+          // raw_payload_path. A storage failure for one advisory must not
+          // abort the vendor's run — log it and leave that advisory's path
+          // null rather than throwing.
+          //
+          // Uploads happen per batch, immediately before that batch's upsert,
+          // rather than for every advisory up front. Uploading everything up
+          // front would leave later, never-attempted batches' objects orphaned
+          // in the bucket if an earlier batch's upsert fails.
+          const rawPayloadPaths = new Map<string, string>();
+          const advisoryIdMap = new Map<string, string>();
+          for (const batch of chunk(advisories, DB_BATCH_SIZE)) {
           for (const adv of batch as any[]) {
             const hasPayload = adv.raw_payload && Object.keys(adv.raw_payload).length > 0;
             if (!hasPayload) continue;
@@ -310,7 +312,30 @@ serve(async (req) => {
           })
           .filter((m: any) => m !== null);
 
-        for (const batch of chunk(mappingRows, DB_BATCH_SIZE)) {
+        const dedupedMappings = Array.from(
+          mappingRows.reduce((acc: Map<string, any>, m: any) => {
+            const key = `${m.advisory_id}:${m.cve_id}`;
+            if (!acc.has(key)) {
+              acc.set(key, m);
+            } else {
+              const existing = acc.get(key);
+              const mergedProducts = Array.from(
+                new Set([...(existing.affected_products || []), ...(m.affected_products || [])])
+              );
+              const mergedVersions = Array.from(
+                new Set([...(existing.fixed_versions || []), ...(m.fixed_versions || [])])
+              );
+              acc.set(key, {
+                ...existing,
+                affected_products: mergedProducts,
+                fixed_versions: mergedVersions,
+              });
+            }
+            return acc;
+          }, new Map<string, any>()).values()
+        );
+
+        for (const batch of chunk(dedupedMappings, DB_BATCH_SIZE)) {
           const { error: mapError } = await supabaseClient
             .from('advisory_cve_map')
             .upsert(batch, { onConflict: 'advisory_id, cve_id' });

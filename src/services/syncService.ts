@@ -261,8 +261,15 @@ export class SyncService {
 
         if (error) {
           const errorMsg = await extractErrorMessage(error);
-          if (mode === 'auto' && (errorMsg.includes('Unsupported action') || errorMsg.includes('404'))) {
-            console.warn('Server-side manual sync unsupported; falling back to client execution:', errorMsg);
+          if (
+            mode === 'auto' &&
+            (errorMsg.includes('Unsupported action') ||
+              errorMsg.includes('404') ||
+              errorMsg.includes('Failed to send a request') ||
+              errorMsg.includes('Failed to fetch') ||
+              errorMsg.includes('FunctionsFetchError'))
+          ) {
+            console.warn('Server-side manual sync unsupported or unreachable; falling back to client execution:', errorMsg);
           } else {
             return {
               success: false,

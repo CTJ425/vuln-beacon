@@ -292,8 +292,9 @@ serve(async (req) => {
             const cves = engine.getCves();
             const mappings = engine.getMappings();
 
+            const uniqueCves = Array.from(new Map(cves.map((c: any) => [c.cve_id, c])).values());
             const cveIdMap = new Map<string, string>();
-            for (const batch of chunk(cves, DB_BATCH_SIZE)) {
+            for (const batch of chunk(uniqueCves, DB_BATCH_SIZE)) {
               const { data: insertedCves, error: cveError } = await supabaseClient
                 .from('cves')
                 .upsert(
@@ -317,9 +318,10 @@ serve(async (req) => {
               }
             }
 
+            const uniqueAdvisories = Array.from(new Map(advisories.map((a: any) => [a.advisory_id, a])).values());
             const rawPayloadPaths = new Map<string, string>();
             const advisoryIdMap = new Map<string, string>();
-            for (const batch of chunk(advisories, DB_BATCH_SIZE)) {
+            for (const batch of chunk(uniqueAdvisories, DB_BATCH_SIZE)) {
               for (const adv of batch as any[]) {
                 const hasPayload = adv.raw_payload && Object.keys(adv.raw_payload).length > 0;
                 if (!hasPayload) continue;
@@ -395,7 +397,30 @@ serve(async (req) => {
               })
               .filter((m: any) => m !== null);
 
-            for (const batch of chunk(mappingRows, DB_BATCH_SIZE)) {
+            const dedupedMappings = Array.from(
+              mappingRows.reduce((acc: Map<string, any>, m: any) => {
+                const key = `${m.advisory_id}:${m.cve_id}`;
+                if (!acc.has(key)) {
+                  acc.set(key, m);
+                } else {
+                  const existing = acc.get(key);
+                  const mergedProducts = Array.from(
+                    new Set([...(existing.affected_products || []), ...(m.affected_products || [])])
+                  );
+                  const mergedVersions = Array.from(
+                    new Set([...(existing.fixed_versions || []), ...(m.fixed_versions || [])])
+                  );
+                  acc.set(key, {
+                    ...existing,
+                    affected_products: mergedProducts,
+                    fixed_versions: mergedVersions,
+                  });
+                }
+                return acc;
+              }, new Map<string, any>()).values()
+            );
+
+            for (const batch of chunk(dedupedMappings, DB_BATCH_SIZE)) {
               const { error: mapError } = await supabaseClient
                 .from('advisory_cve_map')
                 .upsert(batch, { onConflict: 'advisory_id, cve_id' });

@@ -121,6 +121,20 @@ describe('NutanixAdapter — parsing and normalization', () => {
     expect(adv.cves[0].severity).toBe('CRITICAL');
   });
 
+  it('deduplicates identical CVE IDs within an advisory payload', () => {
+    const payload = {
+      ...nutanixFixture,
+      cvelist: [
+        { cve_id: 'CVE-2026-11111', cvss: 7.5 },
+        { cve_id: 'CVE-2026-11111', cvss: 7.5 },
+        'CVE-2026-11111',
+      ],
+    };
+    const [adv] = adapter.parse([payload]);
+    expect(adv.cves).toHaveLength(1);
+    expect(adv.cves[0].cveId).toBe('CVE-2026-11111');
+  });
+
   it('correctly parses affected_version array and sets justification in productImpacts', () => {
     const payload = {
       advisory_id: 'NXSA-AOS-7.5.1.12',
