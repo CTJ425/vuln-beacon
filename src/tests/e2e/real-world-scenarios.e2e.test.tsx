@@ -7,6 +7,7 @@ import { SyncService } from '@/services/syncService';
 import { WebhookConfigService } from '@/services/webhookConfigService';
 import { AdvisoryService } from '@/services/advisoryService';
 import { VendorService } from '@/services/vendorService';
+import { APP_VERSION } from '@/config/version';
 
 describe('E2E: Cross-Feature Interactions & Real-World Scenarios (Tiers 3 & 4)', () => {
   const mockAdminUser = { id: 'admin-e2e-super', email: 'secops-admin@vulnbeacon.com' };
@@ -225,7 +226,7 @@ describe('E2E: Cross-Feature Interactions & Real-World Scenarios (Tiers 3 & 4)',
       await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
       // Public checks: version in sidebar, GitHub link in header
-      expect(screen.getByText(/1\.0\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(APP_VERSION, 'i'))).toBeInTheDocument();
       expect(document.querySelector('a[href*="github.com/CTJ425/vuln-beacon"]')).toBeInTheDocument();
 
       // Authenticate
@@ -390,7 +391,7 @@ describe('E2E: Cross-Feature Interactions & Real-World Scenarios (Tiers 3 & 4)',
       expect(githubLink).toBeInTheDocument();
 
       // 3. Checks application version in bottom-left Sidebar
-      expect(screen.getByText(/1\.0\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(APP_VERSION, 'i'))).toBeInTheDocument();
 
       // 4. Confirms absence of Sync Monitor / Webhooks / Public Sync button
       expect(screen.queryByRole('button', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();

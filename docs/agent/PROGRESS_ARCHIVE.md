@@ -1,3 +1,36 @@
+## 2026-09-11 15:10:00 Asia/Taipei - Codebase Review, Defensive Null Safety & UI/UX Enhancements (1.1.0)
+- **Codebase Review, Bug Remediations & Defensive Hardening**:
+  - **Canonical Advisory URL Resolution Utility (`src/utils/advisoryUrl.ts`)**:
+    - Created unified utility resolving vendor errata / notice URLs across Red Hat, Nutanix, Ubuntu, Debian, and SUSE.
+    - Synthesizes exact SUSE announcement URLs (`https://www.suse.com/support/update/announcement/${year}/suse-su-${year}${num}-${rev}/`) from advisory IDs instead of falling back to the generic announcement index.
+    - Added comprehensive unit test suite in `src/tests/unit/utils/advisoryUrl.test.ts` (6 tests).
+  - **Defensive Null-Safety in Explorer & Impact Matrix Tables (`CveDetailDrawer`, `AdvisoryDetailDrawer`, `ExplorerPage`, `CveTable`, `AdvisoryTable`)**:
+    - Guarded against null / undefined states on `imp.state`, `imp.component`, and `imp.product_name` in search, filter matching, and badge renderers.
+    - Wrapped `item.cves` and `item.product_impacts` in safe array defaults across table and drawer components.
+    - Added fallback official advisory URLs so "官方公告頁面" action buttons resolve accurately even when database records lack explicit `url` fields.
+    - Transformed static errata text in `AdvisoryDetailDrawer` into direct clickable vendor links with consistent `Advisory: ${imp.errata}` labeling.
+  - **Vendor Scope Normalization (`src/pages/VendorPage.tsx` & `src/components/sync/FeedSourceTable.tsx`)**:
+    - Made vendor code comparison case-insensitive across `VendorPage` advisories and CVE matching.
+    - Normalized log matching in `newestLogFor` to case-insensitive comparison.
+  - **SUSE Ingestion Adapter Announcement URL Synthesis (`src/adapters/suse.ts` & Edge Bundle)**:
+    - Added regex-based announcement URL resolver in `SuseAdapter.parse` when `selfRef.url` points to generic index.
+    - Recompiled Edge Function bundle `ingest.bundle.js` via `npm run build:edge`.
+- **UI/UX Polish & Performance Optimization**:
+  - **Explorer Search Filter Bar (`src/components/explorer/CveFilterBar.tsx`)**:
+    - Added clear ("X") icon button in `endAdornment` when search term is non-empty for instantaneous search reset.
+  - **Header Accessibility & Tooltips (`src/components/common/Header.tsx`)**:
+    - Wrapped theme toggle button and GitHub repository link with descriptive MUI Tooltips and aria labels.
+  - **Feed Source Visual Consistency (`src/components/sync/FeedSourceTable.tsx`)**:
+    - Integrated authentic `VendorIcon` alongside vendor names in the Sync Monitor feed table.
+  - **System Health Monitor Latency Optimization (`src/components/admin/SystemHealthMonitor.tsx`)**:
+    - Parallelized 6 external threat feed health probes using `Promise.all` instead of sequential loop, dropping health check latency from ~10s to ~1s.
+- **Deep Verification**:
+  - Unit tests: 70/70 files passed (467/467 tests).
+  - Smoke tests: 3/3 files passed (16/16 tests).
+  - E2E tests: 13/13 files passed (114/114 tests).
+  - Total test pyramid: 86/86 test files passed (597/597 tests).
+  - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
+
 ## 2026-09-11 12:35:00 Asia/Taipei - Harden Ubuntu, Debian & SUSE Threat Feed Ingestion & Type Safety (1.0.0)
 - **Defects Discovered & Remediated from Prior Attempt**:
   - **Debian On-Demand Query Breakdown (`syncService.ts`)**:

@@ -308,7 +308,7 @@
   - **Verification**: Live manual sync against production project succeeded HTTP 200 with 903 CVEs, 70 advisories, and SUCCESS logs.
   - **Completed**: 2026-09-11 09:25:00 Asia/Taipei.
 
-- [x] **Task 26: Ubuntu, Debian & SUSE Threat Feed Ingestion & UI Integration (1.0.0)**
+- [x] **Task 26: Ubuntu, Debian & SUSE Threat Feed Ingestion & UI Integration (1.1.0)**
   - [x] Implement `UbuntuAdapter` (`src/adapters/ubuntu.ts`) adhering to `VendorAdapter` interface with USN notice and CVE parsing.
   - [x] Implement `DebianAdapter` (`src/adapters/debian.ts`) with multi-format support for DSA text lists and Security Tracker JSON.
   - [x] Implement `SuseAdapter` (`src/adapters/suse.ts`) with CSAF 2.0 parser, `changes.csv` index fetcher, and remediations extraction.
@@ -320,7 +320,7 @@
   - [x] Add live external feed health checks in `SystemHealthMonitor.tsx`.
   - [x] Adversary review & hardening: resolved Debian DSA query CVE extraction, SUSE changes.csv chronological ordering, hyphenated advisory ID normalization, Ubuntu regression notice regex fallback, and fixed 2 TypeScript compilation errors.
   - **Verification**: 85/85 test files (591 tests) passing 100%; live smoke test against Nutanix, Ubuntu, Debian, SUSE public APIs passing; clean edge bundle + tsc + vite build (`npm --prefix src run verify`).
-- [x] **Task 27: Codebase Review, Defensive Null Safety & UI/UX Enhancements (1.0.0)**
+- [x] **Task 27: Codebase Review, Defensive Null Safety & UI/UX Enhancements (1.1.0)**
   - [x] Implement canonical advisory URL resolution utility (`src/utils/advisoryUrl.ts`) supporting Red Hat, Nutanix, Ubuntu, Debian, and SUSE announcements.
   - [x] Add unit tests for advisory URL resolution (`src/tests/unit/utils/advisoryUrl.test.ts`, 6 tests).
   - [x] Add defensive null guards for impact state, component, and product names across `CveDetailDrawer.tsx`, `AdvisoryDetailDrawer.tsx`, `ExplorerPage.tsx`, `CveTable.tsx`, and `AdvisoryTable.tsx`.
@@ -333,7 +333,7 @@
   - [x] Parallelize external threat feed health probes using `Promise.all` in `SystemHealthMonitor.tsx`.
   - **Verification**: 86/86 test files (597 tests) passing 100%; clean production build via `npm --prefix src run verify`.
   - **Completed**: 2026-09-11 15:10:00 Asia/Taipei.
-- [x] **Task 28: Codebase Adversary Audit, State Collision Fix & Multi-Vendor UX Hardening (1.0.0)**
+- [x] **Task 28: Codebase Adversary Audit, State Collision Fix & Multi-Vendor UX Hardening (1.1.0)**
   - [x] Fix critical Component State filter substring collision in `ExplorerPage.tsx` where filtering by `AFFECTED` matched `Not affected` components.
   - [x] Implement centralized state classification helpers (`matchesImpactState`, `isAffectedState`) in `src/utils/statusUtils.ts` backed by unit tests (`src/tests/unit/utils/statusUtils.test.ts`, 6 tests).
   - [x] Create unified `StateBadge` component (`src/components/common/StateBadge.tsx`) replacing duplicated drawer badge renderers with support for `Will not fix`, `Under investigation`, `Resolved`, `Released`, `Open`, and `Needed`.
@@ -347,6 +347,14 @@
   - [x] Recompile Edge Function bundle `ingest.bundle.js` with SUSE RU pattern support.
   - **Verification**: 89/89 test files (614/614 tests) passing 100%; clean production build via `npm --prefix src run verify`.
   - **Completed**: 2026-09-11 15:35:00 Asia/Taipei.
+- [x] **Task 29: Version 1.1.0 Release Finalization & Documentation Sync (1.1.0)**
+  - [x] Restored and tailored `.claude/skills/versioning/SKILL.md` aligned with `.claude/version.config.json` and project structure.
+  - [x] Synchronized application version to `1.1.0` in `src/package.json`, `src/package-lock.json`, and `src/config/version.ts`.
+  - [x] Updated `README.md` to reflect multi-vendor threat feed capabilities and architecture.
+  - [x] Documented complete 1.1.0 release notes in `docs/agent/CHANGELOG.md`.
+  - [x] Tagged official releases in git (`1.0.0` on release commit and `1.1.0` on HEAD).
+  - **Verification**: `npm --prefix src run verify` passing 100% (89 test files, 614 tests, production build clean).
+  - **Completed**: 2026-09-11 16:15:00 Asia/Taipei.
 
 
 

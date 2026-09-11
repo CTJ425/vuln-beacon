@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.1.0 - 2026-09-11
+### Added
+- **Ubuntu Threat Feed Ingestion (Task 26)**: Implemented `UbuntuAdapter` (`src/adapters/ubuntu.ts`) parsing Ubuntu Security Notices (USN), affected packages, CVE associations, CVSS metrics, and canonical announcement links.
+- **Debian Security Tracker Ingestion (Task 26)**: Implemented `DebianAdapter` (`src/adapters/debian.ts`) with multi-format parsing for DSA advisory lists and Debian Security Tracker JSON feeds.
+- **SUSE CSAF 2.0 Ingestion (Task 26)**: Implemented `SuseAdapter` (`src/adapters/suse.ts`) parsing CSAF 2.0 documents, reverse chronological index resolution from `changes.csv`, and exact announcement URL synthesis for `suse-su-` and `suse-ru-` (Recommended Updates).
+- **Multi-Vendor Identity Logos**: Added vector SVG components in `VendorLogos.tsx` and `VendorIcon.tsx` for Ubuntu, Debian, and SUSE.
+- **Unified State Badge Component (Task 28)**: Created `StateBadge.tsx` and centralized state classification utilities in `src/utils/statusUtils.ts` (`matchesImpactState`, `isAffectedState`), standardizing 10+ multi-vendor component vulnerability statuses (`Affected`, `Not affected`, `Fixed`, `Fix deferred`, `Will not fix`, `Under investigation`, `Resolved`, `Released`, `Open`, `Needed`).
+- **Canonical Advisory URL Resolution (`src/utils/advisoryUrl.ts`)**: Built unified advisory URL generator with native CVE lookup across Red Hat, Ubuntu, Debian, SUSE, Nutanix, and CVE.org fallback.
+- **Interactive CVE Links in Drawers**: Converted static CVE chips in `AdvisoryDetailDrawer.tsx` to clickable external links routing directly to vendor and NVD/CVE.org security databases.
+- **Database Migration**: Added `20260911000000_add_ubuntu_debian_suse_vendors.sql` seeding `ubuntu`, `debian`, and `suse` vendor records, configurations, and adapter targets.
+- **Versioning Skill**: Restored `.claude/skills/versioning/SKILL.md` aligned with VulnBeacon's semver guidelines, release checklists, and branch synchronization rules.
+
+### Changed
+- **Explorer Search & Filter Performance**: Added instantaneous search reset button in `CveFilterBar.tsx`, case-insensitive vendor scoping, and defensive null-safety guards across all product impact matrices.
+- **Health Check Probe Optimization**: Parallelized external threat feed health probes using `Promise.all` in `SystemHealthMonitor.tsx`, reducing health check latency from ~10s to ~1s.
+- **Accessibility Compliance (A11y)**: Added `labelId` and `id` bindings to filter selects in `CveFilterBar.tsx` and descriptive `aria-label` attributes to table actions in `CveTable.tsx` and `AdvisoryTable.tsx`.
+
+### Fixed
+- **Explorer Component State Filter Collision (Task 28)**: Resolved critical substring collision where `'notaffected'.includes('affected')` caused `AFFECTED` and `NOT_AFFECTED` filters to overlap.
+- **Batch Deduplication & Conflict Handling in Edge Ingestion (BUG-021)**: Resolved PostgreSQL unique constraint collisions in `sync-cve` and `scheduled-sync` by deduplicating batch upserts (`uniqueCves`, `uniqueAdvisories`, `dedupedMappings`).
+- **Transport Error Classification & Client Fallback**: Restricted client-side ingestion fallback exclusively to network transport failures, preventing operational conflicts from masking edge runtime status.
+- **Timer & Memory Leaks**: Fixed unmount timers in `AdvisoryDetailDrawer.tsx` (`copyTimerRef`) and guaranteed probe timeout cancellation in `SystemHealthMonitor.tsx` via `finally` block.
+- **Advisory URL Double-Wrapping**: Fixed redundant URL encoding when advisory identifiers are already full canonical URLs.
+
 ## 1.0.0 - 2026-09-09
 ### Added
 - **Server-Side Manual Threat Feed Sync (Task 11c)**: Moved manual sync trigger from client browser to Edge Function endpoint (`action: 'trigger_manual_sync'` in `sync-cve`), supporting tailnet-restricted environments with PostgreSQL advisory locking (`try_acquire_sync_lock`) and admin role verification.

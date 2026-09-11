@@ -6,6 +6,7 @@ import { SyncService } from '@/services/syncService';
 import { WebhookConfigService } from '@/services/webhookConfigService';
 import { AdvisoryService } from '@/services/advisoryService';
 import { VendorService } from '@/services/vendorService';
+import { APP_VERSION } from '@/config/version';
 
 describe('E2E: Header & Sidebar UI Enhancements (R4 / F5, F6)', () => {
   beforeEach(() => {
@@ -152,7 +153,8 @@ describe('E2E: Header & Sidebar UI Enhancements (R4 / F5, F6)', () => {
       await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
       // R4 specifies displaying application version in bottom-left of sidebar
-      const versionText = screen.getByText(/v?1\.0\.0(-dev\.\d+)?/i);
+      const versionPattern = new RegExp(`v?${APP_VERSION.replace(/\./g, '\\.')}(-dev\\.\\d+)?`, 'i');
+      const versionText = screen.getByText(versionPattern);
       expect(versionText).toBeInTheDocument();
     });
 
@@ -160,15 +162,16 @@ describe('E2E: Header & Sidebar UI Enhancements (R4 / F5, F6)', () => {
       render(<App />);
       await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
-      const versionElement = screen.getByText(/1\.0\.0/i);
-      expect(versionElement.textContent).toMatch(/v?1\.0\.0(-dev\.\d+)?/i);
+      const versionElement = screen.getByText(new RegExp(APP_VERSION, 'i'));
+      const versionPattern = new RegExp(`v?${APP_VERSION.replace(/\./g, '\\.')}(-dev\\.\\d+)?`, 'i');
+      expect(versionElement.textContent).toMatch(versionPattern);
     });
 
     it('Tier 1: sidebar layout positions version at the bottom of the sidebar area', async () => {
       render(<App />);
       await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
-      const versionElement = screen.getByText(/1\.0\.0/i);
+      const versionElement = screen.getByText(new RegExp(APP_VERSION, 'i'));
       // The version element is contained inside the sidebar structure
       const sidebarContainer = versionElement.closest('[class*="MuiBox-root"]') || versionElement.parentElement;
       expect(sidebarContainer).toBeInTheDocument();
@@ -192,14 +195,14 @@ describe('E2E: Header & Sidebar UI Enhancements (R4 / F5, F6)', () => {
       expect(await screen.findByRole('heading', { level: 4, name: /Explorer/i }, { timeout: 4000 })).toBeInTheDocument();
 
       // Version remains visible
-      expect(screen.getByText(/1\.0\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(APP_VERSION, 'i'))).toBeInTheDocument();
     });
 
     it('Tier 2 (Boundary): version display uses secondary/muted typography', async () => {
       render(<App />);
       await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
-      const versionElement = screen.getByText(/1\.0\.0/i);
+      const versionElement = screen.getByText(new RegExp(APP_VERSION, 'i'));
       // Verify it is not styled as a primary action
       expect(versionElement.tagName.toLowerCase()).not.toBe('button');
     });
@@ -215,14 +218,14 @@ describe('E2E: Header & Sidebar UI Enhancements (R4 / F5, F6)', () => {
         fireEvent.click(themeToggle);
       }
 
-      expect(screen.getByText(/1\.0\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(APP_VERSION, 'i'))).toBeInTheDocument();
     });
 
     it('Tier 2 (Boundary): version element is rendered as informative static text', async () => {
       render(<App />);
       await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
-      const versionElement = screen.getByText(/1\.0\.0/i);
+      const versionElement = screen.getByText(new RegExp(APP_VERSION, 'i'));
       // Should not have role="button" or interactive navigation action
       expect(versionElement.getAttribute('role')).not.toBe('button');
     });
@@ -234,19 +237,19 @@ describe('E2E: Header & Sidebar UI Enhancements (R4 / F5, F6)', () => {
       // Navigate to CVE Explorer
       fireEvent.click(screen.getByText('CVE Explorer'));
       expect(await screen.findByRole('heading', { level: 4, name: /Explorer/i }, { timeout: 4000 })).toBeInTheDocument();
-      expect(screen.getByText(/1\.0\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(APP_VERSION, 'i'))).toBeInTheDocument();
 
       // Navigate back to Overview
       fireEvent.click(screen.getByText('Overview'));
       expect(await screen.findByText(/Security Intelligence Overview/i)).toBeInTheDocument();
-      expect(screen.getByText(/1\.0\.0/i)).toBeInTheDocument();
+      expect(screen.getByText(new RegExp(APP_VERSION, 'i'))).toBeInTheDocument();
     });
 
     it('Tier 2 (Boundary): sidebar container maintains correct width and flex layout with version container', async () => {
       render(<App />);
       await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
-      const versionElement = screen.getByText(/1\.0\.0/i);
+      const versionElement = screen.getByText(new RegExp(APP_VERSION, 'i'));
       expect(versionElement).toBeVisible();
     });
   });

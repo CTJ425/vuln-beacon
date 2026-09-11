@@ -1,15 +1,16 @@
 # VulnBeacon
 
-CVE (Common Vulnerabilities & Exposures) collection, tracking, and dashboard tool focused on Red Hat Security Advisories (RHSA/RHBA/RHEA). VulnBeacon ingests CSAF (Common Security Advisory Framework) data, stores normalized advisories in Supabase, and exposes a filterable web explorer plus webhook alert integrations.
+Enterprise CVE (Common Vulnerabilities & Exposures) collection, tracking, and triage dashboard tool supporting multi-vendor security advisories across **Red Hat (CSAF)**, **Nutanix**, **Ubuntu (USN)**, **Debian (DSA & Security Tracker)**, and **SUSE (CSAF 2.0)**. VulnBeacon ingests standardized security data, stores normalized advisories in Supabase, and exposes a filterable web explorer plus multi-channel webhook alert integrations.
 
 ## Features
 
-- Sync Red Hat Security Advisories (RHSA/RHBA/RHEA) via a Supabase Edge Function
-- Store full CSAF advisory documents in Supabase Storage, with metadata in Postgres
-- Explore, filter, and inspect CVEs and advisories through a React dashboard
-- Vendor/product taxonomy navigation
-- Webhook-based alert notifications
-- Sync monitor page for tracking ingestion runs
+- Multi-vendor threat feed ingestion (Red Hat, Nutanix, Ubuntu, Debian, SUSE) via Supabase Edge Functions
+- Store full advisory documents in Supabase Storage with normalized relational metadata in PostgreSQL
+- Explore, filter, and inspect CVEs and advisories through an accessible React dashboard with product impact matrix
+- Vendor/product taxonomy navigation with authentic vendor brand logos
+- Multi-channel webhook alerts (Discord, Slack, Telegram) with severity threshold filtering
+- Unified vulnerability state classification across diverse vendor terminologies
+- Sync monitor and backstage administrative controls for authenticated operations
 
 ## Tech Stack
 
