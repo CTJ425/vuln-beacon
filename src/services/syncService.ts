@@ -270,7 +270,7 @@ export class SyncService {
             errorMsg.includes('fetch failed') ||
             errorMsg.includes('NetworkError');
 
-          if (isTransportError || mode === 'auto') {
+          if (isTransportError) {
             console.warn('Server-side manual sync unsupported or unreachable; falling back to client execution:', errorMsg);
           } else {
             return {
@@ -297,7 +297,7 @@ export class SyncService {
           errorMsg.includes('fetch failed') ||
           errorMsg.includes('NetworkError');
 
-        if (!isTransportError && mode === 'server') {
+        if (!isTransportError) {
           return {
             success: false,
             newLogs: [],

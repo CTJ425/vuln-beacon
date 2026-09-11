@@ -16,10 +16,10 @@
   1. Applied all 8 database migrations to production via `supabase db push --include-all`. Configured Supabase Vault secrets (`scheduled_sync_url`, `scheduled_sync_key`).
   2. Deployed both `sync-cve` and `scheduled-sync` Edge Functions to production and dev Supabase projects.
   3. Deduplicated CVE entries per advisory in `nutanix.ts`, deduplicated mappings and CVEs in `ingestion.ts`, and deduplicated batch upsert entities (`uniqueCves`, `uniqueAdvisories`, `dedupedMappings`) in both `sync-cve/index.ts` and `scheduled-sync/index.ts`.
-  4. Updated `App.tsx` to pass `mode: 'auto'`, which prioritizes server-side sync when authenticated while ensuring graceful fallback to client ingestion if the Edge Function network request fails. Enhanced `syncService.ts` to handle transport errors cleanly in both `auto` and `server` paths.
+  4. Updated `App.tsx` to pass `mode: 'auto'`, which prioritizes server-side sync when authenticated while ensuring graceful fallback to client ingestion if the Edge Function network request fails. Refined `syncService.ts` to strictly gate fallback on `isTransportError` (network / 404 / FunctionsFetchError), guaranteeing that operational conflicts (such as HTTP 409 sync lock conflicts or HTTP 401 errors) surface failure directly instead of triggering unintended client ingestion.
   5. Provisioned `/usr/local/bin/supabase-vuln` and `/usr/local/bin/supabase-stock` executable scripts in `$PATH`.
   6. Added regression unit tests in `nutanix.test.ts`, `ingestionNewCveCount.test.ts`, and `syncServiceServerMode.test.ts`.
-- **Status**: ✅ FIXED (2026-09-11 09:35:00 CST)
+- **Status**: ✅ FIXED (2026-09-11 09:48:00 CST)
 
 ---
 

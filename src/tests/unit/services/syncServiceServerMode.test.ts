@@ -158,6 +158,48 @@ describe('SyncService — Server-Side Manual Sync Trigger (Task 11c, TDD)', () =
     expect(result.errors).toContain('A threat feed synchronization is already in progress');
   });
 
+  it('surfaces 409 lock conflict error in auto mode without falling back to client', async () => {
+    mockInvoke.mockResolvedValue({
+      data: null,
+      error: {
+        message: 'A threat feed synchronization is already in progress',
+        context: {
+          json: async () => ({
+            success: false,
+            error: 'A threat feed synchronization is already in progress',
+          }),
+        },
+      },
+    });
+
+    const service = new SyncService();
+    const result = await service.syncVendors(undefined, { mode: 'auto' });
+
+    expect(result.success).toBe(false);
+    expect(result.errors).toContain('A threat feed synchronization is already in progress');
+    // Ensure persist_ingestion was NOT invoked (no client-side fallback)
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+    expect(mockInvoke).toHaveBeenCalledWith(
+      'sync-cve',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          action: 'trigger_manual_sync',
+        }),
+      })
+    );
+  });
+
+  it('surfaces operational error thrown as exception in auto mode without falling back to client', async () => {
+    mockInvoke.mockRejectedValue(new Error('Unauthorized: Admin privileges required'));
+
+    const service = new SyncService();
+    const result = await service.syncVendors(undefined, { mode: 'auto' });
+
+    expect(result.success).toBe(false);
+    expect(result.errors).toContain('Unauthorized: Admin privileges required');
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to client-side ingestion when mode is explicitly set to client', async () => {
     mockInvoke.mockResolvedValue({
       data: { log: { id: 'client-log-1', status: 'SUCCESS' } },
