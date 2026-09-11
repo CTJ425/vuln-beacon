@@ -96,7 +96,7 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
 
             const totalImpacts = item.product_impacts ? item.product_impacts.length : 0;
             const affectedCount = item.product_impacts
-              ? item.product_impacts.filter((p) => p.state.toLowerCase() === 'affected').length
+              ? item.product_impacts.filter((p) => (p.state || '').toLowerCase() === 'affected').length
               : 0;
 
             return (

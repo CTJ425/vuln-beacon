@@ -317,41 +317,45 @@ export const SystemHealthMonitor: React.FC = () => {
       },
     ];
 
-    for (const feed of externalFeeds) {
-      const feedStart = performance.now();
-      try {
-        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-        const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
-        const res = await fetch(feed.endpoint, {
-          method: 'HEAD',
-          mode: 'no-cors',
-          signal: controller?.signal,
-        });
-        if (timeoutId) clearTimeout(timeoutId);
-        const latency = Math.round(performance.now() - feedStart);
-        updatedServices.push({
-          id: feed.id,
-          name: feed.name,
-          category: 'external',
-          description: feed.description,
-          endpoint: feed.endpoint,
-          status: 'operational',
-          latencyMs: latency,
-          message: res.status ? `HTTP ${res.status} OK` : '端點連線正常 (Active)',
-        });
-      } catch (err: any) {
-        updatedServices.push({
-          id: feed.id,
-          name: feed.name,
-          category: 'external',
-          description: feed.description,
-          endpoint: feed.endpoint,
-          status: 'degraded',
-          latencyMs: Math.round(performance.now() - feedStart),
-          message: err?.name === 'AbortError' ? '連線逾時 (Timeout)' : err?.message || '連線逾時或被遠端拒絕',
-        });
-      }
-    }
+    // 5. External Feeds Check (run concurrently via Promise.all for fast diagnostics)
+    const externalResults = await Promise.all(
+      externalFeeds.map(async (feed): Promise<ServiceCheck> => {
+        const feedStart = performance.now();
+        try {
+          const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
+          const res = await fetch(feed.endpoint, {
+            method: 'HEAD',
+            mode: 'no-cors',
+            signal: controller?.signal,
+          });
+          if (timeoutId) clearTimeout(timeoutId);
+          const latency = Math.round(performance.now() - feedStart);
+          return {
+            id: feed.id,
+            name: feed.name,
+            category: 'external',
+            description: feed.description,
+            endpoint: feed.endpoint,
+            status: 'operational',
+            latencyMs: latency,
+            message: res.status ? `HTTP ${res.status} OK` : '端點連線正常 (Active)',
+          };
+        } catch (err: any) {
+          return {
+            id: feed.id,
+            name: feed.name,
+            category: 'external',
+            description: feed.description,
+            endpoint: feed.endpoint,
+            status: 'degraded',
+            latencyMs: Math.round(performance.now() - feedStart),
+            message: err?.name === 'AbortError' ? '連線逾時 (Timeout)' : err?.message || '連線逾時或被遠端拒絕',
+          };
+        }
+      })
+    );
+    updatedServices.push(...externalResults);
 
     setServices(updatedServices);
     setLastCheckedAt(new Date().toISOString());

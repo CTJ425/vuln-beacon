@@ -57,7 +57,7 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
       if (selectedStatus !== 'ALL') {
         const impacts = item.product_impacts || [];
         const hasMatchingState = impacts.some((imp) => {
-          const s = imp.state.toLowerCase().replace(/[\s_-]/g, '');
+          const s = (imp.state || '').toLowerCase().replace(/[\s_-]/g, '');
           const target = selectedStatus.toLowerCase().replace(/[\s_-]/g, '');
           return s.includes(target) || target.includes(s);
         });
@@ -77,8 +77,8 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
         const matchProd = item.affected_products.some((p) => p.toLowerCase().includes(term));
         const matchImpact = (item.product_impacts || []).some(
           (imp) =>
-            imp.component.toLowerCase().includes(term) ||
-            imp.product_name.toLowerCase().includes(term) ||
+            (imp.component || '').toLowerCase().includes(term) ||
+            (imp.product_name || '').toLowerCase().includes(term) ||
             (imp.errata && imp.errata.toLowerCase().includes(term))
         );
 
@@ -109,7 +109,7 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
       if (selectedStatus !== 'ALL') {
         const impacts = item.product_impacts || [];
         const hasMatchingState = impacts.some((imp) => {
-          const s = imp.state.toLowerCase().replace(/[\s_-]/g, '');
+          const s = (imp.state || '').toLowerCase().replace(/[\s_-]/g, '');
           const target = selectedStatus.toLowerCase().replace(/[\s_-]/g, '');
           return s.includes(target) || target.includes(s);
         });
@@ -132,8 +132,8 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
         const matchProd = item.affected_products.some((p) => p.toLowerCase().includes(term));
         const matchImpact = (item.product_impacts || []).some(
           (imp) =>
-            imp.component.toLowerCase().includes(term) ||
-            imp.product_name.toLowerCase().includes(term) ||
+            (imp.component || '').toLowerCase().includes(term) ||
+            (imp.product_name || '').toLowerCase().includes(term) ||
             (imp.errata && imp.errata.toLowerCase().includes(term))
         );
 

@@ -38,6 +38,7 @@ import { CveTableRowItem } from './CveTable';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
+import { getAdvisoryUrl } from '@/utils/advisoryUrl';
 
 interface CveDetailDrawerProps {
   open: boolean;
@@ -89,21 +90,21 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
   // Group into Affected vs Not Affected vs Fix Deferred
   const affectedList = useMemo(() => {
     return impacts.filter((imp) => {
-      const s = imp.state.toLowerCase();
+      const s = (imp.state || '').toLowerCase();
       return s === 'affected' || s === 'will not fix';
     });
   }, [impacts]);
 
   const notAffectedList = useMemo(() => {
     return impacts.filter((imp) => {
-      const s = imp.state.toLowerCase();
+      const s = (imp.state || '').toLowerCase();
       return s.includes('not affected') || s === 'fixed' || s === 'not_affected';
     });
   }, [impacts]);
 
   const deferredList = useMemo(() => {
     return impacts.filter((imp) => {
-      const s = imp.state.toLowerCase();
+      const s = (imp.state || '').toLowerCase();
       return s === 'fix deferred' || s === 'under investigation';
     });
   }, [impacts]);
@@ -122,8 +123,8 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
       const term = searchTerm.toLowerCase();
       list = list.filter(
         (imp) =>
-          imp.product_name.toLowerCase().includes(term) ||
-          imp.component.toLowerCase().includes(term) ||
+          (imp.product_name || '').toLowerCase().includes(term) ||
+          (imp.component || '').toLowerCase().includes(term) ||
           (imp.errata && imp.errata.toLowerCase().includes(term))
       );
     }
@@ -155,7 +156,7 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
   if (!item) return null;
 
   const getStateBadge = (state: string) => {
-    const s = state.toLowerCase();
+    const s = (state || '').toLowerCase();
     if (s === 'affected') {
       return (
         <Chip
@@ -363,23 +364,7 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                   label={adv}
                   size="small"
                   component="a"
-                  href={
-                    adv.startsWith('NXSA-') || item.vendor_code === 'nutanix'
-                      ? `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(adv)}`
-                      : adv.startsWith('USN-') || adv.startsWith('LSN-') || item.vendor_code === 'ubuntu'
-                      ? `https://ubuntu.com/security/notices/${encodeURIComponent(adv)}`
-                      : adv.startsWith('DSA-') || adv.startsWith('DLA-') || item.vendor_code === 'debian'
-                      ? `https://security-tracker.debian.org/tracker/${encodeURIComponent(adv)}`
-                      : adv.startsWith('SUSE-SU-') || adv.startsWith('OPENSUSE-SU-') || item.vendor_code === 'suse'
-                      ? (() => {
-                          const m = adv.trim().match(/^(suse|opensuse)-su-(\d{4})[:\-_](\d+)-(\d+)$/i);
-                          if (m && m[1].toLowerCase() === 'suse') {
-                            return `https://www.suse.com/support/update/announcement/${m[2]}/suse-su-${m[2]}${m[3]}-${m[4]}/`;
-                          }
-                          return 'https://www.suse.com/support/update/announcement/';
-                        })()
-                      : `https://access.redhat.com/errata/${adv}`
-                  }
+                  href={getAdvisoryUrl(adv, item.vendor_code)}
                   target="_blank"
                   clickable
                   sx={{ fontFamily: 'JetBrains Mono', fontWeight: 600, fontSize: '0.75rem' }}
@@ -517,17 +502,7 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                     <TableCell sx={{ fontFamily: 'JetBrains Mono', fontSize: '0.775rem' }}>
                       {imp.errata && imp.errata !== '-' ? (
                         <Link
-                          href={
-                            imp.errata.startsWith('NXSA-') || item.vendor_code === 'nutanix'
-                              ? `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(imp.errata)}`
-                              : imp.errata.startsWith('USN-') || imp.errata.startsWith('LSN-') || item.vendor_code === 'ubuntu'
-                              ? `https://ubuntu.com/security/notices/${encodeURIComponent(imp.errata)}`
-                              : imp.errata.startsWith('DSA-') || imp.errata.startsWith('DLA-') || item.vendor_code === 'debian'
-                              ? `https://security-tracker.debian.org/tracker/${encodeURIComponent(imp.errata)}`
-                              : imp.errata.startsWith('SUSE-SU-') || imp.errata.startsWith('OPENSUSE-SU-') || item.vendor_code === 'suse'
-                              ? `https://www.suse.com/support/update/announcement/`
-                              : `https://access.redhat.com/errata/${imp.errata}`
-                          }
+                          href={getAdvisoryUrl(imp.errata, item.vendor_code)}
                           target="_blank"
                           rel="noopener noreferrer"
                           sx={{ color: 'primary.main', fontWeight: 600 }}

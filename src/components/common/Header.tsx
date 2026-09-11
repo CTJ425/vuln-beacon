@@ -81,9 +81,31 @@ export const Header: React.FC<HeaderProps> = ({
           </Box>
 
           <Box role="group" aria-label="Theme mode switcher">
+            <Tooltip title={isDark ? '切換為淺色模式' : '切換為深色模式'}>
+              <IconButton
+                onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
+                aria-label={isDark ? '切換為淺色模式' : '切換為深色模式'}
+                size="small"
+                sx={{
+                  color: 'text.secondary',
+                  '&:hover': {
+                    color: 'text.primary',
+                  },
+                }}
+              >
+                {isDark ? <Sun size={18} /> : <Moon size={18} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+
+          <Tooltip title="GitHub 原始碼儲存庫">
             <IconButton
-              onClick={() => setThemeMode(isDark ? 'light' : 'dark')}
-              aria-label={isDark ? '切換為淺色模式' : '切換為深色模式'}
+              component="a"
+              href="https://github.com/CTJ425/vuln-beacon"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="GitHub Repository"
+              data-testid="header-github-link"
               size="small"
               sx={{
                 color: 'text.secondary',
@@ -92,27 +114,9 @@ export const Header: React.FC<HeaderProps> = ({
                 },
               }}
             >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
+              <Github size={20} />
             </IconButton>
-          </Box>
-
-          <IconButton
-            component="a"
-            href="https://github.com/CTJ425/vuln-beacon"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="GitHub Repository"
-            data-testid="header-github-link"
-            size="small"
-            sx={{
-              color: 'text.secondary',
-              '&:hover': {
-                color: 'text.primary',
-              },
-            }}
-          >
-            <Github size={20} />
-          </IconButton>
+          </Tooltip>
         </Box>
       </Toolbar>
     </AppBar>

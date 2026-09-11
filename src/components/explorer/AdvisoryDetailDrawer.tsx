@@ -15,6 +15,7 @@ import {
   TableRow,
   Paper,
   Tooltip,
+  Link,
 } from '@mui/material';
 import { X, ExternalLink, Copy, Check, Flame, Layers, Wrench } from 'lucide-react';
 
@@ -22,6 +23,7 @@ import { AdvisoryRowItem } from '@/services/advisoryService';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
+import { getAdvisoryUrl } from '@/utils/advisoryUrl';
 
 interface AdvisoryDetailDrawerProps {
   open: boolean;
@@ -58,7 +60,7 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
   };
 
   const getStateBadge = (state: string) => {
-    const s = state.toLowerCase();
+    const s = (state || '').toLowerCase();
     if (s === 'affected') {
       return (
         <Chip
@@ -133,7 +135,9 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
     );
   };
 
-  const firstComponent = item.product_impacts[0]?.component;
+  const firstComponent = item.product_impacts?.[0]?.component;
+
+  const officialUrl = item.url || getAdvisoryUrl(item.advisory_id, item.vendor_code);
 
   return (
     <Drawer
@@ -168,12 +172,12 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-          {item.url && (
+          {officialUrl && (
             <Button
               size="small"
               variant="outlined"
               component="a"
-              href={item.url}
+              href={officialUrl}
               target="_blank"
               rel="noopener noreferrer"
               endIcon={<ExternalLink size={14} />}
@@ -218,11 +222,11 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
           <Layers size={18} color="#ee0000" /> 修補的 CVE 弱點 (Fixed CVEs)
         </Typography>
         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1.5 }}>
-          共 {item.cves.length} 個 CVE
+          共 {(item.cves || []).length} 個 CVE
         </Typography>
 
         <Stack spacing={1.5}>
-          {item.cves.map((cve, idx) => {
+          {(item.cves || []).map((cve, idx) => {
             const cveId = typeof cve === 'string' ? cve : cve.cve_id;
             const severity = typeof cve === 'string' ? 'UNKNOWN' : cve.severity;
             const score = typeof cve === 'string' ? undefined : cve.cvss_v3_score;
@@ -282,7 +286,7 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {item.product_impacts.map((imp, idx) => (
+              {(item.product_impacts || []).map((imp, idx) => (
                 <TableRow key={idx} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
                   <TableCell sx={{ fontWeight: 600, color: 'text.primary', fontSize: '0.8125rem' }}>
                     {imp.product_name}
@@ -292,7 +296,18 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
                   </TableCell>
                   <TableCell>{getStateBadge(imp.state)}</TableCell>
                   <TableCell sx={{ fontFamily: 'JetBrains Mono', fontSize: '0.775rem' }}>
-                    {imp.errata && imp.errata !== '-' ? `Advisory: ${imp.errata}` : <span style={{ color: '#94a3b8' }}>-</span>}
+                    {imp.errata && imp.errata !== '-' ? (
+                      <Link
+                        href={getAdvisoryUrl(imp.errata, item.vendor_code)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ color: 'primary.main', fontWeight: 600 }}
+                      >
+                        Advisory: {imp.errata}
+                      </Link>
+                    ) : (
+                      <span style={{ color: '#94a3b8' }}>-</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

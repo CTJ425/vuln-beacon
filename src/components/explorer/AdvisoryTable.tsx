@@ -110,9 +110,9 @@ export const AdvisoryTable: React.FC<AdvisoryTableProps> = ({ items, onSelectRow
                   <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 500 }} noWrap>
                     {item.title}
                   </Typography>
-                  {item.product_impacts.length > 0 && (
+                  {(item.product_impacts || []).length > 0 && (
                     <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                      共涉及 {item.product_impacts.length} 個元件
+                      共涉及 {(item.product_impacts || []).length} 個元件
                     </Typography>
                   )}
                 </TableCell>

@@ -28,10 +28,10 @@ export const VendorPage: React.FC<VendorPageProps> = ({
   onRefreshCves,
   isAuthenticated,
 }) => {
-  const vendor = taxonomy.find((v) => v.vendorCode === vendorCode);
+  const vendor = taxonomy.find((v) => v.vendorCode?.toLowerCase() === vendorCode?.toLowerCase());
 
   const scopedAdvisories = useMemo(
-    () => advisories.filter((a) => a.vendor_code === vendorCode),
+    () => advisories.filter((a) => a.vendor_code?.toLowerCase() === vendorCode?.toLowerCase()),
     [advisories, vendorCode]
   );
 
@@ -44,7 +44,7 @@ export const VendorPage: React.FC<VendorPageProps> = ({
     () =>
       cves.filter(
         (c) =>
-          c.vendor_code === vendorCode ||
+          c.vendor_code?.toLowerCase() === vendorCode?.toLowerCase() ||
           scopedAdvisoryIds.has(c.advisory_id) ||
           (c.all_advisories || []).some((id) => scopedAdvisoryIds.has(id))
       ),

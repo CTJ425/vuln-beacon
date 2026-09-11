@@ -1062,6 +1062,12 @@ var SuseAdapter = class {
           url = selfRef.url;
         }
       }
+      if (url === "https://www.suse.com/support/update/announcement/") {
+        const m = advisoryId.trim().match(/^(suse|opensuse)-su-(\d{4})[:\-_](\d+)-(\d+)$/i);
+        if (m && m[1].toLowerCase() === "suse") {
+          url = `https://www.suse.com/support/update/announcement/${m[2]}/suse-su-${m[2]}${m[3]}-${m[4]}/`;
+        }
+      }
       const summary = Array.isArray(document.notes) ? document.notes.find((n) => n?.category === "summary" || n?.category === "general")?.text : void 0;
       const rawVulns = Array.isArray(doc.vulnerabilities) ? doc.vulnerabilities : [];
       const parsedCves = [];

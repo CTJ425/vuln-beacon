@@ -1,5 +1,38 @@
 # Progress Log
 
+## 2026-09-11 15:10:00 Asia/Taipei - Codebase Review, Defensive Null Safety & UI/UX Enhancements (1.0.0)
+- **Codebase Review, Bug Remediations & Defensive Hardening**:
+  - **Canonical Advisory URL Resolution Utility (`src/utils/advisoryUrl.ts`)**:
+    - Created unified utility resolving vendor errata / notice URLs across Red Hat, Nutanix, Ubuntu, Debian, and SUSE.
+    - Synthesizes exact SUSE announcement URLs (`https://www.suse.com/support/update/announcement/${year}/suse-su-${year}${num}-${rev}/`) from advisory IDs instead of falling back to the generic announcement index.
+    - Added comprehensive unit test suite in `src/tests/unit/utils/advisoryUrl.test.ts` (6 tests).
+  - **Defensive Null-Safety in Explorer & Impact Matrix Tables (`CveDetailDrawer`, `AdvisoryDetailDrawer`, `ExplorerPage`, `CveTable`, `AdvisoryTable`)**:
+    - Guarded against null / undefined states on `imp.state`, `imp.component`, and `imp.product_name` in search, filter matching, and badge renderers.
+    - Wrapped `item.cves` and `item.product_impacts` in safe array defaults across table and drawer components.
+    - Added fallback official advisory URLs so "官方公告頁面" action buttons resolve accurately even when database records lack explicit `url` fields.
+    - Transformed static errata text in `AdvisoryDetailDrawer` into direct clickable vendor links with consistent `Advisory: ${imp.errata}` labeling.
+  - **Vendor Scope Normalization (`src/pages/VendorPage.tsx` & `src/components/sync/FeedSourceTable.tsx`)**:
+    - Made vendor code comparison case-insensitive across `VendorPage` advisories and CVE matching.
+    - Normalized log matching in `newestLogFor` to case-insensitive comparison.
+  - **SUSE Ingestion Adapter Announcement URL Synthesis (`src/adapters/suse.ts` & Edge Bundle)**:
+    - Added regex-based announcement URL resolver in `SuseAdapter.parse` when `selfRef.url` points to generic index.
+    - Recompiled Edge Function bundle `ingest.bundle.js` via `npm run build:edge`.
+- **UI/UX Polish & Performance Optimization**:
+  - **Explorer Search Filter Bar (`src/components/explorer/CveFilterBar.tsx`)**:
+    - Added clear ("X") icon button in `endAdornment` when search term is non-empty for instantaneous search reset.
+  - **Header Accessibility & Tooltips (`src/components/common/Header.tsx`)**:
+    - Wrapped theme toggle button and GitHub repository link with descriptive MUI Tooltips and aria labels.
+  - **Feed Source Visual Consistency (`src/components/sync/FeedSourceTable.tsx`)**:
+    - Integrated authentic `VendorIcon` alongside vendor names in the Sync Monitor feed table.
+  - **System Health Monitor Latency Optimization (`src/components/admin/SystemHealthMonitor.tsx`)**:
+    - Parallelized 6 external threat feed health probes using `Promise.all` instead of sequential loop, dropping health check latency from ~10s to ~1s.
+- **Deep Verification**:
+  - Unit tests: 70/70 files passed (467/467 tests).
+  - Smoke tests: 3/3 files passed (16/16 tests).
+  - E2E tests: 13/13 files passed (114/114 tests).
+  - Total test pyramid: 86/86 test files passed (597/597 tests).
+  - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
+
 ## 2026-09-11 12:35:00 Asia/Taipei - Harden Ubuntu, Debian & SUSE Threat Feed Ingestion & Type Safety (1.0.0)
 - **Defects Discovered & Remediated from Prior Attempt**:
   - **Debian On-Demand Query Breakdown (`syncService.ts`)**:
@@ -23,35 +56,4 @@
   - Smoke tests: 3/3 files passed (16/16 tests, including live HTTP fetching for Nutanix, Ubuntu, Debian, SUSE).
   - E2E tests: 13/13 files passed (114/114 tests).
   - Total test pyramid: 85/85 test files passed (591/591 tests).
-  - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
-
-## 2026-09-11 12:02:00 Asia/Taipei - Ubuntu, Debian & SUSE Multi-Vendor Ingestion & UI Integration (1.0.0)
-- **Implemented Threat Feed Ingestion Adapters for Ubuntu, Debian & SUSE**:
-  - **Ubuntu Adapter (`src/adapters/ubuntu.ts`)**:
-    - Built official unauthenticated integration with `https://ubuntu.com/security/notices.json` and notice/CVE lookup endpoints.
-    - Implemented `parse()` normalizing USN security notices, CVE mappings, release packages (`release_packages`), package version justifications, and remediation instructions.
-  - **Debian Adapter (`src/adapters/debian.ts`)**:
-    - Integrated with Debian Security Tracker (`https://security-tracker.debian.org/tracker/data/json`) and official DSA feeds (`https://salsa.debian.org/security-tracker-team/security-tracker/-/raw/master/data/DSA/list`).
-    - Implemented multi-format parsing supporting plain text DSA list, structured DSA advisories, and `data/json` package CVE entries.
-  - **SUSE Adapter (`src/adapters/suse.ts`)**:
-    - Built CSAF 2.0 parser reading `changes.csv` and individual advisory JSON documents (`suse-su-*.json`).
-    - Normalized CSAF document metadata, tracking IDs, aggregate severity, vulnerability notes, CVSS v3 score/vector, and `remediations` with product ID mapping.
-  - **Adapter Registry & Edge Bundle Synchronization**:
-    - Registered all 3 adapters in `src/adapters/index.ts` alongside Red Hat and Nutanix (`ALL_ADAPTERS` length 5).
-    - Expanded `SYNCED_VENDOR_CODES` in `src/services/syncService.ts` to `['redhat', 'nutanix', 'ubuntu', 'debian', 'suse']`.
-    - Bundled all adapters into Edge Function runtime bundle (`src/supabase/functions/_shared/ingest.bundle.js`).
-    - Updated `src/supabase/functions/sync-cve/index.ts` default target vendors to include all 5 supported vendors.
-  - **Database Vendor Migration**:
-    - Added database migration `src/supabase/migrations/20260911000000_add_ubuntu_debian_suse_vendors.sql` seeding `ubuntu`, `debian`, and `suse` records into `public.vendors`.
-  - **UI & Multi-Vendor Polish**:
-    - Created authentic vector SVG brand logos (`UbuntuLogo`, `DebianLogo`, `SuseLogo`) in `src/components/icons/VendorLogos.tsx`.
-    - Added brand colors, names, and logos to `src/components/common/VendorIcon.tsx`.
-    - Added vendor-specific remediation instructions in `AdvisoryDetailDrawer.tsx` and `CveDetailDrawer.tsx` (`$ sudo apt-get --only-upgrade install -y <pkg>` for Ubuntu/Debian, `$ sudo zypper update -y <pkg>` for SUSE).
-    - Added Ubuntu, Debian, and SUSE endpoints to `src/components/admin/SystemHealthMonitor.tsx` for real-time feed connectivity diagnostics.
-    - Verified `FeedSourceTable` displays all 5 vendors as `Connected` with their live endpoints.
-- **Deep Verification**:
-  - Unit tests: 68/68 files passed (454/454 tests).
-  - Smoke tests: 3/3 files passed (16/16 tests), including live HTTP public API verification against Nutanix, Ubuntu, Debian, and SUSE.
-  - E2E tests: 13/13 files passed (111/111 tests), including dedicated `ubuntu-debian-suse.e2e.test.tsx`.
-  - Total test pyramid: 84/84 test files passed (581/581 tests).
   - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.

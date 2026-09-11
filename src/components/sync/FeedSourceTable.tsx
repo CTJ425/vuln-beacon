@@ -15,6 +15,7 @@ import { Vendor, VendorSyncLog } from '@/types';
 import { getAdapterByCode } from '@/adapters';
 import { SYNCED_VENDOR_CODES } from '@/services/syncService';
 import { formatDate } from '@/utils/date';
+import { VendorIcon } from '@/components/common/VendorIcon';
 
 interface FeedSourceTableProps {
   vendors: Vendor[];
@@ -23,8 +24,9 @@ interface FeedSourceTableProps {
 
 /** Newest log entry for a vendor code, or undefined when it has never synced. */
 function newestLogFor(vendorCode: string, logs: VendorSyncLog[]): VendorSyncLog | undefined {
+  const target = (vendorCode || '').toLowerCase();
   return logs
-    .filter((log) => log.vendor_code === vendorCode)
+    .filter((log) => (log.vendor_code || '').toLowerCase() === target)
     .reduce<VendorSyncLog | undefined>((newest, log) => {
       if (!newest || new Date(log.started_at) > new Date(newest.started_at)) return log;
       return newest;
@@ -69,10 +71,15 @@ export const FeedSourceTable: React.FC<FeedSourceTableProps> = ({ vendors, logs 
             return (
               <TableRow key={vendor.id} hover>
                 <TableCell>
-                  <Typography sx={{ fontWeight: 700, color: 'text.primary' }}>{vendor.name}</Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                    {vendor.code}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <VendorIcon vendorCode={vendor.code} name={vendor.name} size={18} hideLabel />
+                    <Box>
+                      <Typography sx={{ fontWeight: 700, color: 'text.primary' }}>{vendor.name}</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        {vendor.code}
+                      </Typography>
+                    </Box>
+                  </Box>
                 </TableCell>
 
                 <TableCell>

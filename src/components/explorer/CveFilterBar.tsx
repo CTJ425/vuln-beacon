@@ -8,10 +8,11 @@ import {
   Select,
   MenuItem,
   Button,
+  IconButton,
   ToggleButtonGroup,
   ToggleButton,
 } from '@mui/material';
-import { Search, RotateCcw, ShieldCheck, Bug } from 'lucide-react';
+import { Search, RotateCcw, ShieldCheck, Bug, X } from 'lucide-react';
 
 interface CveFilterBarProps {
   searchTerm: string;
@@ -87,6 +88,19 @@ export const CveFilterBar: React.FC<CveFilterBarProps> = ({
                 <Search size={18} color="#94a3b8" />
               </InputAdornment>
             ),
+            endAdornment: searchTerm ? (
+              <InputAdornment position="end">
+                <IconButton
+                  size="small"
+                  aria-label="清除搜尋關鍵字"
+                  onClick={() => onSearchChange('')}
+                  edge="end"
+                  sx={{ color: 'text.secondary', p: 0.5 }}
+                >
+                  <X size={16} />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
           }}
           sx={{
             flexGrow: 1,

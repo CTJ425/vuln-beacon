@@ -320,6 +320,19 @@
   - [x] Add live external feed health checks in `SystemHealthMonitor.tsx`.
   - [x] Adversary review & hardening: resolved Debian DSA query CVE extraction, SUSE changes.csv chronological ordering, hyphenated advisory ID normalization, Ubuntu regression notice regex fallback, and fixed 2 TypeScript compilation errors.
   - **Verification**: 85/85 test files (591 tests) passing 100%; live smoke test against Nutanix, Ubuntu, Debian, SUSE public APIs passing; clean edge bundle + tsc + vite build (`npm --prefix src run verify`).
-  - **Completed**: 2026-09-11 12:35:00 Asia/Taipei.
+- [x] **Task 27: Codebase Review, Defensive Null Safety & UI/UX Enhancements (1.0.0)**
+  - [x] Implement canonical advisory URL resolution utility (`src/utils/advisoryUrl.ts`) supporting Red Hat, Nutanix, Ubuntu, Debian, and SUSE announcements.
+  - [x] Add unit tests for advisory URL resolution (`src/tests/unit/utils/advisoryUrl.test.ts`, 6 tests).
+  - [x] Add defensive null guards for impact state, component, and product names across `CveDetailDrawer.tsx`, `AdvisoryDetailDrawer.tsx`, `ExplorerPage.tsx`, `CveTable.tsx`, and `AdvisoryTable.tsx`.
+  - [x] Support fallback official advisory URLs and direct clickable errata links in `AdvisoryDetailDrawer.tsx`.
+  - [x] Normalize vendor code comparison to case-insensitive matching across `VendorPage.tsx` and `FeedSourceTable.tsx`.
+  - [x] Synthesize exact SUSE announcement URLs in `SuseAdapter.parse` and re-bundle Edge runtime (`ingest.bundle.js`).
+  - [x] Add clear ("X") button in `CveFilterBar.tsx` for instantaneous search reset.
+  - [x] Add tooltips and aria-labels for theme switcher and GitHub link in `Header.tsx`.
+  - [x] Integrate authentic `VendorIcon` alongside vendor names in `FeedSourceTable.tsx`.
+  - [x] Parallelize external threat feed health probes using `Promise.all` in `SystemHealthMonitor.tsx`.
+  - **Verification**: 86/86 test files (597 tests) passing 100%; clean production build via `npm --prefix src run verify`.
+  - **Completed**: 2026-09-11 15:10:00 Asia/Taipei.
+
 
 
