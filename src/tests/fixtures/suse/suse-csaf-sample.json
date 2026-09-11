@@ -1,0 +1,105 @@
+{
+  "document": {
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "title": "Security update for erlang",
+    "tracking": {
+      "id": "SUSE-SU-2026:3951-1",
+      "initial_release_date": "2026-09-03T07:43:14Z",
+      "current_release_date": "2026-09-03T07:43:14Z",
+      "status": "final",
+      "version": "1"
+    },
+    "aggregate_severity": {
+      "text": "moderate",
+      "namespace": "https://www.suse.com/support/security/rating/"
+    },
+    "notes": [
+      {
+        "category": "summary",
+        "text": "A security update for erlang is now available."
+      }
+    ],
+    "references": [
+      {
+        "category": "self",
+        "summary": "URL for SUSE-SU-2026:3951-1",
+        "url": "https://www.suse.com/support/update/announcement/2026/suse-su-20263951-1/"
+      },
+      {
+        "category": "self",
+        "summary": "SUSE CVE CVE-2026-32147 page",
+        "url": "https://www.suse.com/security/cve/CVE-2026-32147/"
+      }
+    ]
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "category": "vendor",
+        "name": "SUSE",
+        "branches": [
+          {
+            "category": "product_family",
+            "name": "SUSE Linux Enterprise",
+            "branches": [
+              {
+                "category": "product_name",
+                "name": "SUSE Linux Enterprise Server 15 SP7",
+                "product": {
+                  "name": "SUSE Linux Enterprise Server 15 SP7",
+                  "product_id": "SUSE Linux Enterprise Server 15 SP7"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2026-32147",
+      "title": "Directory traversal in Erlang OTP ssh",
+      "notes": [
+        {
+          "category": "general",
+          "text": "Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal') vulnerability in Erlang OTP ssh (ssh_sftpd module) allows an authenticated SFTP user to modify file attributes outside the configured chroot directory."
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "baseScore": 5.3,
+            "baseSeverity": "MEDIUM",
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N",
+            "version": "3.1"
+          },
+          "products": [
+            "SUSE Linux Enterprise Server 15 SP7:erlang-23.3.4.19-150300.3.42.1.x86_64"
+          ]
+        }
+      ],
+      "threats": [
+        {
+          "category": "impact",
+          "details": "moderate"
+        }
+      ],
+      "product_status": {
+        "recommended": [
+          "SUSE Linux Enterprise Server 15 SP7:erlang-23.3.4.19-150300.3.42.1.x86_64"
+        ]
+      },
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "details": "To install this SUSE Security Update use zypper patch or YaST.",
+          "product_ids": [
+            "SUSE Linux Enterprise Server 15 SP7:erlang-23.3.4.19-150300.3.42.1.x86_64"
+          ]
+        }
+      ]
+    }
+  ]
+}

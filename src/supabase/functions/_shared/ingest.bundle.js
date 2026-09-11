@@ -413,10 +413,663 @@ var NutanixAdapter = class {
   }
 };
 
+// adapters/ubuntu.ts
+function normalizeSeverity3(priority, cvssScore) {
+  if (typeof priority === "string") {
+    const p = priority.trim().toLowerCase();
+    if (p === "critical") return "CRITICAL";
+    if (p === "high") return "HIGH";
+    if (p === "medium") return "MEDIUM";
+    if (p === "low" || p === "negligible") return "LOW";
+  }
+  if (cvssScore !== void 0 && !isNaN(cvssScore)) {
+    if (cvssScore >= 9) return "CRITICAL";
+    if (cvssScore >= 7) return "HIGH";
+    if (cvssScore >= 4) return "MEDIUM";
+    if (cvssScore > 0) return "LOW";
+  }
+  return "UNKNOWN";
+}
+var CVE_ID_REGEX2 = /^CVE-\d{4}-\d{4,}$/i;
+var USN_ID_REGEX = /^(?:USN|LSN)-\d+-\d+$/i;
+var UbuntuAdapter = class {
+  vendorCode = "ubuntu";
+  vendorName = "Ubuntu";
+  baseUrl = "https://ubuntu.com/security";
+  listUrl = "https://ubuntu.com/security/notices.json";
+  detailUrlBase = "https://ubuntu.com/security/notices";
+  cveUrlBase = "https://ubuntu.com/security/cves";
+  endpoints = [
+    { label: "Security notices list", url: this.listUrl },
+    { label: "Notice detail", url: `${this.detailUrlBase}/{noticeId}.json` },
+    { label: "CVE lookup", url: `${this.cveUrlBase}/{cveId}.json` }
+  ];
+  noticeDetailUrl(noticeId) {
+    return `${this.detailUrlBase}/${encodeURIComponent(noticeId)}.json`;
+  }
+  cveLookupUrl(cveId) {
+    return `${this.cveUrlBase}/${encodeURIComponent(cveId)}.json`;
+  }
+  noticesListUrl(limit = 20) {
+    return `${this.listUrl}?limit=${limit}`;
+  }
+  async fetchAdvisories(limit = 20) {
+    const res = await fetch(this.noticesListUrl(limit));
+    if (!res.ok) {
+      const msg = res.statusText || `HTTP ${res.status}`;
+      throw new Error(`Failed to fetch Ubuntu security notices: ${msg}`);
+    }
+    const data = await res.json();
+    const notices = Array.isArray(data?.notices) ? data.notices : [];
+    return this.parse(notices);
+  }
+  parse(rawPayload) {
+    if (!rawPayload || typeof rawPayload !== "object") {
+      return [];
+    }
+    let items = [];
+    if (Array.isArray(rawPayload)) {
+      items = rawPayload;
+    } else if (Array.isArray(rawPayload.notices)) {
+      items = rawPayload.notices;
+    } else if (typeof rawPayload.id === "string" && rawPayload.notices) {
+      const cveDoc = rawPayload;
+      const cveId = cveDoc.id.toUpperCase();
+      const nestedNotices = Array.isArray(cveDoc.notices) ? cveDoc.notices : [];
+      return nestedNotices.flatMap((notice) => {
+        const parsed = this.parse(notice);
+        for (const item of parsed) {
+          if (!item.cves.some((c) => c.cveId === cveId)) {
+            item.cves.push({
+              cveId,
+              description: cveDoc.description || item.summary || "",
+              cvssScore: typeof cveDoc.cvss3 === "number" ? cveDoc.cvss3 : void 0,
+              severity: normalizeSeverity3(cveDoc.priority, typeof cveDoc.cvss3 === "number" ? cveDoc.cvss3 : void 0)
+            });
+          }
+        }
+        return parsed;
+      });
+    } else {
+      items = [rawPayload];
+    }
+    const normalizedItems = [];
+    for (const raw of items) {
+      if (!raw || typeof raw !== "object") continue;
+      const advisoryId = typeof raw.id === "string" ? raw.id.trim() : "";
+      if (!advisoryId || !USN_ID_REGEX.test(advisoryId)) continue;
+      const title = typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : `[Ubuntu] Security Notice ${advisoryId}`;
+      const summary = typeof raw.summary === "string" && raw.summary.trim() ? raw.summary.trim() : typeof raw.description === "string" ? raw.description.trim() : void 0;
+      const instructions = typeof raw.instructions === "string" && raw.instructions.trim() ? raw.instructions.trim() : void 0;
+      const solution = instructions || (summary ? `${summary} In general, a standard system update will make all the necessary changes: sudo apt-get update && sudo apt-get --only-upgrade install -y <package>` : "In general, a standard system update will make all the necessary changes.");
+      const publishedAt = raw.published || (/* @__PURE__ */ new Date()).toISOString();
+      const updatedAt = raw.updated_at || raw.published;
+      const url = `https://ubuntu.com/security/notices/${encodeURIComponent(advisoryId)}`;
+      const productImpacts = [];
+      const fixedVersionsSet = /* @__PURE__ */ new Set();
+      const affectedProductsSet = /* @__PURE__ */ new Set();
+      if (raw.release_packages && typeof raw.release_packages === "object") {
+        for (const [releaseCodename, pkgList] of Object.entries(raw.release_packages)) {
+          const productName = `Ubuntu ${releaseCodename}`;
+          affectedProductsSet.add(productName);
+          if (Array.isArray(pkgList)) {
+            for (const pkg of pkgList) {
+              if (!pkg || typeof pkg !== "object") continue;
+              const pkgName = typeof pkg.name === "string" ? pkg.name.trim() : "";
+              const pkgVer = typeof pkg.version === "string" ? pkg.version.trim() : "";
+              if (!pkgName) continue;
+              if (pkgVer) fixedVersionsSet.add(pkgVer);
+              if (pkg.is_source !== false || !productImpacts.some((p) => p.product_name === productName && p.component === pkgName)) {
+                productImpacts.push({
+                  product_name: productName,
+                  component: pkgName,
+                  state: "Fixed",
+                  justification: pkgVer || void 0,
+                  errata: advisoryId,
+                  release_date: publishedAt
+                });
+              }
+            }
+          }
+        }
+      }
+      const rawCves = Array.isArray(raw.cves) ? raw.cves : Array.isArray(raw.cves_ids) ? raw.cves_ids.map((id) => ({ id })) : [];
+      const parsedCves = [];
+      const seenCveIds = /* @__PURE__ */ new Set();
+      let highestScore;
+      for (const c of rawCves) {
+        if (!c) continue;
+        const cveId = (typeof c === "string" ? c : c?.id || "").trim().toUpperCase();
+        if (!CVE_ID_REGEX2.test(cveId) || seenCveIds.has(cveId)) continue;
+        seenCveIds.add(cveId);
+        let cvssScore;
+        let cvssVector;
+        if (typeof c === "object") {
+          if (typeof c.cvss3 === "number") {
+            cvssScore = c.cvss3;
+          } else if (typeof c.cvss3?.base_score === "number") {
+            cvssScore = c.cvss3.base_score;
+          } else if (typeof c.impact?.baseMetricV3?.cvssV3?.baseScore === "number") {
+            cvssScore = c.impact.baseMetricV3.cvssV3.baseScore;
+          }
+          if (typeof c.cvss3_vector === "string") {
+            cvssVector = c.cvss3_vector;
+          } else if (typeof c.impact?.baseMetricV3?.cvssV3?.vectorString === "string") {
+            cvssVector = c.impact.baseMetricV3.cvssV3.vectorString;
+          }
+        }
+        if (cvssScore !== void 0 && (highestScore === void 0 || cvssScore > highestScore)) {
+          highestScore = cvssScore;
+        }
+        const priority = typeof c === "object" ? c.priority : void 0;
+        const severity = normalizeSeverity3(priority, cvssScore);
+        parsedCves.push({
+          cveId,
+          description: typeof c === "object" && typeof c.description === "string" ? c.description : summary || "",
+          cvssScore,
+          cvssVector,
+          severity,
+          affectedProducts: Array.from(affectedProductsSet),
+          productImpacts,
+          fixedVersions: Array.from(fixedVersionsSet),
+          solution
+        });
+      }
+      if (parsedCves.length === 0) continue;
+      const advisorySeverity = normalizeSeverity3(raw.priority, highestScore);
+      normalizedItems.push({
+        advisoryId,
+        title,
+        severity: advisorySeverity,
+        publishedAt,
+        updatedAt,
+        url,
+        summary,
+        solution,
+        cves: parsedCves,
+        rawPayload: raw
+      });
+    }
+    return normalizedItems;
+  }
+};
+
+// adapters/debian.ts
+function normalizeDebianUrgency(urgency) {
+  if (typeof urgency !== "string") return "MEDIUM";
+  const u = urgency.trim().toLowerCase();
+  if (u.includes("high") || u.includes("critical") || u.includes("emergency")) return "HIGH";
+  if (u.includes("medium") || u.includes("moderate")) return "MEDIUM";
+  if (u.includes("low") || u.includes("unimportant")) return "LOW";
+  return "MEDIUM";
+}
+var CVE_ID_REGEX3 = /^CVE-\d{4}-\d{4,}$/i;
+var DSA_HEADER_REGEX = /^\[(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\]\s+(DSA-\d+-\d+)\s+([^\s]+)\s*-\s*(.*)$/;
+var DebianAdapter = class {
+  vendorCode = "debian";
+  vendorName = "Debian";
+  trackerJsonUrl = "https://security-tracker.debian.org/tracker/data/json";
+  dsaListUrl = "https://salsa.debian.org/security-tracker-team/security-tracker/-/raw/master/data/DSA/list";
+  trackerBaseUrl = "https://security-tracker.debian.org/tracker";
+  endpoints = [
+    { label: "Debian Security Tracker JSON", url: this.trackerJsonUrl },
+    { label: "Debian Security Advisories (DSA) list", url: this.dsaListUrl },
+    { label: "Security Tracker Lookup", url: `${this.trackerBaseUrl}/{cveOrDsa}` }
+  ];
+  dsaLookupUrl(dsaId) {
+    return `${this.trackerBaseUrl}/${encodeURIComponent(dsaId)}`;
+  }
+  cveLookupUrl(cveId) {
+    return `${this.trackerBaseUrl}/${encodeURIComponent(cveId)}`;
+  }
+  async fetchAdvisories(limit = 20) {
+    const res = await fetch(this.dsaListUrl);
+    if (!res.ok) {
+      const msg = res.statusText || `HTTP ${res.status}`;
+      throw new Error(`Failed to fetch Debian advisories: ${msg}`);
+    }
+    const text = await res.text();
+    const items = this.parse(text);
+    return items.slice(0, limit);
+  }
+  parse(rawPayload) {
+    if (!rawPayload) return [];
+    if (typeof rawPayload === "string") {
+      return this.parseDsaListText(rawPayload);
+    }
+    if (Array.isArray(rawPayload)) {
+      return rawPayload.flatMap((entry) => this.parse(entry));
+    }
+    if (typeof rawPayload === "object") {
+      const obj = rawPayload;
+      if (obj.id && typeof obj.id === "string" && obj.id.startsWith("DSA-")) {
+        return this.parseStructuredDsa(obj);
+      }
+      return this.parseTrackerJson(obj);
+    }
+    return [];
+  }
+  parseDsaListText(text) {
+    const lines = text.split(/\r?\n/);
+    const advisories = [];
+    let currentAdv = null;
+    const commitCurrent = () => {
+      if (!currentAdv || currentAdv.cveIds.length === 0) return;
+      const { dateStr, dsaId, pkgName, titleDesc, cveIds, releases } = currentAdv;
+      const title = `[${pkgName}] Debian Security Advisory ${dsaId}`;
+      const publishedAt = this.parseDebianDate(dateStr);
+      const url = this.dsaLookupUrl(dsaId);
+      const solution = `\u8ACB\u900F\u904E APT \u5DE5\u5177\u57F7\u884C\u66F4\u65B0\uFF1Asudo apt-get update && sudo apt-get --only-upgrade install -y ${pkgName}`;
+      const summary = `Debian \u5B89\u5168\u516C\u544A ${dsaId} \u4FEE\u5FA9\u4E86 ${pkgName} \u5957\u4EF6\u4E2D\u7684\u8CC7\u5B89\u5F31\u9EDE (${cveIds.join(", ")})\u3002`;
+      const affectedProducts = releases.map((r) => `Debian ${r.release}`);
+      const fixedVersions = Array.from(new Set(releases.map((r) => r.version).filter(Boolean)));
+      const productImpacts = releases.map((r) => ({
+        product_name: `Debian ${r.release}`,
+        component: pkgName,
+        state: "Fixed",
+        justification: r.version,
+        errata: dsaId,
+        release_date: publishedAt
+      }));
+      const parsedCves = cveIds.map((cveId) => ({
+        cveId,
+        description: `${pkgName} security update for ${cveId}`,
+        severity: "HIGH",
+        affectedProducts,
+        productImpacts,
+        fixedVersions,
+        solution
+      }));
+      advisories.push({
+        advisoryId: dsaId,
+        title,
+        severity: "HIGH",
+        publishedAt,
+        url,
+        summary,
+        solution,
+        cves: parsedCves,
+        rawPayload: { dsaId, pkgName, cveIds, releases, titleDesc }
+      });
+    };
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const headerMatch = line.match(DSA_HEADER_REGEX);
+      if (headerMatch) {
+        commitCurrent();
+        currentAdv = {
+          dateStr: headerMatch[1],
+          dsaId: headerMatch[2],
+          pkgName: headerMatch[3],
+          titleDesc: headerMatch[4],
+          cveIds: [],
+          releases: []
+        };
+        continue;
+      }
+      if (currentAdv) {
+        if (line.startsWith("	{") || line.startsWith("  {") || trimmed.startsWith("{")) {
+          const cveMatches = line.match(/CVE-\d{4}-\d{4,}/gi);
+          if (cveMatches) {
+            for (const c of cveMatches) {
+              const u = c.toUpperCase();
+              if (!currentAdv.cveIds.includes(u)) {
+                currentAdv.cveIds.push(u);
+              }
+            }
+          }
+        } else if (line.startsWith("	[") || line.startsWith("  [") || trimmed.startsWith("[")) {
+          const relMatch = line.match(/\[([^\]]+)\]\s*-\s*([^\s]+)\s*(.*)/);
+          if (relMatch) {
+            currentAdv.releases.push({
+              release: relMatch[1].trim(),
+              pkg: relMatch[2].trim(),
+              version: relMatch[3].trim()
+            });
+          }
+        }
+      }
+    }
+    commitCurrent();
+    return advisories;
+  }
+  parseStructuredDsa(obj) {
+    const advisoryId = obj.id;
+    const pkg = obj.package || "package";
+    const title = obj.title || `[${pkg}] Debian Security Advisory ${advisoryId}`;
+    const publishedAt = obj.date ? new Date(obj.date).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
+    const url = this.dsaLookupUrl(advisoryId);
+    const summary = obj.description || `Debian Security Advisory ${advisoryId} for ${pkg}`;
+    const solution = `\u8ACB\u900F\u904E APT \u5DE5\u5177\u57F7\u884C\u66F4\u65B0\uFF1Asudo apt-get update && sudo apt-get --only-upgrade install -y ${pkg}`;
+    const rawCves = Array.isArray(obj.cves) ? obj.cves : [];
+    const cveIds = rawCves.map((c) => String(c).toUpperCase()).filter((c) => CVE_ID_REGEX3.test(c));
+    const productImpacts = [];
+    const fixedVersions = [];
+    const affectedProducts = [];
+    if (obj.releases && typeof obj.releases === "object") {
+      for (const [rel, data] of Object.entries(obj.releases)) {
+        const prodName = `Debian ${rel}`;
+        affectedProducts.push(prodName);
+        const ver = data?.version || "";
+        if (ver) fixedVersions.push(ver);
+        productImpacts.push({
+          product_name: prodName,
+          component: pkg,
+          state: "Fixed",
+          justification: ver || void 0,
+          errata: advisoryId,
+          release_date: publishedAt
+        });
+      }
+    }
+    const parsedCves = cveIds.map((cveId) => ({
+      cveId,
+      description: summary,
+      severity: "HIGH",
+      affectedProducts,
+      productImpacts,
+      fixedVersions,
+      solution
+    }));
+    if (parsedCves.length === 0) return [];
+    return [
+      {
+        advisoryId,
+        title,
+        severity: "HIGH",
+        publishedAt,
+        url,
+        summary,
+        solution,
+        cves: parsedCves,
+        rawPayload: obj
+      }
+    ];
+  }
+  parseTrackerJson(data) {
+    const advisories = [];
+    for (const [pkgName, cvesMap] of Object.entries(data)) {
+      if (!cvesMap || typeof cvesMap !== "object") continue;
+      for (const [cveIdRaw, cveData] of Object.entries(cvesMap)) {
+        const cveId = cveIdRaw.toUpperCase();
+        if (!CVE_ID_REGEX3.test(cveId)) continue;
+        const description = typeof cveData.description === "string" ? cveData.description : "";
+        const releases = cveData.releases && typeof cveData.releases === "object" ? cveData.releases : {};
+        let highestSeverity = "LOW";
+        const productImpacts = [];
+        const fixedVersions = [];
+        const affectedProducts = [];
+        for (const [releaseName, relInfo] of Object.entries(releases)) {
+          const prodName = `Debian ${releaseName}`;
+          affectedProducts.push(prodName);
+          const status = relInfo?.status === "resolved" ? "Fixed" : "Affected";
+          const urgency = normalizeDebianUrgency(relInfo?.urgency);
+          if (urgency === "HIGH") highestSeverity = "HIGH";
+          else if (urgency === "MEDIUM" && highestSeverity !== "HIGH") highestSeverity = "MEDIUM";
+          const fixedVer = relInfo?.fixed_version || relInfo?.repositories?.[releaseName] || "";
+          if (fixedVer) fixedVersions.push(fixedVer);
+          productImpacts.push({
+            product_name: prodName,
+            component: pkgName,
+            state: status,
+            justification: fixedVer || void 0,
+            errata: `DSA-${pkgName}`
+          });
+        }
+        const advisoryId = `DEBIAN-${pkgName}-${cveId}`;
+        const solution = `sudo apt-get update && sudo apt-get --only-upgrade install -y ${pkgName}`;
+        advisories.push({
+          advisoryId,
+          title: `[${pkgName}] ${cveId}`,
+          severity: highestSeverity,
+          publishedAt: (/* @__PURE__ */ new Date()).toISOString(),
+          url: this.cveLookupUrl(cveId),
+          summary: description || `Debian security issue for ${pkgName}`,
+          solution,
+          cves: [
+            {
+              cveId,
+              description,
+              severity: highestSeverity,
+              affectedProducts,
+              productImpacts,
+              fixedVersions,
+              solution
+            }
+          ],
+          rawPayload: { pkgName, cveId, cveData }
+        });
+      }
+    }
+    return advisories;
+  }
+  parseDebianDate(dateStr) {
+    try {
+      const parsed = new Date(dateStr);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+    } catch {
+    }
+    return (/* @__PURE__ */ new Date()).toISOString();
+  }
+};
+
+// adapters/suse.ts
+function normalizeSuseSeverity(text, cvssScore) {
+  if (typeof text === "string") {
+    const s = text.trim().toLowerCase();
+    if (s === "critical") return "CRITICAL";
+    if (s === "important" || s === "high") return "HIGH";
+    if (s === "moderate" || s === "medium") return "MEDIUM";
+    if (s === "low") return "LOW";
+  }
+  if (cvssScore !== void 0 && !isNaN(cvssScore)) {
+    if (cvssScore >= 9) return "CRITICAL";
+    if (cvssScore >= 7) return "HIGH";
+    if (cvssScore >= 4) return "MEDIUM";
+    if (cvssScore > 0) return "LOW";
+  }
+  return "UNKNOWN";
+}
+var CVE_ID_REGEX4 = /^CVE-\d{4}-\d{4,}$/i;
+function componentFromPackageName(pkgFull) {
+  const match = pkgFull.match(/^([a-zA-Z0-9_\-+]+?)-\d+/);
+  if (match) return match[1];
+  return pkgFull.split("-")[0] || pkgFull;
+}
+var SuseAdapter = class {
+  vendorCode = "suse";
+  vendorName = "SUSE";
+  baseUrl = "https://ftp.suse.com/pub/projects/security/csaf";
+  changesCsvUrl = "https://ftp.suse.com/pub/projects/security/csaf/changes.csv";
+  cveBaseUrl = "https://www.suse.com/security/cve";
+  endpoints = [
+    { label: "CSAF changes index", url: this.changesCsvUrl },
+    { label: "CSAF advisory detail", url: `${this.baseUrl}/{advisoryFile}` },
+    { label: "SUSE CVE page", url: `${this.cveBaseUrl}/{cveId}` }
+  ];
+  advisoryDetailUrl(advisoryId) {
+    const filename = advisoryId.trim().toLowerCase().replace(/:/g, "_").replace(/\.json$/i, "") + ".json";
+    return `${this.baseUrl}/${filename}`;
+  }
+  cveLookupUrl(cveId) {
+    return `${this.cveBaseUrl}/${encodeURIComponent(cveId)}`;
+  }
+  async fetchAdvisories(limit = 20) {
+    const res = await fetch(this.changesCsvUrl);
+    if (!res.ok) {
+      const msg = res.statusText || `HTTP ${res.status}`;
+      throw new Error(`Failed to fetch SUSE changes index: ${msg}`);
+    }
+    const csvText = await res.text();
+    const lines = csvText.split(/\r?\n/).filter(Boolean);
+    const filenames = [];
+    for (let i = lines.length - 1; i >= 0 && filenames.length < limit; i--) {
+      const line = lines[i].trim();
+      const match = line.match(/^"([^"]+\.json)"/i);
+      if (match) {
+        const file = match[1];
+        if (file.toLowerCase().startsWith("suse-su-") || file.toLowerCase().startsWith("opensuse-su-")) {
+          filenames.push(file);
+        }
+      }
+    }
+    if (filenames.length === 0) return [];
+    const detailDocuments = [];
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < filenames.length; i += BATCH_SIZE) {
+      const batch = filenames.slice(i, i + BATCH_SIZE);
+      const batchDocs = await Promise.all(
+        batch.map(async (file) => {
+          try {
+            const detailRes = await fetch(`${this.baseUrl}/${file}`);
+            if (detailRes.ok) {
+              return await detailRes.json();
+            }
+          } catch {
+          }
+          return null;
+        })
+      );
+      for (const doc of batchDocs) {
+        if (doc !== null) detailDocuments.push(doc);
+      }
+    }
+    return this.parse(detailDocuments);
+  }
+  parse(rawPayload) {
+    if (!rawPayload || typeof rawPayload !== "object") {
+      return [];
+    }
+    let docs = [];
+    if (Array.isArray(rawPayload)) {
+      docs = rawPayload;
+    } else {
+      docs = [rawPayload];
+    }
+    const normalizedItems = [];
+    for (const doc of docs) {
+      if (!doc || typeof doc !== "object") continue;
+      const document = doc.document;
+      if (!document || typeof document !== "object") continue;
+      const tracking = document.tracking;
+      const advisoryId = typeof tracking?.id === "string" ? tracking.id.trim() : "";
+      if (!advisoryId) continue;
+      const title = typeof document.title === "string" ? document.title.trim() : `[SUSE] ${advisoryId}`;
+      const publishedAt = tracking?.current_release_date || tracking?.initial_release_date || (/* @__PURE__ */ new Date()).toISOString();
+      const updatedAt = tracking?.current_release_date || tracking?.initial_release_date;
+      let url = `https://www.suse.com/support/update/announcement/`;
+      if (Array.isArray(document.references)) {
+        const selfRef = document.references.find(
+          (r) => typeof r?.url === "string" && (r.url.includes("/announcement/") || r.category === "self") && !r.url.endsWith(".json")
+        );
+        if (selfRef && selfRef.url) {
+          url = selfRef.url;
+        }
+      }
+      const summary = Array.isArray(document.notes) ? document.notes.find((n) => n?.category === "summary" || n?.category === "general")?.text : void 0;
+      const rawVulns = Array.isArray(doc.vulnerabilities) ? doc.vulnerabilities : [];
+      const parsedCves = [];
+      let overallSeverity = normalizeSuseSeverity(document.aggregate_severity?.text);
+      for (const v of rawVulns) {
+        if (!v || typeof v !== "object") continue;
+        const cveId = typeof v.cve === "string" ? v.cve.trim().toUpperCase() : "";
+        if (!CVE_ID_REGEX4.test(cveId)) continue;
+        let cvssScore;
+        let cvssVector;
+        let vulnSeverity = "UNKNOWN";
+        if (Array.isArray(v.scores) && v.scores.length > 0) {
+          const s = v.scores[0]?.cvss_v3;
+          if (s) {
+            if (typeof s.baseScore === "number") cvssScore = s.baseScore;
+            if (typeof s.vectorString === "string") cvssVector = s.vectorString;
+            if (typeof s.baseSeverity === "string") vulnSeverity = normalizeSuseSeverity(s.baseSeverity, cvssScore);
+          }
+        }
+        if (vulnSeverity === "UNKNOWN" && Array.isArray(v.threats) && v.threats.length > 0) {
+          const t = v.threats.find((item) => item?.category === "impact");
+          if (t?.details) {
+            vulnSeverity = normalizeSuseSeverity(t.details, cvssScore);
+          }
+        }
+        if (vulnSeverity === "UNKNOWN") {
+          vulnSeverity = normalizeSuseSeverity(document.aggregate_severity?.text, cvssScore);
+        }
+        if (overallSeverity === "UNKNOWN" && vulnSeverity !== "UNKNOWN") {
+          overallSeverity = vulnSeverity;
+        }
+        const description = Array.isArray(v.notes) ? v.notes.find((n) => n?.category === "general" || n?.category === "description")?.text || v.title || "" : v.title || "";
+        let solution = "";
+        const productImpacts = [];
+        const fixedVersions = [];
+        const affectedProducts = [];
+        if (Array.isArray(v.remediations)) {
+          const fixRem = v.remediations.find((r) => r?.category === "vendor_fix") || v.remediations[0];
+          if (fixRem?.details) {
+            solution = fixRem.details.trim();
+          }
+          if (Array.isArray(fixRem?.product_ids)) {
+            for (const pid of fixRem.product_ids) {
+              if (typeof pid !== "string") continue;
+              const colonIdx = pid.indexOf(":");
+              const prodName = colonIdx !== -1 ? pid.slice(0, colonIdx).trim() : "SUSE Linux Enterprise";
+              const pkgFull = colonIdx !== -1 ? pid.slice(colonIdx + 1).trim() : pid.trim();
+              const component = componentFromPackageName(pkgFull);
+              if (!affectedProducts.includes(prodName)) affectedProducts.push(prodName);
+              if (!fixedVersions.includes(pkgFull)) fixedVersions.push(pkgFull);
+              productImpacts.push({
+                product_name: prodName,
+                component,
+                state: "Fixed",
+                justification: pkgFull,
+                errata: advisoryId,
+                release_date: publishedAt
+              });
+            }
+          }
+        }
+        if (!solution) {
+          solution = `\u8ACB\u4F7F\u7528 Zypper \u57F7\u884C\u66F4\u65B0\uFF1Asudo zypper update -y ${productImpacts[0]?.component || "package"}`;
+        }
+        parsedCves.push({
+          cveId,
+          description,
+          cvssScore,
+          cvssVector,
+          severity: vulnSeverity,
+          affectedProducts,
+          productImpacts,
+          fixedVersions,
+          solution
+        });
+      }
+      if (parsedCves.length === 0) continue;
+      normalizedItems.push({
+        advisoryId,
+        title,
+        severity: overallSeverity,
+        publishedAt,
+        updatedAt,
+        url,
+        summary: summary || title,
+        solution: parsedCves[0]?.solution,
+        cves: parsedCves,
+        rawPayload: doc
+      });
+    }
+    return normalizedItems;
+  }
+};
+
 // adapters/index.ts
 var ALL_ADAPTERS = [
   new RedHatCsafAdapter(),
-  new NutanixAdapter()
+  new NutanixAdapter(),
+  new UbuntuAdapter(),
+  new DebianAdapter(),
+  new SuseAdapter()
 ];
 var seenVendorCodes = /* @__PURE__ */ new Set();
 for (const adapter of ALL_ADAPTERS) {

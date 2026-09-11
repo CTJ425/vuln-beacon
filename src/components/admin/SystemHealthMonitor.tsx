@@ -92,6 +92,30 @@ export const SystemHealthMonitor: React.FC = () => {
       endpoint: 'https://portal.nutanix.com/api/v1/advisories',
       status: 'checking',
     },
+    {
+      id: 'ubuntu_notices',
+      name: 'Ubuntu Security Notices API',
+      category: 'external',
+      description: 'Canonical 官方 Ubuntu 資安公告來源',
+      endpoint: 'https://ubuntu.com/security/notices.json?limit=1',
+      status: 'checking',
+    },
+    {
+      id: 'debian_security',
+      name: 'Debian Security Advisories (DSA)',
+      category: 'external',
+      description: 'Debian 官方資安公告追蹤來源',
+      endpoint: 'https://salsa.debian.org/security-tracker-team/security-tracker/-/raw/master/data/DSA/list',
+      status: 'checking',
+    },
+    {
+      id: 'suse_csaf',
+      name: 'SUSE CSAF Feed',
+      category: 'external',
+      description: 'SUSE 官方 CSAF 2.0 資安公告來源',
+      endpoint: 'https://ftp.suse.com/pub/projects/security/csaf/changes.csv',
+      status: 'checking',
+    },
   ]);
 
   const runDiagnostics = useCallback(async () => {
@@ -272,6 +296,24 @@ export const SystemHealthMonitor: React.FC = () => {
         name: 'Nutanix Security Advisories API',
         description: 'Nutanix Portal 官方資安公告來源',
         endpoint: 'https://portal.nutanix.com/api/v1/advisories',
+      },
+      {
+        id: 'ubuntu_notices',
+        name: 'Ubuntu Security Notices API',
+        description: 'Canonical 官方 Ubuntu 資安公告來源',
+        endpoint: 'https://ubuntu.com/security/notices.json?limit=1',
+      },
+      {
+        id: 'debian_security',
+        name: 'Debian Security Advisories (DSA)',
+        description: 'Debian 官方資安公告追蹤來源',
+        endpoint: 'https://salsa.debian.org/security-tracker-team/security-tracker/-/raw/master/data/DSA/list',
+      },
+      {
+        id: 'suse_csaf',
+        name: 'SUSE CSAF Feed',
+        description: 'SUSE 官方 CSAF 2.0 資安公告來源',
+        endpoint: 'https://ftp.suse.com/pub/projects/security/csaf/changes.csv',
       },
     ];
 

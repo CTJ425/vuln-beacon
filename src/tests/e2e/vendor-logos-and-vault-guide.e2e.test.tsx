@@ -90,7 +90,7 @@ vi.mock('@/services/vendorService', () => ({
 }));
 
 vi.mock('@/services/syncService', () => ({
-  SYNCED_VENDOR_CODES: ['redhat', 'nutanix'],
+  SYNCED_VENDOR_CODES: ['redhat', 'nutanix', 'ubuntu', 'debian', 'suse'],
   SyncService: vi.fn().mockImplementation(() => ({
     fetchSyncLogs: vi.fn().mockResolvedValue([
       {

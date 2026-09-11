@@ -9,6 +9,9 @@ import {
   HpeLogo,
   VeeamLogo,
   CohesityLogo,
+  UbuntuLogo,
+  DebianLogo,
+  SuseLogo,
   DefaultVendorLogo,
 } from '@/components/icons/VendorLogos';
 
@@ -28,6 +31,9 @@ export const VENDOR_COLORS: Record<string, string> = {
   netapp: '#0067c5',
   veeam: '#00b336',
   cohesity: '#ff5722',
+  ubuntu: '#E95420',
+  debian: '#D70A53',
+  suse: '#30BA78',
 };
 
 export const VENDOR_NAMES: Record<string, string> = {
@@ -39,6 +45,9 @@ export const VENDOR_NAMES: Record<string, string> = {
   netapp: 'NetApp',
   veeam: 'Veeam',
   cohesity: 'Cohesity',
+  ubuntu: 'Ubuntu',
+  debian: 'Debian',
+  suse: 'SUSE',
 };
 
 export const VendorIcon: React.FC<VendorIconProps> = ({
@@ -61,6 +70,9 @@ export const VendorIcon: React.FC<VendorIconProps> = ({
       case 'hpe': return <HpeLogo size={size} color={color} />;
       case 'veeam': return <VeeamLogo size={size} color={color} />;
       case 'cohesity': return <CohesityLogo size={size} color={color} />;
+      case 'ubuntu': return <UbuntuLogo size={size} color={color} />;
+      case 'debian': return <DebianLogo size={size} color={color} />;
+      case 'suse': return <SuseLogo size={size} color={color} />;
       default: return <DefaultVendorLogo size={size} color={color} />;
     }
   };

@@ -236,7 +236,7 @@ serve(async (req) => {
       try {
         const targetVendors: string[] = Array.isArray(body.vendorCodes) && body.vendorCodes.length > 0
           ? body.vendorCodes
-          : ['redhat', 'nutanix'];
+          : ['redhat', 'nutanix', 'ubuntu', 'debian', 'suse'];
 
         let knownCveIds: string[] = [];
         try {

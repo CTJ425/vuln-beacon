@@ -1,0 +1,63 @@
+{
+  "id": "USN-8747-1",
+  "title": "Beets vulnerability",
+  "summary": "Beets could allow malicious media metadata to compromise its web interface.",
+  "instructions": "In general, a standard system update will make all the necessary changes.",
+  "references": [
+    "https://ubuntu.com/security/notices/USN-8747-1",
+    "https://www.cve.org/CVERecord?id=CVE-2026-42052"
+  ],
+  "published": "2026-09-10T15:56:46.094967",
+  "description": "It was discovered that Beets incorrectly escaped untrusted media metadata in its web interface. An attacker could possibly use this issue to inject arbitrary HTML or execute arbitrary JavaScript code in a user's browser.",
+  "is_hidden": false,
+  "release_packages": {
+    "jammy": [
+      {
+        "name": "beets",
+        "version": "1.6.0-1ubuntu0.1~esm1",
+        "description": "music tagger and library organizer",
+        "is_source": true
+      },
+      {
+        "name": "beets-doc",
+        "version": "1.6.0-1ubuntu0.1~esm1",
+        "is_source": false,
+        "is_visible": false
+      }
+    ],
+    "noble": [
+      {
+        "name": "beets",
+        "version": "1.6.0-8ubuntu0.1~esm1",
+        "description": "music tagger and library organizer",
+        "is_source": true
+      }
+    ],
+    "focal": [
+      {
+        "name": "beets",
+        "version": "1.4.9-4ubuntu0.1~esm1",
+        "description": "music tagger and library organizer",
+        "is_source": true
+      }
+    ]
+  },
+  "type": "USN",
+  "cves": [
+    {
+      "id": "CVE-2026-42052",
+      "notices_ids": ["USN-8747-1"],
+      "priority": "medium",
+      "cvss3": 6.0,
+      "cvss3_vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:H/A:N",
+      "description": "Beets media library web interface DOM XSS vulnerability."
+    }
+  ],
+  "cves_ids": ["CVE-2026-42052"],
+  "releases": [
+    { "codename": "noble", "version": "24.04", "support_tag": "LTS" },
+    { "codename": "jammy", "version": "22.04", "support_tag": "LTS" },
+    { "codename": "focal", "version": "20.04", "support_tag": "ESM" }
+  ],
+  "related_notices": []
+}

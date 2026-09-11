@@ -72,10 +72,13 @@ import { fetchAllRows } from '@/lib/fetchAllRows';
 import { getAdapterByCode } from '@/adapters';
 import { RedHatCsafAdapter } from '@/adapters/redhat-csaf';
 import { NutanixAdapter } from '@/adapters/nutanix';
+import { UbuntuAdapter } from '@/adapters/ubuntu';
+import { DebianAdapter } from '@/adapters/debian';
+import { SuseAdapter } from '@/adapters/suse';
 
 // The vendors SyncService actually contacts today. Kept as the single source
 // of truth so the UI can state sync coverage truthfully instead of guessing.
-export const SYNCED_VENDOR_CODES = ['redhat', 'nutanix'] as const;
+export const SYNCED_VENDOR_CODES = ['redhat', 'nutanix', 'ubuntu', 'debian', 'suse'] as const;
 
 // BUG-003: a full vendor run can build a functions.invoke body of tens of MB,
 // which the self-hosted Edge Runtime supervisor kills. Bound the size of each
@@ -503,6 +506,32 @@ export class SyncService {
         if (!res.ok) return false;
         const doc = await res.json();
         if (doc) detailDocuments.push(doc);
+      } else if (q.startsWith('USN-') || q.startsWith('LSN-')) {
+        const ubuntuAdapter = getAdapterByCode('ubuntu') as UbuntuAdapter | undefined;
+        if (!ubuntuAdapter) return false;
+        vendorCode = 'ubuntu';
+        const res = await fetch(ubuntuAdapter.noticeDetailUrl(q));
+        if (!res.ok) return false;
+        const doc = await res.json();
+        if (doc) detailDocuments.push(doc);
+      } else if (q.startsWith('DSA-') || q.startsWith('DLA-')) {
+        const debianAdapter = getAdapterByCode('debian') as DebianAdapter | undefined;
+        if (!debianAdapter) return false;
+        vendorCode = 'debian';
+        detailDocuments.push({
+          id: q,
+          package: 'debian-package',
+          cves: [q],
+          description: `Debian Security Advisory ${q}`,
+        });
+      } else if (q.startsWith('SUSE-SU-') || q.startsWith('OPENSUSE-SU-')) {
+        const suseAdapter = getAdapterByCode('suse') as SuseAdapter | undefined;
+        if (!suseAdapter) return false;
+        vendorCode = 'suse';
+        const res = await fetch(suseAdapter.advisoryDetailUrl(q));
+        if (!res.ok) return false;
+        const doc = await res.json();
+        if (doc) detailDocuments.push(doc);
       } else {
         // Try Red Hat reverse lookup first
         const listRes = await fetch(redhatAdapter.cveLookupUrl(q));
@@ -581,6 +610,44 @@ export class SyncService {
             }
           } catch {
             // Ignore Nutanix lookup error
+          }
+        }
+
+        // If still not found, try Ubuntu CVE lookup
+        if (!foundRedhat && detailDocuments.length === 0) {
+          const ubuntuAdapter = getAdapterByCode('ubuntu') as UbuntuAdapter | undefined;
+          if (ubuntuAdapter) {
+            try {
+              const uRes = await fetch(ubuntuAdapter.cveLookupUrl(q));
+              if (uRes.ok) {
+                const uDoc = await uRes.json();
+                if (uDoc && (uDoc.id || Array.isArray(uDoc.notices))) {
+                  detailDocuments.push(uDoc);
+                  vendorCode = 'ubuntu';
+                }
+              }
+            } catch {
+              // Ignore Ubuntu lookup error
+            }
+          }
+        }
+
+        // If still not found, try SUSE CSAF lookup
+        if (!foundRedhat && detailDocuments.length === 0) {
+          const suseAdapter = getAdapterByCode('suse') as SuseAdapter | undefined;
+          if (suseAdapter) {
+            try {
+              const sRes = await fetch(suseAdapter.advisoryDetailUrl(q));
+              if (sRes.ok) {
+                const sDoc = await sRes.json();
+                if (sDoc) {
+                  detailDocuments.push(sDoc);
+                  vendorCode = 'suse';
+                }
+              }
+            } catch {
+              // Ignore SUSE lookup error
+            }
           }
         }
       }

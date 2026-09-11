@@ -222,36 +222,46 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
         </Typography>
 
         <Stack spacing={1.5}>
-          {item.cves.map((cve) => (
-            <Paper
-              key={cve.cve_id}
-              sx={{
-                p: 2,
-                bgcolor: 'background.default',
-                border: 1,
-                borderColor: 'divider',
-                borderRadius: 2,
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 0.8 }}>
-                <Typography sx={{ fontFamily: 'JetBrains Mono', fontWeight: 800, color: 'primary.main' }}>
-                  {cve.cve_id}
-                </Typography>
-                <SeverityBadge severity={cve.severity} score={cve.cvss_v3_score} />
-                {cve.is_known_exploited && (
-                  <Chip
-                    size="small"
-                    icon={<Flame size={13} color="#ef4444" />}
-                    label="CISA KEV"
-                    sx={{ bgcolor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontWeight: 700 }}
-                  />
+          {item.cves.map((cve, idx) => {
+            const cveId = typeof cve === 'string' ? cve : cve.cve_id;
+            const severity = typeof cve === 'string' ? 'UNKNOWN' : cve.severity;
+            const score = typeof cve === 'string' ? undefined : cve.cvss_v3_score;
+            const isKev = typeof cve === 'string' ? false : cve.is_known_exploited;
+            const desc = typeof cve === 'string' ? '' : cve.description;
+
+            return (
+              <Paper
+                key={cveId || idx}
+                sx={{
+                  p: 2,
+                  bgcolor: 'background.default',
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 2,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 0.8 }}>
+                  <Typography sx={{ fontFamily: 'JetBrains Mono', fontWeight: 800, color: 'primary.main' }}>
+                    {cveId}
+                  </Typography>
+                  <SeverityBadge severity={severity} score={score} />
+                  {isKev && (
+                    <Chip
+                      size="small"
+                      icon={<Flame size={13} color="#ef4444" />}
+                      label="CISA KEV"
+                      sx={{ bgcolor: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', fontWeight: 700 }}
+                    />
+                  )}
+                </Box>
+                {desc && (
+                  <Typography variant="body2" sx={{ color: 'text.primary', lineHeight: 1.6 }}>
+                    {desc}
+                  </Typography>
                 )}
-              </Box>
-              <Typography variant="body2" sx={{ color: 'text.primary', lineHeight: 1.6 }}>
-                {cve.description}
-              </Typography>
-            </Paper>
-          ))}
+              </Paper>
+            );
+          })}
         </Stack>
       </Box>
 
@@ -334,6 +344,32 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
                 sx={{ color: 'text.secondary' }}
               >
                 {copiedText === (item.fixed_versions?.[0] || item.advisory_id) ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : item.vendor_code === 'ubuntu' || item.vendor_code === 'debian' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
+            <span>$ sudo apt-get --only-upgrade install -y {firstComponent || 'package-name'}</span>
+            <Tooltip title={copiedText === `$ sudo apt-get --only-upgrade install -y ${firstComponent || 'package-name'}` ? '已複製指令！' : '複製升級指令'}>
+              <IconButton
+                size="small"
+                onClick={() => handleCopy(`$ sudo apt-get --only-upgrade install -y ${firstComponent || 'package-name'}`)}
+                sx={{ color: 'text.secondary' }}
+              >
+                {copiedText === `$ sudo apt-get --only-upgrade install -y ${firstComponent || 'package-name'}` ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : item.vendor_code === 'suse' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
+            <span>$ sudo zypper update -y {firstComponent || 'package-name'}</span>
+            <Tooltip title={copiedText === `$ sudo zypper update -y ${firstComponent || 'package-name'}` ? '已複製指令！' : '複製升級指令'}>
+              <IconButton
+                size="small"
+                onClick={() => handleCopy(`$ sudo zypper update -y ${firstComponent || 'package-name'}`)}
+                sx={{ color: 'text.secondary' }}
+              >
+                {copiedText === `$ sudo zypper update -y ${firstComponent || 'package-name'}` ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
               </IconButton>
             </Tooltip>
           </Box>

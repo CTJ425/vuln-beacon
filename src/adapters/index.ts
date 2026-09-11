@@ -2,8 +2,18 @@ import { VendorAdapter } from '@/types';
 import { RedHatAdapter } from './redhat';
 import { RedHatCsafAdapter } from './redhat-csaf';
 import { NutanixAdapter } from './nutanix';
+import { UbuntuAdapter } from './ubuntu';
+import { DebianAdapter } from './debian';
+import { SuseAdapter } from './suse';
 
-export { RedHatAdapter, RedHatCsafAdapter, NutanixAdapter };
+export {
+  RedHatAdapter,
+  RedHatCsafAdapter,
+  NutanixAdapter,
+  UbuntuAdapter,
+  DebianAdapter,
+  SuseAdapter,
+};
 
 // RedHatAdapter (legacy cve.json based adapter) also declares vendorCode
 // 'redhat', but it is intentionally NOT registered here: RedHatCsafAdapter is
@@ -13,6 +23,9 @@ export { RedHatAdapter, RedHatCsafAdapter, NutanixAdapter };
 export const ALL_ADAPTERS: VendorAdapter[] = [
   new RedHatCsafAdapter(),
   new NutanixAdapter(),
+  new UbuntuAdapter(),
+  new DebianAdapter(),
+  new SuseAdapter(),
 ];
 
 // Guard against silently-ambiguous vendorCode resolution: if a future change

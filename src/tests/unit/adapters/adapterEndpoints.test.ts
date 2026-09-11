@@ -53,6 +53,18 @@ describe('RedHatCsafAdapter describes its own endpoints', () => {
     const foundNutanix = getAdapterByCode('nutanix');
     expect(foundNutanix).toBeDefined();
     expect(foundNutanix!.endpoints).toHaveLength(3);
+
+    const foundUbuntu = getAdapterByCode('ubuntu');
+    expect(foundUbuntu).toBeDefined();
+    expect(foundUbuntu!.endpoints).toHaveLength(3);
+
+    const foundDebian = getAdapterByCode('debian');
+    expect(foundDebian).toBeDefined();
+    expect(foundDebian!.endpoints).toHaveLength(3);
+
+    const foundSuse = getAdapterByCode('suse');
+    expect(foundSuse).toBeDefined();
+    expect(foundSuse!.endpoints).toHaveLength(3);
   });
 
   it('gives every registered adapter an endpoints list', () => {

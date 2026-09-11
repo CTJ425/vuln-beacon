@@ -329,6 +329,12 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                   : item.advisory_id
                   ? `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(item.advisory_id)}`
                   : 'https://portal.nutanix.com/page/documents/security-advisories'
+                : item.vendor_code === 'ubuntu'
+                ? `https://ubuntu.com/security/cves/${item.cve_id}`
+                : item.vendor_code === 'debian'
+                ? `https://security-tracker.debian.org/tracker/${item.cve_id}`
+                : item.vendor_code === 'suse'
+                ? `https://www.suse.com/security/cve/${item.cve_id}`
                 : `https://access.redhat.com/security/cve/${item.cve_id}`
             }
             target="_blank"
@@ -360,6 +366,12 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                   href={
                     adv.startsWith('NXSA-') || item.vendor_code === 'nutanix'
                       ? `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(adv)}`
+                      : adv.startsWith('USN-') || adv.startsWith('LSN-') || item.vendor_code === 'ubuntu'
+                      ? `https://ubuntu.com/security/notices/${encodeURIComponent(adv)}`
+                      : adv.startsWith('DSA-') || adv.startsWith('DLA-') || item.vendor_code === 'debian'
+                      ? `https://security-tracker.debian.org/tracker/${encodeURIComponent(adv)}`
+                      : adv.startsWith('SUSE-SU-') || adv.startsWith('OPENSUSE-SU-') || item.vendor_code === 'suse'
+                      ? `https://www.suse.com/support/update/announcement/`
                       : `https://access.redhat.com/errata/${adv}`
                   }
                   target="_blank"
@@ -502,6 +514,12 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                           href={
                             imp.errata.startsWith('NXSA-') || item.vendor_code === 'nutanix'
                               ? `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(imp.errata)}`
+                              : imp.errata.startsWith('USN-') || imp.errata.startsWith('LSN-') || item.vendor_code === 'ubuntu'
+                              ? `https://ubuntu.com/security/notices/${encodeURIComponent(imp.errata)}`
+                              : imp.errata.startsWith('DSA-') || imp.errata.startsWith('DLA-') || item.vendor_code === 'debian'
+                              ? `https://security-tracker.debian.org/tracker/${encodeURIComponent(imp.errata)}`
+                              : imp.errata.startsWith('SUSE-SU-') || imp.errata.startsWith('OPENSUSE-SU-') || item.vendor_code === 'suse'
+                              ? `https://www.suse.com/support/update/announcement/`
                               : `https://access.redhat.com/errata/${imp.errata}`
                           }
                           target="_blank"
@@ -565,6 +583,32 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                 sx={{ color: 'text.secondary' }}
               >
                 {copiedText === (item.fixed_versions?.[0] || item.advisory_id) ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : item.vendor_code === 'ubuntu' || item.vendor_code === 'debian' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
+            <span>$ sudo apt-get --only-upgrade install -y {impacts[0]?.component || 'package-name'}</span>
+            <Tooltip title={copiedText === `$ sudo apt-get --only-upgrade install -y ${impacts[0]?.component || 'package-name'}` ? '已複製指令！' : '複製升級指令'}>
+              <IconButton
+                size="small"
+                onClick={() => handleCopy(`$ sudo apt-get --only-upgrade install -y ${impacts[0]?.component || 'package-name'}`)}
+                sx={{ color: 'text.secondary' }}
+              >
+                {copiedText === `$ sudo apt-get --only-upgrade install -y ${impacts[0]?.component || 'package-name'}` ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ) : item.vendor_code === 'suse' ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 1.25, bgcolor: 'action.hover', borderRadius: 1.5, fontFamily: 'JetBrains Mono', fontSize: '0.8rem', color: 'primary.main' }}>
+            <span>$ sudo zypper update -y {impacts[0]?.component || 'package-name'}</span>
+            <Tooltip title={copiedText === `$ sudo zypper update -y ${impacts[0]?.component || 'package-name'}` ? '已複製指令！' : '複製升級指令'}>
+              <IconButton
+                size="small"
+                onClick={() => handleCopy(`$ sudo zypper update -y ${impacts[0]?.component || 'package-name'}`)}
+                sx={{ color: 'text.secondary' }}
+              >
+                {copiedText === `$ sudo zypper update -y ${impacts[0]?.component || 'package-name'}` ? <Check size={14} color="#22c55e" /> : <Copy size={14} />}
               </IconButton>
             </Tooltip>
           </Box>

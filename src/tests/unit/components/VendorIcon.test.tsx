@@ -39,6 +39,9 @@ describe('VendorIcon Component (TDD)', () => {
       { code: 'hpe', label: 'HPE logo' },
       { code: 'veeam', label: 'Veeam logo' },
       { code: 'cohesity', label: 'Cohesity logo' },
+      { code: 'ubuntu', label: 'Ubuntu logo' },
+      { code: 'debian', label: 'Debian logo' },
+      { code: 'suse', label: 'SUSE logo' },
     ];
 
     for (const v of vendors) {

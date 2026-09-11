@@ -153,16 +153,45 @@ export class CveService {
           fixedVersions.length === 0 ||
           fixedVersions.some((v) => v.toLowerCase().includes('pending'));
 
-        const vendorCode = vendor?.code || (advisory?.advisory_id?.startsWith('NXSA-') ? 'nutanix' : 'redhat');
+        const advId = advisory?.advisory_id || '';
+        const vendorCode =
+          vendor?.code ||
+          (advId.startsWith('NXSA-')
+            ? 'nutanix'
+            : advId.startsWith('USN-') || advId.startsWith('LSN-')
+            ? 'ubuntu'
+            : advId.startsWith('DSA-') || advId.startsWith('DLA-') || advId.startsWith('DEBIAN-')
+            ? 'debian'
+            : advId.startsWith('SUSE-') || advId.startsWith('openSUSE-')
+            ? 'suse'
+            : 'redhat');
 
         let solution = '';
-        if (vendorCode === 'nutanix') {
-          if (advisory?.summary) {
-            solution = advisory.summary;
-          } else if (!isFixPending) {
+        if (advisory?.summary) {
+          solution = advisory.summary;
+        } else if (vendorCode === 'nutanix') {
+          if (!isFixPending) {
             solution = `請依據 Nutanix 官方公告 (${advisory?.advisory_id || 'NXSA'}) 與修復版本 (${fixedVersions.join(', ') || '最新修復版'}) 執行系統升級。詳情請參閱官方公告指引。`;
           } else {
             solution = `官方目前針對該漏洞分析處置中，請參閱 Nutanix 公告 ${advisory?.advisory_id || 'NXSA'} 密切關注後續更新。`;
+          }
+        } else if (vendorCode === 'ubuntu') {
+          if (!isFixPending) {
+            solution = `請透過 APT 工具執行更新：sudo apt-get update && sudo apt-get --only-upgrade install -y <package>`;
+          } else {
+            solution = `Ubuntu 原廠目前正在分析處置該漏洞，請參閱公告 ${advisory?.advisory_id || 'USN'} 密切關注後續更新。`;
+          }
+        } else if (vendorCode === 'debian') {
+          if (!isFixPending) {
+            solution = `請透過 APT 工具執行更新：sudo apt-get update && sudo apt-get --only-upgrade install -y <package>`;
+          } else {
+            solution = `Debian 資安團隊目前正在處理該漏洞，請參閱公告 ${advisory?.advisory_id || 'DSA'} 密切關注後續更新。`;
+          }
+        } else if (vendorCode === 'suse') {
+          if (!isFixPending) {
+            solution = `請使用 Zypper 執行更新：sudo zypper update -y <package>`;
+          } else {
+            solution = `SUSE 官方目前正在處置該漏洞，請參閱公告 ${advisory?.advisory_id || 'SUSE-SU'} 密切關注後續更新。`;
           }
         } else if (!isFixPending) {
           solution = `請依據官方發佈之資安更新公告 (${fixedVersions.join(', ')}) 執行升級更新 (例如 dnf/yum update)。詳情請參閱官方指引：https://access.redhat.com/articles/11258`;

@@ -308,3 +308,18 @@
   - **Verification**: Live manual sync against production project succeeded HTTP 200 with 903 CVEs, 70 advisories, and SUCCESS logs.
   - **Completed**: 2026-09-11 09:25:00 Asia/Taipei.
 
+- [x] **Task 26: Ubuntu, Debian & SUSE Threat Feed Ingestion & UI Integration (1.0.0)**
+  - [x] Implement `UbuntuAdapter` (`src/adapters/ubuntu.ts`) adhering to `VendorAdapter` interface with USN notice and CVE parsing.
+  - [x] Implement `DebianAdapter` (`src/adapters/debian.ts`) with multi-format support for DSA text lists and Security Tracker JSON.
+  - [x] Implement `SuseAdapter` (`src/adapters/suse.ts`) with CSAF 2.0 parser, `changes.csv` index fetcher, and remediations extraction.
+  - [x] Register all 3 adapters in `src/adapters/index.ts` and update `SYNCED_VENDOR_CODES` in `src/services/syncService.ts`.
+  - [x] Synchronize Edge Function bundle (`src/supabase/functions/_shared/ingest.bundle.js`) and default target vendors in `sync-cve`.
+  - [x] Add database migration `20260911000000_add_ubuntu_debian_suse_vendors.sql` seeding `ubuntu`, `debian`, and `suse`.
+  - [x] Design authentic SVG brand logos in `VendorLogos.tsx` and integrate into `VendorIcon.tsx`.
+  - [x] Add vendor-specific remediation instructions in `AdvisoryDetailDrawer.tsx` and `CveDetailDrawer.tsx`.
+  - [x] Add live external feed health checks in `SystemHealthMonitor.tsx`.
+  - [x] Follow strict TDD: unit tests (`ubuntu.test.ts`, `debian.test.ts`, `suse.test.ts`), smoke tests (`adapters.smoke.test.ts`), and E2E scenario (`ubuntu-debian-suse.e2e.test.tsx`).
+  - **Verification**: 84/84 test files (581 tests) passing 100%; live smoke test against public APIs passing; clean build.
+  - **Completed**: 2026-09-11 12:02:00 Asia/Taipei.
+
+

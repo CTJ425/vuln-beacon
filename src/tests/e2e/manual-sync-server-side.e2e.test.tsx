@@ -114,7 +114,7 @@ describe('E2E: Server-Side Manual Threat Feed Sync (Task 11c)', () => {
           }),
           body: {
             action: 'trigger_manual_sync',
-            vendorCodes: ['redhat', 'nutanix'],
+            vendorCodes: ['redhat', 'nutanix', 'ubuntu', 'debian', 'suse'],
           },
         })
       );

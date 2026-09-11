@@ -165,6 +165,15 @@ describe('SyncService — Nutanix integration', () => {
       if (urlStr.includes('NXSA-AOS-7.5.1.12')) {
         return { ok: true, status: 200, json: async () => nutanixFixture };
       }
+      if (urlStr.includes('ubuntu.com')) {
+        return { ok: true, status: 200, json: async () => ({ notices: [] }) };
+      }
+      if (urlStr.includes('debian.org') || urlStr.includes('salsa.debian.org')) {
+        return { ok: true, status: 200, text: async () => '' };
+      }
+      if (urlStr.includes('suse.com')) {
+        return { ok: true, status: 200, text: async () => '' };
+      }
       return { ok: false, status: 404 };
     });
     vi.stubGlobal('fetch', fetchSpy);

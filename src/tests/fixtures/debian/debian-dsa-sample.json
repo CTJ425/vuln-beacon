@@ -1,0 +1,38 @@
+{
+  "dsaListSample": "[10 Sep 2026] DSA-6492-1 ruby-rack - security update\n\t{CVE-2026-26961 CVE-2026-26962 CVE-2026-32762}\n\t[trixie] - ruby-rack 3.1.20-0+deb13u2\n[09 Sep 2026] DSA-6491-1 slurm-wlm - security update\n\t{CVE-2026-65107 CVE-2026-65108}\n\t[trixie] - slurm-wlm 24.11.5-4+deb13u1\n",
+  "dsaAdvisory": {
+    "id": "DSA-6492-1",
+    "package": "ruby-rack",
+    "title": "DSA-6492-1 ruby-rack - security update",
+    "date": "2026-09-10",
+    "cves": ["CVE-2026-26961", "CVE-2026-26962", "CVE-2026-32762"],
+    "releases": {
+      "trixie": {
+        "package": "ruby-rack",
+        "version": "3.1.20-0+deb13u2",
+        "status": "resolved"
+      }
+    },
+    "description": "Multiple security issues were found in Rack, an interface for developing web applications in Ruby."
+  },
+  "trackerJsonSample": {
+    "ruby-rack": {
+      "CVE-2026-26961": {
+        "description": "Rack contains a denial of service vulnerability due to inefficient header parsing.",
+        "scope": "remote",
+        "releases": {
+          "bookworm": {
+            "status": "resolved",
+            "fixed_version": "2.2.4-1+deb12u1",
+            "urgency": "medium"
+          },
+          "trixie": {
+            "status": "resolved",
+            "fixed_version": "3.1.20-0+deb13u2",
+            "urgency": "high"
+          }
+        }
+      }
+    }
+  }
+}
