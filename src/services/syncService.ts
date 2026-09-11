@@ -2,10 +2,27 @@ import { supabase } from '@/lib/supabase';
 import { getFunctionHeaders } from '@/lib/functionAuth';
 
 export async function extractErrorMessage(err: any): Promise<string> {
-  if (err?.context && typeof err.context.json === 'function') {
+  if (err?.context) {
     try {
       const response = typeof err.context.clone === 'function' ? err.context.clone() : err.context;
-      const errorBody = await response.json();
+      let errorBody: any;
+      if (typeof response.json === 'function') {
+        try {
+          errorBody = await response.json();
+        } catch {
+          if (typeof response.text === 'function') {
+            const text = await response.text();
+            if (text && text.trim().length > 0) {
+              return text.trim();
+            }
+          }
+        }
+      } else if (typeof response.text === 'function') {
+        const text = await response.text();
+        if (text && text.trim().length > 0) {
+          return text.trim();
+        }
+      }
       if (errorBody?.error && typeof errorBody.error === 'string') {
         return errorBody.error;
       }
@@ -16,10 +33,36 @@ export async function extractErrorMessage(err: any): Promise<string> {
         return errorBody.message;
       }
     } catch {
-      // Fall through to err.message on JSON extraction error
+      // Fall through to err.message on extraction error
     }
   }
   return err?.message || 'Sync failed';
+}
+
+export function isTransportError(err: any, errorMsg: string): boolean {
+  const status = err?.context?.status;
+  if (status === 404 || status === 502 || status === 503 || status === 504) {
+    return true;
+  }
+  const name = err?.name || '';
+  if (name === 'FunctionsFetchError' || name === 'FunctionsRelayError') {
+    return true;
+  }
+  return (
+    errorMsg.includes('Unsupported action') ||
+    errorMsg.includes('404') ||
+    errorMsg.includes('Function not found') ||
+    errorMsg.includes('Failed to send a request') ||
+    errorMsg.includes('Failed to fetch') ||
+    errorMsg.includes('FunctionsFetchError') ||
+    errorMsg.includes('FunctionsRelayError') ||
+    errorMsg.includes('Relay Error') ||
+    errorMsg.includes('fetch failed') ||
+    errorMsg.includes('NetworkError') ||
+    errorMsg.includes('Bad Gateway') ||
+    errorMsg.includes('Gateway Timeout') ||
+    errorMsg.includes('Service Unavailable')
+  );
 }
 import { VendorSyncLog } from '@/types';
 import { IngestionEngine } from '@/engine/ingestion';
@@ -261,16 +304,7 @@ export class SyncService {
 
         if (error) {
           const errorMsg = await extractErrorMessage(error);
-          const isTransportError =
-            errorMsg.includes('Unsupported action') ||
-            errorMsg.includes('404') ||
-            errorMsg.includes('Failed to send a request') ||
-            errorMsg.includes('Failed to fetch') ||
-            errorMsg.includes('FunctionsFetchError') ||
-            errorMsg.includes('fetch failed') ||
-            errorMsg.includes('NetworkError');
-
-          if (isTransportError) {
+          if (isTransportError(error, errorMsg)) {
             console.warn('Server-side manual sync unsupported or unreachable; falling back to client execution:', errorMsg);
           } else {
             return {
@@ -288,16 +322,7 @@ export class SyncService {
         }
       } catch (invokeErr: any) {
         const errorMsg = await extractErrorMessage(invokeErr);
-        const isTransportError =
-          errorMsg.includes('Unsupported action') ||
-          errorMsg.includes('404') ||
-          errorMsg.includes('Failed to send a request') ||
-          errorMsg.includes('Failed to fetch') ||
-          errorMsg.includes('FunctionsFetchError') ||
-          errorMsg.includes('fetch failed') ||
-          errorMsg.includes('NetworkError');
-
-        if (!isTransportError) {
+        if (!isTransportError(invokeErr, errorMsg)) {
           return {
             success: false,
             newLogs: [],

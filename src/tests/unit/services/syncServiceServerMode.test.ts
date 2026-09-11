@@ -37,7 +37,7 @@ vi.mock('@/services/webhook', () => ({
   })),
 }));
 
-import { SyncService } from '@/services/syncService';
+import { SyncService, isTransportError } from '@/services/syncService';
 
 describe('SyncService — Server-Side Manual Sync Trigger (Task 11c, TDD)', () => {
   beforeEach(() => {
@@ -312,6 +312,138 @@ describe('SyncService — Server-Side Manual Sync Trigger (Task 11c, TDD)', () =
       })
     );
     expect(result.success).toBe(true);
+  });
+
+  it('surfaces 401 unauthorized error in auto mode without falling back to client', async () => {
+    mockInvoke.mockResolvedValue({
+      data: null,
+      error: {
+        message: 'Edge Function returned a non-2xx status code',
+        name: 'FunctionsHttpError',
+        context: {
+          status: 401,
+          json: async () => ({
+            success: false,
+            error: 'Unauthorized: Admin authentication required for manual sync',
+          }),
+        },
+      },
+    });
+
+    const service = new SyncService();
+    const result = await service.syncVendors(undefined, { mode: 'auto' });
+
+    expect(result.success).toBe(false);
+    expect(result.errors).toContain('Unauthorized: Admin authentication required for manual sync');
+    expect(mockInvoke).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to client-side ingestion in auto mode when server invocation returns FunctionsRelayError', async () => {
+    mockInvoke
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          name: 'FunctionsRelayError',
+          message: 'Relay Error invoking the Edge Function',
+        },
+      })
+      .mockResolvedValue({
+        data: { log: { id: 'fallback-relay-log', status: 'SUCCESS' } },
+        error: null,
+      });
+
+    const service = new SyncService();
+    const result = await service.syncVendors(['redhat'], { mode: 'auto' });
+
+    expect(mockInvoke).toHaveBeenNthCalledWith(
+      1,
+      'sync-cve',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          action: 'trigger_manual_sync',
+        }),
+      })
+    );
+    expect(mockInvoke).toHaveBeenNthCalledWith(
+      2,
+      'sync-cve',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          action: 'persist_ingestion',
+        }),
+      })
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it('falls back to client-side ingestion in auto mode when server returns 404 Function not found', async () => {
+    mockInvoke
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          name: 'FunctionsHttpError',
+          message: 'Edge Function returned a non-2xx status code',
+          context: {
+            status: 404,
+            json: async () => ({ message: 'Function not found' }),
+          },
+        },
+      })
+      .mockResolvedValue({
+        data: { log: { id: 'fallback-404-log', status: 'SUCCESS' } },
+        error: null,
+      });
+
+    const service = new SyncService();
+    const result = await service.syncVendors(['redhat'], { mode: 'auto' });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('falls back to client-side ingestion in auto mode when gateway returns 502 Bad Gateway text', async () => {
+    mockInvoke
+      .mockResolvedValueOnce({
+        data: null,
+        error: {
+          name: 'FunctionsHttpError',
+          message: 'Edge Function returned a non-2xx status code',
+          context: {
+            status: 502,
+            text: async () => '502 Bad Gateway: Edge Runtime supervisor crashed',
+          },
+        },
+      })
+      .mockResolvedValue({
+        data: { log: { id: 'fallback-502-log', status: 'SUCCESS' } },
+        error: null,
+      });
+
+    const service = new SyncService();
+    const result = await service.syncVendors(['redhat'], { mode: 'auto' });
+
+    expect(result.success).toBe(true);
+  });
+
+  describe('isTransportError helper classification', () => {
+    it('classifies network and infrastructure errors as transport errors', () => {
+      expect(isTransportError({ name: 'FunctionsFetchError' }, 'Failed to send a request')).toBe(true);
+      expect(isTransportError({ name: 'FunctionsRelayError' }, 'Relay Error invoking the Edge Function')).toBe(true);
+      expect(isTransportError({ context: { status: 404 } }, 'Function not found')).toBe(true);
+      expect(isTransportError({ context: { status: 502 } }, 'Bad Gateway')).toBe(true);
+      expect(isTransportError({ context: { status: 503 } }, 'Service Unavailable')).toBe(true);
+      expect(isTransportError({ context: { status: 504 } }, 'Gateway Timeout')).toBe(true);
+      expect(isTransportError(new Error('fetch failed'), 'fetch failed')).toBe(true);
+      expect(isTransportError(new Error('NetworkError when attempting to fetch resource'), 'NetworkError')).toBe(true);
+      expect(isTransportError(null, 'Unsupported action')).toBe(true);
+    });
+
+    it('classifies operational errors as non-transport errors', () => {
+      expect(isTransportError({ context: { status: 409 } }, 'A threat feed synchronization is already in progress')).toBe(false);
+      expect(isTransportError({ context: { status: 401 } }, 'Unauthorized: Admin authentication required for manual sync')).toBe(false);
+      expect(isTransportError({ context: { status: 403 } }, 'Forbidden')).toBe(false);
+      expect(isTransportError({ context: { status: 500 } }, 'Database transaction rolled back')).toBe(false);
+      expect(isTransportError(new Error('Invalid argument'), 'Invalid argument')).toBe(false);
+    });
   });
 });
 

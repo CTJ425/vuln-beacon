@@ -1,17 +1,19 @@
 # Progress Log
 
-## 2026-09-11 09:48:00 Asia/Taipei - Operational Conflict Fallback Boundary Fix (1.0.0)
+## 2026-09-11 09:58:00 Asia/Taipei - Operational Conflict Fallback Boundary & Transport Classifier Fix (1.0.0)
 - **Resolved Concurrency Lock & Operational Conflict Fallback Bug (`syncService.ts`)**:
-  - **Fallback Boundary Restriction**: Refined fallback guard in `SyncService.syncVendors` line 273 and 300. Changed condition from `if (isTransportError || mode === 'auto')` to strictly `if (isTransportError)`.
+  - **Fallback Boundary Restriction**: Refined fallback guard in `SyncService.syncVendors` lines 307 and 333. Changed condition from `if (isTransportError || mode === 'auto')` to strictly `if (isTransportError(error, errorMsg))`.
+  - **Centralized Transport Classifier**: Extracted `isTransportError` helper checking HTTP status (404, 502, 503, 504), SDK error names (`FunctionsFetchError`, `FunctionsRelayError`), and network/gateway strings (`Failed to send a request`, `Relay Error`, `fetch failed`, `NetworkError`, `Bad Gateway`, `Gateway Timeout`).
+  - **Plain Text / Gateway Error Extraction**: Enhanced `extractErrorMessage` to fall back to `response.text()` when non-JSON bodies (e.g. gateway 502/504 errors) are returned.
   - **Operational Conflict Surfacing**: Ensured operational conflicts (such as HTTP 409 `A threat feed synchronization is already in progress` or HTTP 401 unauthorized errors) cleanly return `{ success: false, errors: [errorMsg] }` instead of falling back to client-side ingestion when in `auto` mode.
   - **Unit & E2E Test Hardening**:
-    - Added unit test coverage in `src/tests/unit/services/syncServiceServerMode.test.ts` verifying that 409 concurrency lock conflicts and operational errors in `auto` mode surface failure without triggering client ingestion.
+    - Added comprehensive unit test coverage in `src/tests/unit/services/syncServiceServerMode.test.ts` verifying that 409 concurrency lock conflicts, 401 unauthorized, 404 Function not found, 502 Bad Gateway text, and FunctionsRelayError behave strictly according to transport vs operational specifications.
     - Verified `tests/e2e/manual-sync-server-side.e2e.test.tsx` Phase 2 passes with expected error banner display.
 - **Deep Verification**:
-  - Unit tests: 65/65 files passed (421/421 tests).
+  - Unit tests: 65/65 files passed (427/427 tests).
   - Smoke tests: 3/3 files passed (13/13 tests).
   - E2E tests: 12/12 files passed (106/106 tests).
-  - Total test pyramid: 80/80 test files passed (540/540 tests).
+  - Total test pyramid: 80/80 test files passed (546/546 tests).
   - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
 
 ## 2026-09-11 09:35:00 Asia/Taipei - Production Sync Fallback & CLI Hardening (1.0.0)
