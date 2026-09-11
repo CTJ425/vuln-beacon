@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Drawer,
   Box,
@@ -21,6 +21,7 @@ import { X, ExternalLink, Copy, Check, Flame, Layers, Wrench } from 'lucide-reac
 
 import { AdvisoryRowItem } from '@/services/advisoryService';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
+import { StateBadge } from '@/components/common/StateBadge';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
 import { getAdvisoryUrl } from '@/utils/advisoryUrl';
@@ -37,6 +38,13 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
   onClose,
 }) => {
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   if (!item) return null;
 
@@ -55,85 +63,14 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
         document.body.removeChild(ta);
       }
       setCopiedText(text);
-      setTimeout(() => setCopiedText(null), 2000);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => {
+        setCopiedText(null);
+        copyTimerRef.current = null;
+      }, 2000);
     } catch {}
   };
 
-  const getStateBadge = (state: string) => {
-    const s = (state || '').toLowerCase();
-    if (s === 'affected') {
-      return (
-        <Chip
-          label="🔴 受影響 (Affected)"
-          size="small"
-          sx={{
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            bgcolor: 'rgba(239, 68, 68, 0.15)',
-            color: '#ef4444',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-          }}
-        />
-      );
-    }
-    if (s.includes('not affected') || s === 'not_affected') {
-      return (
-        <Chip
-          label="🟢 不受影響 (Not affected)"
-          size="small"
-          sx={{
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            bgcolor: 'rgba(34, 197, 94, 0.15)',
-            color: '#22c55e',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-          }}
-        />
-      );
-    }
-    if (s === 'fixed') {
-      return (
-        <Chip
-          label="🟢 已修復 (Fixed)"
-          size="small"
-          sx={{
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            bgcolor: 'rgba(34, 197, 94, 0.15)',
-            color: '#22c55e',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-          }}
-        />
-      );
-    }
-    if (s === 'fix deferred') {
-      return (
-        <Chip
-          label="🟠 延後修復 (Fix deferred)"
-          size="small"
-          sx={{
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            bgcolor: 'rgba(245, 158, 11, 0.15)',
-            color: '#f59e0b',
-            border: '1px solid rgba(245, 158, 11, 0.3)',
-          }}
-        />
-      );
-    }
-    return (
-      <Chip
-        label={state}
-        size="small"
-        sx={{
-          fontWeight: 600,
-          fontSize: '0.75rem',
-          bgcolor: 'action.hover',
-          color: 'text.secondary',
-        }}
-      />
-    );
-  };
 
   const firstComponent = item.product_impacts?.[0]?.component;
 
@@ -245,9 +182,29 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 0.8 }}>
-                  <Typography sx={{ fontFamily: 'JetBrains Mono', fontWeight: 800, color: 'primary.main' }}>
-                    {cveId}
-                  </Typography>
+                  {(() => {
+                    const cveUrl = getAdvisoryUrl(cveId, item.vendor_code);
+                    return cveUrl ? (
+                      <Link
+                        href={cveUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{
+                          fontFamily: 'JetBrains Mono',
+                          fontWeight: 800,
+                          color: 'primary.main',
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
+                        }}
+                      >
+                        {cveId}
+                      </Link>
+                    ) : (
+                      <Typography sx={{ fontFamily: 'JetBrains Mono', fontWeight: 800, color: 'primary.main' }}>
+                        {cveId}
+                      </Typography>
+                    );
+                  })()}
                   <SeverityBadge severity={severity} score={score} />
                   {isKev && (
                     <Chip
@@ -294,17 +251,26 @@ export const AdvisoryDetailDrawer: React.FC<AdvisoryDetailDrawerProps> = ({
                   <TableCell sx={{ fontFamily: 'JetBrains Mono', fontSize: '0.775rem', color: 'primary.main' }}>
                     {imp.component}
                   </TableCell>
-                  <TableCell>{getStateBadge(imp.state)}</TableCell>
+                  <TableCell>
+                    <StateBadge state={imp.state} />
+                  </TableCell>
                   <TableCell sx={{ fontFamily: 'JetBrains Mono', fontSize: '0.775rem' }}>
                     {imp.errata && imp.errata !== '-' ? (
-                      <Link
-                        href={getAdvisoryUrl(imp.errata, item.vendor_code)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        sx={{ color: 'primary.main', fontWeight: 600 }}
-                      >
-                        Advisory: {imp.errata}
-                      </Link>
+                      (() => {
+                        const errataUrl = getAdvisoryUrl(imp.errata, item.vendor_code);
+                        return errataUrl ? (
+                          <Link
+                            href={errataUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{ color: 'primary.main', fontWeight: 600 }}
+                          >
+                            Advisory: {imp.errata}
+                          </Link>
+                        ) : (
+                          <span>Advisory: {imp.errata}</span>
+                        );
+                      })()
                     ) : (
                       <span style={{ color: '#94a3b8' }}>-</span>
                     )}

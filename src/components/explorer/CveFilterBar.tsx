@@ -115,8 +115,10 @@ export const CveFilterBar: React.FC<CveFilterBarProps> = ({
       {/* Bottom row: Filters & Reset */}
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
         <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Product Family</InputLabel>
+          <InputLabel id="product-family-filter-label">Product Family</InputLabel>
           <Select
+            labelId="product-family-filter-label"
+            id="product-family-filter-select"
             value={selectedVendor}
             label="Product Family"
             onChange={(e) => onVendorChange(e.target.value)}
@@ -150,8 +152,10 @@ export const CveFilterBar: React.FC<CveFilterBarProps> = ({
         </FormControl>
 
         <FormControl size="small" sx={{ minWidth: 170 }}>
-          <InputLabel>Component State</InputLabel>
+          <InputLabel id="component-state-filter-label">Component State</InputLabel>
           <Select
+            labelId="component-state-filter-label"
+            id="component-state-filter-select"
             value={selectedStatus}
             label="Component State"
             onChange={(e) => onStatusChange(e.target.value)}

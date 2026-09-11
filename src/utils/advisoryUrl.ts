@@ -1,11 +1,38 @@
 /**
- * Utility for resolving canonical advisory and errata URLs across supported enterprise vendors.
+ * Utility for resolving canonical advisory, errata, and CVE URLs across supported enterprise vendors.
  */
 
 export function getAdvisoryUrl(advisoryId: string, vendorCode?: string): string {
   const adv = (advisoryId || '').trim();
   if (!adv || adv === '-') return '';
-  const v = (vendorCode || '').toLowerCase();
+
+  // If already a valid absolute URL, return directly
+  if (/^https?:\/\//i.test(adv)) {
+    return adv;
+  }
+
+  const v = (vendorCode || '').toLowerCase().trim();
+
+  // If input is a standard CVE identifier (e.g. CVE-2024-1234)
+  if (/^CVE-\d{4}-\d+$/i.test(adv)) {
+    const cveUpper = adv.toUpperCase();
+    if (v === 'redhat') {
+      return `https://access.redhat.com/security/cve/${cveUpper}`;
+    }
+    if (v === 'ubuntu') {
+      return `https://ubuntu.com/security/cve/${cveUpper}`;
+    }
+    if (v === 'debian') {
+      return `https://security-tracker.debian.org/tracker/${cveUpper}`;
+    }
+    if (v === 'suse') {
+      return `https://www.suse.com/security/cve/${cveUpper}`;
+    }
+    if (v === 'nutanix') {
+      return `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(adv)}`;
+    }
+    return `https://www.cve.org/CVERecord?id=${encodeURIComponent(cveUpper)}`;
+  }
 
   // Nutanix advisories: NXSA-... or nutanix vendor
   if (adv.toUpperCase().startsWith('NXSA-') || v === 'nutanix') {
@@ -18,19 +45,42 @@ export function getAdvisoryUrl(advisoryId: string, vendorCode?: string): string 
   }
 
   // Debian security advisories: DSA-..., DLA-..., DEBIAN-... or debian vendor
-  if (adv.toUpperCase().startsWith('DSA-') || adv.toUpperCase().startsWith('DLA-') || adv.toUpperCase().startsWith('DEBIAN-') || v === 'debian') {
+  if (
+    adv.toUpperCase().startsWith('DSA-') ||
+    adv.toUpperCase().startsWith('DLA-') ||
+    adv.toUpperCase().startsWith('DEBIAN-') ||
+    v === 'debian'
+  ) {
     return `https://security-tracker.debian.org/tracker/${encodeURIComponent(adv)}`;
   }
 
-  // SUSE security announcements: SUSE-SU-..., OPENSUSE-SU-... or suse vendor
-  if (adv.toUpperCase().startsWith('SUSE-SU-') || adv.toUpperCase().startsWith('OPENSUSE-SU-') || v === 'suse') {
-    const m = adv.match(/^(suse|opensuse)-su-(\d{4})[:\-_](\d+)-(\d+)$/i);
+  // SUSE security announcements: SUSE-SU-..., SUSE-RU-..., OPENSUSE-SU-... or suse vendor
+  if (
+    adv.toUpperCase().startsWith('SUSE-SU-') ||
+    adv.toUpperCase().startsWith('SUSE-RU-') ||
+    adv.toUpperCase().startsWith('OPENSUSE-SU-') ||
+    v === 'suse'
+  ) {
+    const m = adv.match(/^(suse|opensuse)-(su|ru)-(\d{4})[:\-_](\d+)-(\d+)$/i);
     if (m && m[1].toLowerCase() === 'suse') {
-      return `https://www.suse.com/support/update/announcement/${m[2]}/suse-su-${m[2]}${m[3]}-${m[4]}/`;
+      const type = m[2].toLowerCase();
+      const year = m[3];
+      const id = m[4];
+      const rev = m[5];
+      return `https://www.suse.com/support/update/announcement/${year}/suse-${type}-${year}${id}-${rev}/`;
     }
     return 'https://www.suse.com/support/update/announcement/';
   }
 
-  // Red Hat Errata (default for RHSA-..., RHBA-..., RHEA-... or generic enterprise advisories)
-  return `https://access.redhat.com/errata/${adv}`;
+  // Red Hat Errata: RHSA-..., RHBA-..., RHEA-... or redhat vendor
+  if (
+    adv.toUpperCase().startsWith('RHSA-') ||
+    adv.toUpperCase().startsWith('RHBA-') ||
+    adv.toUpperCase().startsWith('RHEA-') ||
+    v === 'redhat'
+  ) {
+    return `https://access.redhat.com/errata/${adv}`;
+  }
+
+  return '';
 }

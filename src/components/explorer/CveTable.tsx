@@ -19,6 +19,7 @@ import { CveRecord, ProductImpactItem } from '@/types';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
+import { isAffectedState } from '@/utils/statusUtils';
 
 export interface CveTableRowItem extends CveRecord {
   vendor_code: string;
@@ -96,7 +97,7 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
 
             const totalImpacts = item.product_impacts ? item.product_impacts.length : 0;
             const affectedCount = item.product_impacts
-              ? item.product_impacts.filter((p) => (p.state || '').toLowerCase() === 'affected').length
+              ? item.product_impacts.filter((p) => isAffectedState(p.state)).length
               : 0;
 
             return (
@@ -269,7 +270,7 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
 
                 {/* Action Arrow */}
                 <TableCell align="right">
-                  <IconButton size="small" sx={{ color: 'text.secondary' }}>
+                  <IconButton size="small" aria-label="檢視詳細資訊" sx={{ color: 'text.secondary' }}>
                     <ChevronRight size={18} />
                   </IconButton>
                 </TableCell>

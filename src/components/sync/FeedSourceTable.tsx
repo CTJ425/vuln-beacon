@@ -38,7 +38,8 @@ type ChipTone = 'success' | 'warning' | 'default';
 function integrationChip(vendorCode: string): { label: string; color: ChipTone } {
   const adapter = getAdapterByCode(vendorCode);
   if (!adapter) return { label: 'Not implemented', color: 'default' };
-  const isSynced = (SYNCED_VENDOR_CODES as readonly string[]).includes(vendorCode);
+  const target = (vendorCode || '').toLowerCase();
+  const isSynced = (SYNCED_VENDOR_CODES as readonly string[]).some((c) => c.toLowerCase() === target);
   return isSynced ? { label: 'Connected', color: 'success' } : { label: 'Adapter idle', color: 'warning' };
 }
 

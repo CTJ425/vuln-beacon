@@ -7,6 +7,7 @@ import { AdvisoryTable } from '@/components/explorer/AdvisoryTable';
 import { AdvisoryRowItem } from '@/services/advisoryService';
 import { SyncService } from '@/services/syncService';
 import { VendorNode, matchesProductFamily } from '@/services/productTaxonomy';
+import { matchesImpactState } from '@/utils/statusUtils';
 
 
 interface ExplorerPageProps {
@@ -56,11 +57,7 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
       // Component State filter
       if (selectedStatus !== 'ALL') {
         const impacts = item.product_impacts || [];
-        const hasMatchingState = impacts.some((imp) => {
-          const s = (imp.state || '').toLowerCase().replace(/[\s_-]/g, '');
-          const target = selectedStatus.toLowerCase().replace(/[\s_-]/g, '');
-          return s.includes(target) || target.includes(s);
-        });
+        const hasMatchingState = impacts.some((imp) => matchesImpactState(imp.state, selectedStatus));
         if (!hasMatchingState) {
           return false;
         }
@@ -69,12 +66,12 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
       // Search keyword filter (CVE, Advisory, Component name, Product name, Errata, Description)
       if (searchTerm.trim() !== '') {
         const term = searchTerm.toLowerCase();
-        const matchCve = item.cve_id.toLowerCase().includes(term);
-        const matchAdv = item.advisory_id.toLowerCase().includes(term);
-        const matchAllAdv = (item.all_advisories || []).some((a) => a.toLowerCase().includes(term));
-        const matchTitle = item.advisory_title.toLowerCase().includes(term);
-        const matchDesc = item.description.toLowerCase().includes(term);
-        const matchProd = item.affected_products.some((p) => p.toLowerCase().includes(term));
+        const matchCve = (item.cve_id || '').toLowerCase().includes(term);
+        const matchAdv = (item.advisory_id || '').toLowerCase().includes(term);
+        const matchAllAdv = (item.all_advisories || []).some((a) => (a || '').toLowerCase().includes(term));
+        const matchTitle = (item.advisory_title || '').toLowerCase().includes(term);
+        const matchDesc = (item.description || '').toLowerCase().includes(term);
+        const matchProd = (item.affected_products || []).some((p) => (p || '').toLowerCase().includes(term));
         const matchImpact = (item.product_impacts || []).some(
           (imp) =>
             (imp.component || '').toLowerCase().includes(term) ||
@@ -108,11 +105,7 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
       // Component State filter
       if (selectedStatus !== 'ALL') {
         const impacts = item.product_impacts || [];
-        const hasMatchingState = impacts.some((imp) => {
-          const s = (imp.state || '').toLowerCase().replace(/[\s_-]/g, '');
-          const target = selectedStatus.toLowerCase().replace(/[\s_-]/g, '');
-          return s.includes(target) || target.includes(s);
-        });
+        const hasMatchingState = impacts.some((imp) => matchesImpactState(imp.state, selectedStatus));
         if (!hasMatchingState) {
           return false;
         }
@@ -121,15 +114,16 @@ export const ExplorerPage: React.FC<ExplorerPageProps> = ({
       // Search keyword filter (Advisory id, title, summary, CVEs, products, impacts)
       if (searchTerm.trim() !== '') {
         const term = searchTerm.toLowerCase();
-        const matchAdv = item.advisory_id.toLowerCase().includes(term);
-        const matchTitle = item.title.toLowerCase().includes(term);
+        const matchAdv = (item.advisory_id || '').toLowerCase().includes(term);
+        const matchTitle = (item.title || '').toLowerCase().includes(term);
         const matchSummary = (item.summary || '').toLowerCase().includes(term);
-        const matchCve = item.cves.some(
-          (cve) =>
-            cve.cve_id.toLowerCase().includes(term) ||
-            cve.description.toLowerCase().includes(term)
-        );
-        const matchProd = item.affected_products.some((p) => p.toLowerCase().includes(term));
+        const matchCve = (item.cves || []).some((cve: any) => {
+          if (typeof cve === 'string') return cve.toLowerCase().includes(term);
+          const cveId = (cve?.cve_id || '').toLowerCase();
+          const desc = (cve?.description || '').toLowerCase();
+          return cveId.includes(term) || desc.includes(term);
+        });
+        const matchProd = (item.affected_products || []).some((p) => (p || '').toLowerCase().includes(term));
         const matchImpact = (item.product_impacts || []).some(
           (imp) =>
             (imp.component || '').toLowerCase().includes(term) ||

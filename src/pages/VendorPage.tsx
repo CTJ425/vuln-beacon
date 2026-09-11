@@ -58,7 +58,8 @@ export const VendorPage: React.FC<VendorPageProps> = ({
     totalImpactedComponents += a.product_impacts ? a.product_impacts.length : 0;
   });
 
-  const vendorName = vendor?.vendorName ?? VENDOR_NAMES[vendorCode.toLowerCase()] ?? vendorCode;
+  const vCodeLower = (vendorCode || '').toLowerCase();
+  const vendorName = vendor?.vendorName ?? (vCodeLower ? VENDOR_NAMES[vCodeLower] : undefined) ?? vendorCode ?? '';
 
   return (
     <Stack spacing={3.5}>

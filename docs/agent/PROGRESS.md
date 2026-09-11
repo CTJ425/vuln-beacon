@@ -1,5 +1,35 @@
 # Progress Log
 
+## 2026-09-11 15:35:00 Asia/Taipei - Codebase Adversary Audit, State Collision Fix & Multi-Vendor UX Hardening (1.0.0)
+- **Defects Discovered & Remediated from Adversary Review**:
+  - **Critical Component State Filter Collision (`src/pages/ExplorerPage.tsx`)**:
+    - Discovered that filtering by `AFFECTED` was matching all items with `Not affected` because `'notaffected'.includes('affected')` was `true`. Vice versa, filtering by `NOT_AFFECTED` matched `Affected`.
+    - Extracted dedicated classifier `matchesImpactState` and `isAffectedState` in `src/utils/statusUtils.ts` backed by 6 unit tests (`src/tests/unit/utils/statusUtils.test.ts`), eliminating substring collisions across multi-vendor terminology.
+    - Added dedicated Explorer page unit test suite (`src/tests/unit/pages/ExplorerPage.test.tsx`, 3 tests) explicitly validating state isolation between Affected and Not affected.
+  - **Advisory URL Resolver Hardening (`src/utils/advisoryUrl.ts`)**:
+    - Fixed URL double-wrapping when advisory field already contains a full `http://` or `https://` URL.
+    - Added native CVE identifier (`CVE-YYYY-NNNN`) resolution to vendor trackers (Red Hat, Ubuntu, Debian, SUSE, Nutanix) and CVE.org fallback.
+    - Added SUSE Recommended Updates (`SUSE-RU-`) announcement pattern matching in both `getAdvisoryUrl` and `SuseAdapter` (`src/adapters/suse.ts`).
+    - Fixed arbitrary unclassified strings returning broken Red Hat errata URLs by returning safe empty string when no vendor matches.
+    - Extended unit test suite in `src/tests/unit/utils/advisoryUrl.test.ts` (9 tests).
+  - **Unified State Badge Component (`src/components/common/StateBadge.tsx`)**:
+    - Consolidated duplicated `getStateBadge` implementations in `CveDetailDrawer.tsx` and `AdvisoryDetailDrawer.tsx`.
+    - Added visual styling for `Will not fix`, `Under investigation`, `Resolved`, `Released`, `Open`, `Needed`, and safe fallback for unknown / empty states.
+  - **Interactive CVE Links & Memory Leak Prevention in Drawers (`AdvisoryDetailDrawer.tsx` & `CveDetailDrawer.tsx`)**:
+    - Elevated static CVE IDs in `AdvisoryDetailDrawer` into interactive external links to canonical vendor security trackers.
+    - Fixed timer leak in `AdvisoryDetailDrawer.tsx` by using `copyTimerRef` and unmount cleanup.
+    - Added dedicated unit test suite for `AdvisoryDetailDrawer` (`src/tests/unit/components/AdvisoryDetailDrawer.test.tsx`, 5 tests).
+  - **Feed Source & Health Monitor Reliability**:
+    - Fixed case-sensitive vendor code comparison in `FeedSourceTable.tsx`'s `integrationChip`.
+    - Ensured probe timeout in `SystemHealthMonitor.tsx` is cleared in a `finally` block to prevent timer leaks.
+    - Added accessible `labelId` / `id` to `CveFilterBar` selects and `aria-label` to table action buttons.
+- **Deep Verification**:
+  - Unit tests: 73/73 files passed (484/484 tests).
+  - Smoke tests: 3/3 files passed (16/16 tests).
+  - E2E tests: 13/13 files passed (114/114 tests).
+  - Total test pyramid: 89/89 test files passed (614/614 tests 100%).
+  - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors in 7.68s.
+
 ## 2026-09-11 15:10:00 Asia/Taipei - Codebase Review, Defensive Null Safety & UI/UX Enhancements (1.0.0)
 - **Codebase Review, Bug Remediations & Defensive Hardening**:
   - **Canonical Advisory URL Resolution Utility (`src/utils/advisoryUrl.ts`)**:
@@ -31,29 +61,4 @@
   - Smoke tests: 3/3 files passed (16/16 tests).
   - E2E tests: 13/13 files passed (114/114 tests).
   - Total test pyramid: 86/86 test files passed (597/597 tests).
-  - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
-
-## 2026-09-11 12:35:00 Asia/Taipei - Harden Ubuntu, Debian & SUSE Threat Feed Ingestion & Type Safety (1.0.0)
-- **Defects Discovered & Remediated from Prior Attempt**:
-  - **Debian On-Demand Query Breakdown (`syncService.ts`)**:
-    - Prior worker passed advisory IDs (`DSA-6492-1`) directly in `cves: [q]`, which `CVE_ID_REGEX` rejected and resulted in 0 CVEs and immediate failure.
-    - Implemented `fetchAdvisoryById` in `DebianAdapter` querying the DSA list, extracting all referenced CVEs, and routing structured retrieval.
-    - Added Debian reverse CVE lookup fallback in `fetchAndIngestQuery` (`debianAdapter.fetchAdvisoryByCve(q)`).
-  - **SUSE Chronological Inversion & Advisory Resolution (`suse.ts` & `CveDetailDrawer.tsx`)**:
-    - Fixed chronological ordering in `fetchAdvisories`: parsed timestamps in `changes.csv` and sorted descending, preventing legacy 2014 advisories at the CSV tail from displacing recent 2026 advisories.
-    - Added hyphenated advisory ID normalization (`suse-su-2026-3951-1` -> `suse-su-2026_3951-1.json`).
-    - Fixed invalid direct CVE requests to `ftp.suse.com/pub/projects/security/csaf/cve-*.json`.
-    - Added dynamic SUSE advisory announcement URLs in `CveDetailDrawer.tsx`.
-  - **Ubuntu Regression Notice Fallback (`ubuntu.ts`)**:
-    - Added description/summary regex fallback extracting CVE IDs when `cves` and `cves_ids` arrays are empty (e.g. `USN-8571-2`).
-    - Normalized bare numeric notice inputs to `USN-` prefixed format.
-  - **TypeScript Compilation & Test Stability**:
-    - Fixed `CveTableRowItem` missing `advisory_title` property in `tests/e2e/ubuntu-debian-suse.e2e.test.tsx`.
-    - Fixed invalid property access `adv.productImpacts` on `NormalizedAdvisoryItem` in `tests/unit/adapters/debian.test.ts`.
-    - Increased live smoke test timeouts in `adapters.smoke.test.ts` to 30s to prevent concurrency timeout under parallel test runner load.
-- **Deep Verification**:
-  - Unit tests: 69/69 files passed (461/461 tests).
-  - Smoke tests: 3/3 files passed (16/16 tests, including live HTTP fetching for Nutanix, Ubuntu, Debian, SUSE).
-  - E2E tests: 13/13 files passed (114/114 tests).
-  - Total test pyramid: 85/85 test files passed (591/591 tests).
   - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.

@@ -55,7 +55,10 @@ export const AdvisoryTable: React.FC<AdvisoryTableProps> = ({ items, onSelectRow
         </TableHead>
         <TableBody>
           {items.map((item) => {
-            const cveIds = item.cves.map((c) => c.cve_id);
+            const cveList = item.cves || [];
+            const cveIds = cveList
+              .map((c) => (typeof c === 'string' ? c : c?.cve_id || ''))
+              .filter(Boolean);
             const visibleCveIds = cveIds.slice(0, 2);
             const extraCveCount = cveIds.length - visibleCveIds.length;
 
@@ -142,7 +145,7 @@ export const AdvisoryTable: React.FC<AdvisoryTableProps> = ({ items, onSelectRow
 
                 {/* Action Arrow */}
                 <TableCell align="right">
-                  <IconButton size="small" sx={{ color: 'text.secondary' }}>
+                  <IconButton size="small" aria-label="檢視詳細資訊" sx={{ color: 'text.secondary' }}>
                     <ChevronRight size={18} />
                   </IconButton>
                 </TableCell>

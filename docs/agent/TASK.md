@@ -333,6 +333,20 @@
   - [x] Parallelize external threat feed health probes using `Promise.all` in `SystemHealthMonitor.tsx`.
   - **Verification**: 86/86 test files (597 tests) passing 100%; clean production build via `npm --prefix src run verify`.
   - **Completed**: 2026-09-11 15:10:00 Asia/Taipei.
+- [x] **Task 28: Codebase Adversary Audit, State Collision Fix & Multi-Vendor UX Hardening (1.0.0)**
+  - [x] Fix critical Component State filter substring collision in `ExplorerPage.tsx` where filtering by `AFFECTED` matched `Not affected` components.
+  - [x] Implement centralized state classification helpers (`matchesImpactState`, `isAffectedState`) in `src/utils/statusUtils.ts` backed by unit tests (`src/tests/unit/utils/statusUtils.test.ts`, 6 tests).
+  - [x] Create unified `StateBadge` component (`src/components/common/StateBadge.tsx`) replacing duplicated drawer badge renderers with support for `Will not fix`, `Under investigation`, `Resolved`, `Released`, `Open`, and `Needed`.
+  - [x] Harden `getAdvisoryUrl` with URL passthrough, CVE ID resolution across vendors, SUSE Recommended Updates (`SUSE-RU-`) support, and empty string fallback for unclassified strings.
+  - [x] Upgrade `AdvisoryDetailDrawer` with clickable CVE links and `copyTimerRef` cleanup.
+  - [x] Add dedicated unit test suite for `AdvisoryDetailDrawer` (`src/tests/unit/components/AdvisoryDetailDrawer.test.tsx`, 5 tests).
+  - [x] Add dedicated unit test suite for `ExplorerPage` (`src/tests/unit/pages/ExplorerPage.test.tsx`, 3 tests).
+  - [x] Normalize case-insensitive vendor checking in `FeedSourceTable.tsx`'s `integrationChip`.
+  - [x] Guard `timeoutId` cleanup in `SystemHealthMonitor.tsx` via `finally` block to prevent timer leaks.
+  - [x] Add accessible `labelId` and `id` to `CveFilterBar.tsx` selects and `aria-label` to table action buttons in `CveTable.tsx` and `AdvisoryTable.tsx`.
+  - [x] Recompile Edge Function bundle `ingest.bundle.js` with SUSE RU pattern support.
+  - **Verification**: 89/89 test files (614/614 tests) passing 100%; clean production build via `npm --prefix src run verify`.
+  - **Completed**: 2026-09-11 15:35:00 Asia/Taipei.
 
 
 

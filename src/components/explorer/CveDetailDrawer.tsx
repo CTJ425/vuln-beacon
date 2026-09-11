@@ -39,6 +39,8 @@ import { SeverityBadge } from '@/components/common/SeverityBadge';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
 import { getAdvisoryUrl } from '@/utils/advisoryUrl';
+import { StateBadge } from '@/components/common/StateBadge';
+import { isAffectedState, matchesImpactState } from '@/utils/statusUtils';
 
 interface CveDetailDrawerProps {
   open: boolean;
@@ -89,24 +91,17 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
 
   // Group into Affected vs Not Affected vs Fix Deferred
   const affectedList = useMemo(() => {
-    return impacts.filter((imp) => {
-      const s = (imp.state || '').toLowerCase();
-      return s === 'affected' || s === 'will not fix';
-    });
+    return impacts.filter((imp) => isAffectedState(imp.state));
   }, [impacts]);
 
   const notAffectedList = useMemo(() => {
-    return impacts.filter((imp) => {
-      const s = (imp.state || '').toLowerCase();
-      return s.includes('not affected') || s === 'fixed' || s === 'not_affected';
-    });
+    return impacts.filter(
+      (imp) => matchesImpactState(imp.state, 'NOT_AFFECTED') || matchesImpactState(imp.state, 'FIXED')
+    );
   }, [impacts]);
 
   const deferredList = useMemo(() => {
-    return impacts.filter((imp) => {
-      const s = (imp.state || '').toLowerCase();
-      return s === 'fix deferred' || s === 'under investigation';
-    });
+    return impacts.filter((imp) => matchesImpactState(imp.state, 'FIX_DEFERRED'));
   }, [impacts]);
 
   const filteredItems = useMemo(() => {
@@ -155,81 +150,6 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
 
   if (!item) return null;
 
-  const getStateBadge = (state: string) => {
-    const s = (state || '').toLowerCase();
-    if (s === 'affected') {
-      return (
-        <Chip
-          label="🔴 受影響 (Affected)"
-          size="small"
-          sx={{
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            bgcolor: 'rgba(239, 68, 68, 0.15)',
-            color: '#ef4444',
-            border: '1px solid rgba(239, 68, 68, 0.3)',
-          }}
-        />
-      );
-    }
-    if (s.includes('not affected') || s === 'not_affected') {
-      return (
-        <Chip
-          label="🟢 不受影響 (Not affected)"
-          size="small"
-          sx={{
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            bgcolor: 'rgba(34, 197, 94, 0.15)',
-            color: '#22c55e',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-          }}
-        />
-      );
-    }
-    if (s === 'fixed') {
-      return (
-        <Chip
-          label="🟢 已修復 (Fixed)"
-          size="small"
-          sx={{
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            bgcolor: 'rgba(34, 197, 94, 0.15)',
-            color: '#22c55e',
-            border: '1px solid rgba(34, 197, 94, 0.3)',
-          }}
-        />
-      );
-    }
-    if (s === 'fix deferred') {
-      return (
-        <Chip
-          label="🟠 延後修復 (Fix deferred)"
-          size="small"
-          sx={{
-            fontWeight: 700,
-            fontSize: '0.75rem',
-            bgcolor: 'rgba(245, 158, 11, 0.15)',
-            color: '#f59e0b',
-            border: '1px solid rgba(245, 158, 11, 0.3)',
-          }}
-        />
-      );
-    }
-    return (
-      <Chip
-        label={state}
-        size="small"
-        sx={{
-          fontWeight: 600,
-          fontSize: '0.75rem',
-          bgcolor: 'action.hover',
-          color: 'text.secondary',
-        }}
-      />
-    );
-  };
 
   return (
     <Drawer
@@ -358,18 +278,28 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
               相關釋出之公告編號:
             </Typography>
             <Stack direction="row" flexWrap="wrap" gap={0.8}>
-              {realAdvisories.map((adv, i) => (
-                <Chip
-                  key={i}
-                  label={adv}
-                  size="small"
-                  component="a"
-                  href={getAdvisoryUrl(adv, item.vendor_code)}
-                  target="_blank"
-                  clickable
-                  sx={{ fontFamily: 'JetBrains Mono', fontWeight: 600, fontSize: '0.75rem' }}
-                />
-              ))}
+              {realAdvisories.map((adv, i) => {
+                const advUrl = getAdvisoryUrl(adv, item.vendor_code);
+                return advUrl ? (
+                  <Chip
+                    key={i}
+                    label={adv}
+                    size="small"
+                    component="a"
+                    href={advUrl}
+                    target="_blank"
+                    clickable
+                    sx={{ fontFamily: 'JetBrains Mono', fontWeight: 600, fontSize: '0.75rem' }}
+                  />
+                ) : (
+                  <Chip
+                    key={i}
+                    label={adv}
+                    size="small"
+                    sx={{ fontFamily: 'JetBrains Mono', fontWeight: 600, fontSize: '0.75rem' }}
+                  />
+                );
+              })}
             </Stack>
           </Box>
         )}
@@ -496,19 +426,26 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                     </TableCell>
 
                     <TableCell>
-                      {getStateBadge(imp.state)}
+                      <StateBadge state={imp.state} />
                     </TableCell>
 
                     <TableCell sx={{ fontFamily: 'JetBrains Mono', fontSize: '0.775rem' }}>
                       {imp.errata && imp.errata !== '-' ? (
-                        <Link
-                          href={getAdvisoryUrl(imp.errata, item.vendor_code)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          sx={{ color: 'primary.main', fontWeight: 600 }}
-                        >
-                          {imp.errata}
-                        </Link>
+                        (() => {
+                          const errataUrl = getAdvisoryUrl(imp.errata, item.vendor_code);
+                          return errataUrl ? (
+                            <Link
+                              href={errataUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              sx={{ color: 'primary.main', fontWeight: 600 }}
+                            >
+                              {imp.errata}
+                            </Link>
+                          ) : (
+                            <span>{imp.errata}</span>
+                          );
+                        })()
                       ) : (
                         <span style={{ color: '#94a3b8' }}>-</span>
                       )}

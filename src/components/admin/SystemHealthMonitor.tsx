@@ -321,15 +321,15 @@ export const SystemHealthMonitor: React.FC = () => {
     const externalResults = await Promise.all(
       externalFeeds.map(async (feed): Promise<ServiceCheck> => {
         const feedStart = performance.now();
+        let timeoutId: any = null;
         try {
           const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-          const timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
+          timeoutId = controller ? setTimeout(() => controller.abort(), 6000) : null;
           const res = await fetch(feed.endpoint, {
             method: 'HEAD',
             mode: 'no-cors',
             signal: controller?.signal,
           });
-          if (timeoutId) clearTimeout(timeoutId);
           const latency = Math.round(performance.now() - feedStart);
           return {
             id: feed.id,
@@ -352,6 +352,8 @@ export const SystemHealthMonitor: React.FC = () => {
             latencyMs: Math.round(performance.now() - feedStart),
             message: err?.name === 'AbortError' ? '連線逾時 (Timeout)' : err?.message || '連線逾時或被遠端拒絕',
           };
+        } finally {
+          if (timeoutId) clearTimeout(timeoutId);
         }
       })
     );

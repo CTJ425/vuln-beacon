@@ -1,3 +1,28 @@
+## 2026-09-11 12:35:00 Asia/Taipei - Harden Ubuntu, Debian & SUSE Threat Feed Ingestion & Type Safety (1.0.0)
+- **Defects Discovered & Remediated from Prior Attempt**:
+  - **Debian On-Demand Query Breakdown (`syncService.ts`)**:
+    - Prior worker passed advisory IDs (`DSA-6492-1`) directly in `cves: [q]`, which `CVE_ID_REGEX` rejected and resulted in 0 CVEs and immediate failure.
+    - Implemented `fetchAdvisoryById` in `DebianAdapter` querying the DSA list, extracting all referenced CVEs, and routing structured retrieval.
+    - Added Debian reverse CVE lookup fallback in `fetchAndIngestQuery` (`debianAdapter.fetchAdvisoryByCve(q)`).
+  - **SUSE Chronological Inversion & Advisory Resolution (`suse.ts` & `CveDetailDrawer.tsx`)**:
+    - Fixed chronological ordering in `fetchAdvisories`: parsed timestamps in `changes.csv` and sorted descending, preventing legacy 2014 advisories at the CSV tail from displacing recent 2026 advisories.
+    - Added hyphenated advisory ID normalization (`suse-su-2026-3951-1` -> `suse-su-2026_3951-1.json`).
+    - Fixed invalid direct CVE requests to `ftp.suse.com/pub/projects/security/csaf/cve-*.json`.
+    - Added dynamic SUSE advisory announcement URLs in `CveDetailDrawer.tsx`.
+  - **Ubuntu Regression Notice Fallback (`ubuntu.ts`)**:
+    - Added description/summary regex fallback extracting CVE IDs when `cves` and `cves_ids` arrays are empty (e.g. `USN-8571-2`).
+    - Normalized bare numeric notice inputs to `USN-` prefixed format.
+  - **TypeScript Compilation & Test Stability**:
+    - Fixed `CveTableRowItem` missing `advisory_title` property in `tests/e2e/ubuntu-debian-suse.e2e.test.tsx`.
+    - Fixed invalid property access `adv.productImpacts` on `NormalizedAdvisoryItem` in `tests/unit/adapters/debian.test.ts`.
+    - Increased live smoke test timeouts in `adapters.smoke.test.ts` to 30s to prevent concurrency timeout under parallel test runner load.
+- **Deep Verification**:
+  - Unit tests: 69/69 files passed (461/461 tests).
+  - Smoke tests: 3/3 files passed (16/16 tests, including live HTTP fetching for Nutanix, Ubuntu, Debian, SUSE).
+  - E2E tests: 13/13 files passed (114/114 tests).
+  - Total test pyramid: 85/85 test files passed (591/591 tests).
+  - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
+
 ## 2026-09-11 12:02:00 Asia/Taipei - Ubuntu, Debian & SUSE Multi-Vendor Ingestion & UI Integration (1.0.0)
 - **Implemented Threat Feed Ingestion Adapters for Ubuntu, Debian & SUSE**:
   - **Ubuntu Adapter (`src/adapters/ubuntu.ts`)**:
