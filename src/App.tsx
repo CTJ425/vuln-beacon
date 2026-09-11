@@ -213,7 +213,7 @@ export const AppContent: React.FC = () => {
     setSyncMessage(null);
 
     try {
-      const result = await syncService.syncVendors(undefined, { mode: currentUser ? 'server' : 'auto' });
+      const result = await syncService.syncVendors(undefined, { mode: 'auto' });
       if (result.success) {
         setSyncMessage('Ingestion complete! Fetched and updated feeds in Supabase.');
       } else {

@@ -202,4 +202,74 @@ describe('SyncService — Server-Side Manual Sync Trigger (Task 11c, TDD)', () =
       })
     );
   });
+
+  it('falls back to client-side ingestion in auto mode when server invocation returns FunctionsFetchError', async () => {
+    // First call is trigger_manual_sync which fails with FunctionsFetchError
+    // Subsequent calls are client-side chunking/persist_ingestion
+    mockInvoke
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error('FunctionsFetchError: Failed to send a request to the Edge Function'),
+      })
+      .mockResolvedValue({
+        data: { log: { id: 'fallback-log-1', status: 'SUCCESS' } },
+        error: null,
+      });
+
+    const service = new SyncService();
+    const result = await service.syncVendors(['redhat'], { mode: 'auto' });
+
+    expect(mockInvoke).toHaveBeenNthCalledWith(
+      1,
+      'sync-cve',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          action: 'trigger_manual_sync',
+        }),
+      })
+    );
+    expect(mockInvoke).toHaveBeenNthCalledWith(
+      2,
+      'sync-cve',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          action: 'persist_ingestion',
+        }),
+      })
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it('falls back to client-side ingestion in server mode when server invocation throws network transport error', async () => {
+    mockInvoke
+      .mockRejectedValueOnce(new Error('Failed to send a request to the Edge Function'))
+      .mockResolvedValue({
+        data: { log: { id: 'fallback-log-server', status: 'SUCCESS' } },
+        error: null,
+      });
+
+    const service = new SyncService();
+    const result = await service.syncVendors(['redhat'], { mode: 'server' });
+
+    expect(mockInvoke).toHaveBeenNthCalledWith(
+      1,
+      'sync-cve',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          action: 'trigger_manual_sync',
+        }),
+      })
+    );
+    expect(mockInvoke).toHaveBeenNthCalledWith(
+      2,
+      'sync-cve',
+      expect.objectContaining({
+        body: expect.objectContaining({
+          action: 'persist_ingestion',
+        }),
+      })
+    );
+    expect(result.success).toBe(true);
+  });
 });
+

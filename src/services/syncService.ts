@@ -261,14 +261,16 @@ export class SyncService {
 
         if (error) {
           const errorMsg = await extractErrorMessage(error);
-          if (
-            mode === 'auto' &&
-            (errorMsg.includes('Unsupported action') ||
-              errorMsg.includes('404') ||
-              errorMsg.includes('Failed to send a request') ||
-              errorMsg.includes('Failed to fetch') ||
-              errorMsg.includes('FunctionsFetchError'))
-          ) {
+          const isTransportError =
+            errorMsg.includes('Unsupported action') ||
+            errorMsg.includes('404') ||
+            errorMsg.includes('Failed to send a request') ||
+            errorMsg.includes('Failed to fetch') ||
+            errorMsg.includes('FunctionsFetchError') ||
+            errorMsg.includes('fetch failed') ||
+            errorMsg.includes('NetworkError');
+
+          if (isTransportError || mode === 'auto') {
             console.warn('Server-side manual sync unsupported or unreachable; falling back to client execution:', errorMsg);
           } else {
             return {
@@ -285,14 +287,24 @@ export class SyncService {
           };
         }
       } catch (invokeErr: any) {
-        if (mode === 'server') {
-          const errorMsg = await extractErrorMessage(invokeErr);
+        const errorMsg = await extractErrorMessage(invokeErr);
+        const isTransportError =
+          errorMsg.includes('Unsupported action') ||
+          errorMsg.includes('404') ||
+          errorMsg.includes('Failed to send a request') ||
+          errorMsg.includes('Failed to fetch') ||
+          errorMsg.includes('FunctionsFetchError') ||
+          errorMsg.includes('fetch failed') ||
+          errorMsg.includes('NetworkError');
+
+        if (!isTransportError && mode === 'server') {
           return {
             success: false,
             newLogs: [],
             errors: [errorMsg],
           };
         }
+        console.warn('Server-side manual sync invocation exception; falling back to client execution:', errorMsg);
       }
     }
 
