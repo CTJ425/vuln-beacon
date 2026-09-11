@@ -230,4 +230,36 @@ describe('Ubuntu, Debian, and SUSE Multi-Vendor Ingestion & UI Integration (E2E)
     expect(link).toHaveAttribute('href', 'https://ubuntu.com/security/cves/CVE-2026-42052');
     expect(screen.getByText(/sudo apt-get --only-upgrade install -y beets/)).toBeInTheDocument();
   });
+
+  it('renders CveDetailDrawer with specific SUSE announcement URL for advisory chips', () => {
+    render(
+      <ThemeProvider theme={theme}>
+        <CveDetailDrawer
+          item={{
+            id: 'cve-suse-1',
+            cve_id: 'CVE-2026-32147',
+            severity: 'MEDIUM',
+            vendor_code: 'suse',
+            description: 'Erlang path traversal',
+            advisory_id: 'SUSE-SU-2026:3951-1',
+            advisory_title: 'SUSE-SU-2026:3951-1: Security update for erlang',
+            all_advisories: ['SUSE-SU-2026:3951-1', 'SUSE-SU-2026:3952-1'],
+            affected_products: ['SUSE Linux Enterprise Server 15 SP7'],
+            is_known_exploited: false,
+            created_at: '2026-09-03T00:00:00Z',
+            product_impacts: [],
+            fixed_versions: ['erlang-23.3.4.19'],
+          }}
+          open={true}
+          onClose={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+
+    const chipLink = screen.getByText('SUSE-SU-2026:3952-1').closest('a');
+    expect(chipLink).toHaveAttribute(
+      'href',
+      'https://www.suse.com/support/update/announcement/2026/suse-su-20263952-1/'
+    );
+  });
 });

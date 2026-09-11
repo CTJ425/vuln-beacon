@@ -11,11 +11,14 @@ describe('DebianAdapter — metadata and endpoints', () => {
   });
 
   it('describes its official endpoints', () => {
-    expect(adapter.endpoints).toHaveLength(3);
+    expect(adapter.endpoints).toHaveLength(4);
     const urls = adapter.endpoints.map((e) => e.url);
     expect(urls).toContain('https://security-tracker.debian.org/tracker/data/json');
     expect(urls).toContain(
       'https://salsa.debian.org/security-tracker-team/security-tracker/-/raw/master/data/DSA/list'
+    );
+    expect(urls).toContain(
+      'https://salsa.debian.org/security-tracker-team/security-tracker/-/raw/master/data/DLA/list'
     );
     expect(urls).toContain('https://security-tracker.debian.org/tracker/{cveOrDsa}');
   });
@@ -72,6 +75,15 @@ describe('DebianAdapter — parsing and normalization', () => {
     expect(adv.cves[0].productImpacts!.length).toBe(2);
   });
 
+  it('parses DLA list text format with DLA prefix', () => {
+    const dlaText = `[10 Sep 2026] DLA-3800-1 libxml2 - security update\n\t{CVE-2026-44444}\n\t[buster] - libxml2 2.9.4+dfsg1-7+deb10u7\n`;
+    const items = adapter.parse(dlaText);
+    expect(items).toHaveLength(1);
+    expect(items[0].advisoryId).toBe('DLA-3800-1');
+    expect(items[0].cves[0].cveId).toBe('CVE-2026-44444');
+    expect(items[0].cves[0].productImpacts?.[0].component).toBe('libxml2');
+  });
+
   it('handles empty or malformed inputs cleanly', () => {
     expect(adapter.parse(null)).toEqual([]);
     expect(adapter.parse(undefined)).toEqual([]);
@@ -113,5 +125,30 @@ describe('DebianAdapter — fetchAdvisories', () => {
     await expect(adapter.fetchAdvisories()).rejects.toThrow(
       'Failed to fetch Debian advisories: Bad Gateway'
     );
+  });
+
+  it('fetches specific advisory by DSA id using fetchAdvisoryById', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => debianFixture.dsaListSample,
+    } as unknown as Response);
+
+    const adv = await adapter.fetchAdvisoryById('DSA-6492-1');
+    expect(adv).not.toBeNull();
+    expect(adv!.advisoryId).toBe('DSA-6492-1');
+    expect(adv!.cves.some((c) => c.cveId === 'CVE-2026-26961')).toBe(true);
+    expect(adv!.cves[0]?.productImpacts?.[0]?.component).toBe('ruby-rack');
+  });
+
+  it('fetches specific advisory by CVE id using fetchAdvisoryByCve', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => debianFixture.dsaListSample,
+    } as unknown as Response);
+
+    const adv = await adapter.fetchAdvisoryByCve('CVE-2026-65107');
+    expect(adv).not.toBeNull();
+    expect(adv!.advisoryId).toBe('DSA-6491-1');
+    expect(adv!.cves.some((c) => c.cveId === 'CVE-2026-65107')).toBe(true);
   });
 });

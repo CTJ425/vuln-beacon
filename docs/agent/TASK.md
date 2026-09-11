@@ -318,8 +318,8 @@
   - [x] Design authentic SVG brand logos in `VendorLogos.tsx` and integrate into `VendorIcon.tsx`.
   - [x] Add vendor-specific remediation instructions in `AdvisoryDetailDrawer.tsx` and `CveDetailDrawer.tsx`.
   - [x] Add live external feed health checks in `SystemHealthMonitor.tsx`.
-  - [x] Follow strict TDD: unit tests (`ubuntu.test.ts`, `debian.test.ts`, `suse.test.ts`), smoke tests (`adapters.smoke.test.ts`), and E2E scenario (`ubuntu-debian-suse.e2e.test.tsx`).
-  - **Verification**: 84/84 test files (581 tests) passing 100%; live smoke test against public APIs passing; clean build.
-  - **Completed**: 2026-09-11 12:02:00 Asia/Taipei.
+  - [x] Adversary review & hardening: resolved Debian DSA query CVE extraction, SUSE changes.csv chronological ordering, hyphenated advisory ID normalization, Ubuntu regression notice regex fallback, and fixed 2 TypeScript compilation errors.
+  - **Verification**: 85/85 test files (591 tests) passing 100%; live smoke test against Nutanix, Ubuntu, Debian, SUSE public APIs passing; clean edge bundle + tsc + vite build (`npm --prefix src run verify`).
+  - **Completed**: 2026-09-11 12:35:00 Asia/Taipei.
 
 

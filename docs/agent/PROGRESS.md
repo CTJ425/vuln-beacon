@@ -1,5 +1,30 @@
 # Progress Log
 
+## 2026-09-11 12:35:00 Asia/Taipei - Harden Ubuntu, Debian & SUSE Threat Feed Ingestion & Type Safety (1.0.0)
+- **Defects Discovered & Remediated from Prior Attempt**:
+  - **Debian On-Demand Query Breakdown (`syncService.ts`)**:
+    - Prior worker passed advisory IDs (`DSA-6492-1`) directly in `cves: [q]`, which `CVE_ID_REGEX` rejected and resulted in 0 CVEs and immediate failure.
+    - Implemented `fetchAdvisoryById` in `DebianAdapter` querying the DSA list, extracting all referenced CVEs, and routing structured retrieval.
+    - Added Debian reverse CVE lookup fallback in `fetchAndIngestQuery` (`debianAdapter.fetchAdvisoryByCve(q)`).
+  - **SUSE Chronological Inversion & Advisory Resolution (`suse.ts` & `CveDetailDrawer.tsx`)**:
+    - Fixed chronological ordering in `fetchAdvisories`: parsed timestamps in `changes.csv` and sorted descending, preventing legacy 2014 advisories at the CSV tail from displacing recent 2026 advisories.
+    - Added hyphenated advisory ID normalization (`suse-su-2026-3951-1` -> `suse-su-2026_3951-1.json`).
+    - Fixed invalid direct CVE requests to `ftp.suse.com/pub/projects/security/csaf/cve-*.json`.
+    - Added dynamic SUSE advisory announcement URLs in `CveDetailDrawer.tsx`.
+  - **Ubuntu Regression Notice Fallback (`ubuntu.ts`)**:
+    - Added description/summary regex fallback extracting CVE IDs when `cves` and `cves_ids` arrays are empty (e.g. `USN-8571-2`).
+    - Normalized bare numeric notice inputs to `USN-` prefixed format.
+  - **TypeScript Compilation & Test Stability**:
+    - Fixed `CveTableRowItem` missing `advisory_title` property in `tests/e2e/ubuntu-debian-suse.e2e.test.tsx`.
+    - Fixed invalid property access `adv.productImpacts` on `NormalizedAdvisoryItem` in `tests/unit/adapters/debian.test.ts`.
+    - Increased live smoke test timeouts in `adapters.smoke.test.ts` to 30s to prevent concurrency timeout under parallel test runner load.
+- **Deep Verification**:
+  - Unit tests: 69/69 files passed (461/461 tests).
+  - Smoke tests: 3/3 files passed (16/16 tests, including live HTTP fetching for Nutanix, Ubuntu, Debian, SUSE).
+  - E2E tests: 13/13 files passed (114/114 tests).
+  - Total test pyramid: 85/85 test files passed (591/591 tests).
+  - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
+
 ## 2026-09-11 12:02:00 Asia/Taipei - Ubuntu, Debian & SUSE Multi-Vendor Ingestion & UI Integration (1.0.0)
 - **Implemented Threat Feed Ingestion Adapters for Ubuntu, Debian & SUSE**:
   - **Ubuntu Adapter (`src/adapters/ubuntu.ts`)**:
@@ -29,20 +54,4 @@
   - Smoke tests: 3/3 files passed (16/16 tests), including live HTTP public API verification against Nutanix, Ubuntu, Debian, and SUSE.
   - E2E tests: 13/13 files passed (111/111 tests), including dedicated `ubuntu-debian-suse.e2e.test.tsx`.
   - Total test pyramid: 84/84 test files passed (581/581 tests).
-  - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
-
-## 2026-09-11 09:58:00 Asia/Taipei - Operational Conflict Fallback Boundary & Transport Classifier Fix (1.0.0)
-- **Resolved Concurrency Lock & Operational Conflict Fallback Bug (`syncService.ts`)**:
-  - **Fallback Boundary Restriction**: Refined fallback guard in `SyncService.syncVendors` lines 307 and 333. Changed condition from `if (isTransportError || mode === 'auto')` to strictly `if (isTransportError(error, errorMsg))`.
-  - **Centralized Transport Classifier**: Extracted `isTransportError` helper checking HTTP status (404, 502, 503, 504), SDK error names (`FunctionsFetchError`, `FunctionsRelayError`), and network/gateway strings (`Failed to send a request`, `Relay Error`, `fetch failed`, `NetworkError`, `Bad Gateway`, `Gateway Timeout`).
-  - **Plain Text / Gateway Error Extraction**: Enhanced `extractErrorMessage` to fall back to `response.text()` when non-JSON bodies (e.g. gateway 502/504 errors) are returned.
-  - **Operational Conflict Surfacing**: Ensured operational conflicts (such as HTTP 409 `A threat feed synchronization is already in progress` or HTTP 401 unauthorized errors) cleanly return `{ success: false, errors: [errorMsg] }` instead of falling back to client-side ingestion when in `auto` mode.
-  - **Unit & E2E Test Hardening**:
-    - Added comprehensive unit test coverage in `src/tests/unit/services/syncServiceServerMode.test.ts` verifying that 409 concurrency lock conflicts, 401 unauthorized, 404 Function not found, 502 Bad Gateway text, and FunctionsRelayError behave strictly according to transport vs operational specifications.
-    - Verified `tests/e2e/manual-sync-server-side.e2e.test.tsx` Phase 2 passes with expected error banner display.
-- **Deep Verification**:
-  - Unit tests: 65/65 files passed (427/427 tests).
-  - Smoke tests: 3/3 files passed (13/13 tests).
-  - E2E tests: 12/12 files passed (106/106 tests).
-  - Total test pyramid: 80/80 test files passed (546/546 tests).
   - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.

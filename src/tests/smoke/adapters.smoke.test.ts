@@ -39,7 +39,7 @@ describe('Adapters Registry Smoke Test', () => {
     expect(first.advisoryId).toMatch(/^NXSA-/);
     expect(first.url).toContain('portal.nutanix.com');
     expect(first.cves.length).toBeGreaterThan(0);
-  }, 15000);
+  }, 30000);
 
   it('should fetch and parse live Ubuntu security notices from official API', async () => {
     const adapter = getAdapterByCode('ubuntu');
@@ -53,7 +53,7 @@ describe('Adapters Registry Smoke Test', () => {
     expect(first.advisoryId).toMatch(/^(?:USN|LSN)-/);
     expect(first.url).toContain('ubuntu.com/security/notices');
     expect(first.cves.length).toBeGreaterThan(0);
-  }, 15000);
+  }, 30000);
 
   it('should fetch and parse live Debian advisories from official DSA list', async () => {
     const adapter = getAdapterByCode('debian');
@@ -67,7 +67,7 @@ describe('Adapters Registry Smoke Test', () => {
     expect(first.advisoryId).toMatch(/^DSA-/);
     expect(first.url).toContain('security-tracker.debian.org');
     expect(first.cves.length).toBeGreaterThan(0);
-  }, 15000);
+  }, 30000);
 
   it('should fetch and parse live SUSE advisories from CSAF repository', async () => {
     const adapter = getAdapterByCode('suse');
@@ -80,5 +80,5 @@ describe('Adapters Registry Smoke Test', () => {
     const first = items[0];
     expect(first.advisoryId).toMatch(/^(?:SUSE|openSUSE)-/i);
     expect(first.cves.length).toBeGreaterThan(0);
-  }, 15000);
+  }, 30000);
 });

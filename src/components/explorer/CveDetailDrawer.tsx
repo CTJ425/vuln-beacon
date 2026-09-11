@@ -371,7 +371,13 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                       : adv.startsWith('DSA-') || adv.startsWith('DLA-') || item.vendor_code === 'debian'
                       ? `https://security-tracker.debian.org/tracker/${encodeURIComponent(adv)}`
                       : adv.startsWith('SUSE-SU-') || adv.startsWith('OPENSUSE-SU-') || item.vendor_code === 'suse'
-                      ? `https://www.suse.com/support/update/announcement/`
+                      ? (() => {
+                          const m = adv.trim().match(/^(suse|opensuse)-su-(\d{4})[:\-_](\d+)-(\d+)$/i);
+                          if (m && m[1].toLowerCase() === 'suse') {
+                            return `https://www.suse.com/support/update/announcement/${m[2]}/suse-su-${m[2]}${m[3]}-${m[4]}/`;
+                          }
+                          return 'https://www.suse.com/support/update/announcement/';
+                        })()
                       : `https://access.redhat.com/errata/${adv}`
                   }
                   target="_blank"

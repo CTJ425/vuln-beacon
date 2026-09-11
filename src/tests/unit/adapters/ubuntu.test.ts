@@ -22,6 +22,9 @@ describe('UbuntuAdapter — metadata and endpoints', () => {
     expect(adapter.noticeDetailUrl('USN-8747-1')).toBe(
       'https://ubuntu.com/security/notices/USN-8747-1.json'
     );
+    expect(adapter.noticeDetailUrl('8747-1')).toBe(
+      'https://ubuntu.com/security/notices/USN-8747-1.json'
+    );
     expect(adapter.cveLookupUrl('CVE-2026-42052')).toBe(
       'https://ubuntu.com/security/cves/CVE-2026-42052.json'
     );
@@ -96,6 +99,27 @@ describe('UbuntuAdapter — parsing and normalization', () => {
     expect(items).toHaveLength(1);
     expect(items[0].advisoryId).toBe('USN-8747-1');
     expect(items[0].cves[0].cveId).toBe('CVE-2026-42052');
+  });
+
+  it('extracts CVEs from description and summary when cves array is empty', () => {
+    const regressionNotice = {
+      id: 'USN-8571-2',
+      title: 'Apache HTTP Server regression',
+      summary: 'USN-8571-1 fixed vulnerabilities in Apache (CVE-2026-33523).',
+      description: 'Haruki Oyama discovered HTTP response splitting in Apache (CVE-2026-33523) and another issue (CVE-2026-33007).',
+      published: '2026-09-10T19:36:17Z',
+      release_packages: {
+        focal: [{ name: 'apache2', version: '2.4.41-4ubuntu3.23+esm7' }],
+      },
+      cves: [],
+      cves_ids: [],
+    };
+    const items = adapter.parse(regressionNotice);
+    expect(items).toHaveLength(1);
+    expect(items[0].advisoryId).toBe('USN-8571-2');
+    expect(items[0].cves).toHaveLength(2);
+    expect(items[0].cves.map((c) => c.cveId)).toContain('CVE-2026-33523');
+    expect(items[0].cves.map((c) => c.cveId)).toContain('CVE-2026-33007');
   });
 });
 

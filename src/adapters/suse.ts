@@ -49,12 +49,10 @@ export class SuseAdapter implements VendorAdapter {
   ];
 
   advisoryDetailUrl(advisoryId: string): string {
-    const filename = advisoryId
-      .trim()
-      .toLowerCase()
-      .replace(/:/g, '_')
-      .replace(/\.json$/i, '') + '.json';
-    return `${this.baseUrl}/${filename}`;
+    let clean = advisoryId.trim().toLowerCase().replace(/\.json$/i, '');
+    clean = clean.replace(/^(suse-su|opensuse-su)-(\d{4})[-:]/i, '$1-$2_');
+    clean = clean.replace(/:/g, '_');
+    return `${this.baseUrl}/${clean}.json`;
   }
 
   cveLookupUrl(cveId: string): string {
@@ -71,18 +69,23 @@ export class SuseAdapter implements VendorAdapter {
     const csvText = await res.text();
     const lines = csvText.split(/\r?\n/).filter(Boolean);
 
-    // Filter for JSON advisory filenames from the end of changes.csv
-    const filenames: string[] = [];
-    for (let i = lines.length - 1; i >= 0 && filenames.length < limit; i--) {
-      const line = lines[i].trim();
-      const match = line.match(/^"([^"]+\.json)"/i);
+    // Parse changes.csv entries: "filename.json","timestamp"
+    const entries: { file: string; time: string }[] = [];
+    for (const line of lines) {
+      const match = line.trim().match(/^"([^"]+\.json)","([^"]+)"/i);
       if (match) {
         const file = match[1];
+        const time = match[2];
         if (file.toLowerCase().startsWith('suse-su-') || file.toLowerCase().startsWith('opensuse-su-')) {
-          filenames.push(file);
+          entries.push({ file, time });
         }
       }
     }
+
+    // Sort by timestamp descending to ensure the newest advisories are fetched
+    entries.sort((a, b) => b.time.localeCompare(a.time));
+
+    const filenames = entries.slice(0, limit).map((e) => e.file);
 
     if (filenames.length === 0) return [];
 

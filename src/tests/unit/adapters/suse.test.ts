@@ -22,6 +22,12 @@ describe('SuseAdapter — metadata and endpoints', () => {
     expect(adapter.advisoryDetailUrl('SUSE-SU-2026:3951-1')).toBe(
       'https://ftp.suse.com/pub/projects/security/csaf/suse-su-2026_3951-1.json'
     );
+    expect(adapter.advisoryDetailUrl('SUSE-SU-2026-3951-1')).toBe(
+      'https://ftp.suse.com/pub/projects/security/csaf/suse-su-2026_3951-1.json'
+    );
+    expect(adapter.advisoryDetailUrl('openSUSE-SU-2026-21816-1')).toBe(
+      'https://ftp.suse.com/pub/projects/security/csaf/opensuse-su-2026_21816-1.json'
+    );
     expect(adapter.cveLookupUrl('CVE-2026-32147')).toBe(
       'https://www.suse.com/security/cve/CVE-2026-32147'
     );
@@ -108,6 +114,41 @@ describe('SuseAdapter — fetchAdvisories', () => {
     const result = await adapter.fetchAdvisories(1);
     expect(result).toHaveLength(1);
     expect(result[0].advisoryId).toBe('SUSE-SU-2026:3951-1');
+  });
+
+  it('sorts changes.csv by timestamp descending so newer advisories take precedence over tail legacy entries', async () => {
+    // Legacy 2014 entry at the end, newer 2026 entry earlier
+    const unorderedChangesCsv = [
+      '"suse-su-2026_3951-1.json","2026-09-03T07:43:14Z"',
+      '"suse-su-2026_3595-1.json","2026-09-09T12:14:50Z"', // newest!
+      '"suse-su-403.json","2014-10-24T22:07:03Z"', // legacy at tail
+    ].join('\n');
+
+    globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('changes.csv')) {
+        return Promise.resolve({
+          ok: true,
+          text: async () => unorderedChangesCsv,
+        } as unknown as Response);
+      }
+      if (url.includes('suse-su-2026_3595-1.json')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ...suseFixture,
+            document: {
+              ...suseFixture.document,
+              tracking: { id: 'SUSE-SU-2026:3595-1', current_release_date: '2026-09-09T12:14:50Z' },
+            },
+          }),
+        } as unknown as Response);
+      }
+      return Promise.resolve({ ok: false, status: 404 } as unknown as Response);
+    });
+
+    const result = await adapter.fetchAdvisories(1);
+    expect(result).toHaveLength(1);
+    expect(result[0].advisoryId).toBe('SUSE-SU-2026:3595-1');
   });
 
   it('throws descriptive error if changes.csv fails to fetch', async () => {

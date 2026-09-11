@@ -518,12 +518,9 @@ export class SyncService {
         const debianAdapter = getAdapterByCode('debian') as DebianAdapter | undefined;
         if (!debianAdapter) return false;
         vendorCode = 'debian';
-        detailDocuments.push({
-          id: q,
-          package: 'debian-package',
-          cves: [q],
-          description: `Debian Security Advisory ${q}`,
-        });
+        const adv = await debianAdapter.fetchAdvisoryById(q);
+        if (!adv) return false;
+        detailDocuments.push(adv.rawPayload);
       } else if (q.startsWith('SUSE-SU-') || q.startsWith('OPENSUSE-SU-')) {
         const suseAdapter = getAdapterByCode('suse') as SuseAdapter | undefined;
         if (!suseAdapter) return false;
@@ -632,21 +629,18 @@ export class SyncService {
           }
         }
 
-        // If still not found, try SUSE CSAF lookup
+        // If still not found, try Debian CVE reverse lookup
         if (!foundRedhat && detailDocuments.length === 0) {
-          const suseAdapter = getAdapterByCode('suse') as SuseAdapter | undefined;
-          if (suseAdapter) {
+          const debianAdapter = getAdapterByCode('debian') as DebianAdapter | undefined;
+          if (debianAdapter) {
             try {
-              const sRes = await fetch(suseAdapter.advisoryDetailUrl(q));
-              if (sRes.ok) {
-                const sDoc = await sRes.json();
-                if (sDoc) {
-                  detailDocuments.push(sDoc);
-                  vendorCode = 'suse';
-                }
+              const dAdv = await debianAdapter.fetchAdvisoryByCve(q);
+              if (dAdv) {
+                detailDocuments.push(dAdv.rawPayload);
+                vendorCode = 'debian';
               }
             } catch {
-              // Ignore SUSE lookup error
+              // Ignore Debian lookup error
             }
           }
         }

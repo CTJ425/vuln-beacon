@@ -16,7 +16,7 @@ function normalizeDebianUrgency(urgency: unknown): SeverityLevel {
 }
 
 const CVE_ID_REGEX = /^CVE-\d{4}-\d{4,}$/i;
-const DSA_HEADER_REGEX = /^\[(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\]\s+(DSA-\d+-\d+)\s+([^\s]+)\s*-\s*(.*)$/;
+const DSA_HEADER_REGEX = /^\[(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\]\s+((?:DSA|DLA)-\d+-\d+)\s+([^\s]+)\s*-\s*(.*)$/;
 
 export class DebianAdapter implements VendorAdapter {
   readonly vendorCode = 'debian';
@@ -25,11 +25,14 @@ export class DebianAdapter implements VendorAdapter {
   readonly trackerJsonUrl = 'https://security-tracker.debian.org/tracker/data/json';
   readonly dsaListUrl =
     'https://salsa.debian.org/security-tracker-team/security-tracker/-/raw/master/data/DSA/list';
+  readonly dlaListUrl =
+    'https://salsa.debian.org/security-tracker-team/security-tracker/-/raw/master/data/DLA/list';
   readonly trackerBaseUrl = 'https://security-tracker.debian.org/tracker';
 
   readonly endpoints: VendorEndpoint[] = [
     { label: 'Debian Security Tracker JSON', url: this.trackerJsonUrl },
     { label: 'Debian Security Advisories (DSA) list', url: this.dsaListUrl },
+    { label: 'Debian LTS Advisories (DLA) list', url: this.dlaListUrl },
     { label: 'Security Tracker Lookup', url: `${this.trackerBaseUrl}/{cveOrDsa}` },
   ];
 
@@ -53,6 +56,53 @@ export class DebianAdapter implements VendorAdapter {
     return items.slice(0, limit);
   }
 
+  async fetchAdvisoryById(id: string): Promise<NormalizedAdvisoryItem | null> {
+    const cleanId = id.trim().toUpperCase();
+    const url = cleanId.startsWith('DLA-') ? this.dlaListUrl : this.dsaListUrl;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+
+    const text = await res.text();
+    const idx = text.indexOf(cleanId);
+    if (idx === -1) return null;
+
+    const lineStart = text.lastIndexOf('\n', idx);
+    const start = lineStart === -1 ? 0 : lineStart + 1;
+    const nextEntry = text.indexOf('\n[', start + 1);
+    const chunk = nextEntry === -1 ? text.slice(start) : text.slice(start, nextEntry);
+
+    const items = this.parse(chunk);
+    return items.find((item) => item.advisoryId.toUpperCase() === cleanId) || items[0] || null;
+  }
+
+  async fetchAdvisoryByCve(cveId: string): Promise<NormalizedAdvisoryItem | null> {
+    const cleanCve = cveId.trim().toUpperCase();
+    if (!CVE_ID_REGEX.test(cleanCve)) return null;
+
+    for (const url of [this.dsaListUrl, this.dlaListUrl]) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+
+        const text = await res.text();
+        const idx = text.indexOf(cleanCve);
+        if (idx === -1) continue;
+
+        const prevEntry = text.lastIndexOf('\n[', idx);
+        const start = prevEntry === -1 ? 0 : prevEntry + 1;
+        const nextEntry = text.indexOf('\n[', idx);
+        const chunk = nextEntry === -1 ? text.slice(start) : text.slice(start, nextEntry);
+
+        const items = this.parse(chunk);
+        const match = items.find((item) => item.cves.some((c) => c.cveId === cleanCve));
+        if (match) return match;
+      } catch {
+        // Fall through to next list
+      }
+    }
+    return null;
+  }
+
   parse(rawPayload: unknown): NormalizedAdvisoryItem[] {
     if (!rawPayload) return [];
 
@@ -66,7 +116,13 @@ export class DebianAdapter implements VendorAdapter {
 
     if (typeof rawPayload === 'object') {
       const obj = rawPayload as Record<string, any>;
-      if (obj.id && typeof obj.id === 'string' && obj.id.startsWith('DSA-')) {
+      if (typeof obj.advisoryId === 'string' && Array.isArray(obj.cves)) {
+        return [obj as NormalizedAdvisoryItem];
+      }
+      if (
+        (obj.id && typeof obj.id === 'string' && (obj.id.startsWith('DSA-') || obj.id.startsWith('DLA-'))) ||
+        (obj.dsaId && typeof obj.dsaId === 'string')
+      ) {
         return this.parseStructuredDsa(obj);
       }
       return this.parseTrackerJson(obj);
@@ -89,7 +145,21 @@ export class DebianAdapter implements VendorAdapter {
     } | null = null;
 
     const commitCurrent = () => {
-      if (!currentAdv || currentAdv.cveIds.length === 0) return;
+      if (!currentAdv) return;
+
+      if (currentAdv.cveIds.length === 0 && currentAdv.titleDesc) {
+        const matches = currentAdv.titleDesc.match(/CVE-\d{4}-\d{4,}/gi);
+        if (matches) {
+          for (const m of matches) {
+            const u = m.toUpperCase();
+            if (!currentAdv.cveIds.includes(u)) {
+              currentAdv.cveIds.push(u);
+            }
+          }
+        }
+      }
+
+      if (currentAdv.cveIds.length === 0) return;
 
       const { dateStr, dsaId, pkgName, titleDesc, cveIds, releases } = currentAdv;
       const title = `[${pkgName}] Debian Security Advisory ${dsaId}`;
@@ -129,7 +199,18 @@ export class DebianAdapter implements VendorAdapter {
         summary,
         solution,
         cves: parsedCves,
-        rawPayload: { dsaId, pkgName, cveIds, releases, titleDesc },
+        rawPayload: {
+          id: dsaId,
+          dsaId,
+          package: pkgName,
+          pkgName,
+          cves: cveIds,
+          cveIds,
+          releases,
+          titleDesc,
+          date: dateStr,
+          description: summary,
+        },
       });
     };
 
@@ -181,22 +262,36 @@ export class DebianAdapter implements VendorAdapter {
   }
 
   private parseStructuredDsa(obj: Record<string, any>): NormalizedAdvisoryItem[] {
-    const advisoryId = obj.id;
-    const pkg = obj.package || 'package';
+    const advisoryId = obj.id || obj.dsaId;
+    const pkg = obj.package || obj.pkgName || 'package';
     const title = obj.title || `[${pkg}] Debian Security Advisory ${advisoryId}`;
-    const publishedAt = obj.date ? new Date(obj.date).toISOString() : new Date().toISOString();
+    const publishedAt = obj.date ? this.parseDebianDate(obj.date) : new Date().toISOString();
     const url = this.dsaLookupUrl(advisoryId);
     const summary = obj.description || `Debian Security Advisory ${advisoryId} for ${pkg}`;
     const solution = `請透過 APT 工具執行更新：sudo apt-get update && sudo apt-get --only-upgrade install -y ${pkg}`;
 
-    const rawCves = Array.isArray(obj.cves) ? obj.cves : [];
+    const rawCves = Array.isArray(obj.cves) ? obj.cves : (Array.isArray(obj.cveIds) ? obj.cveIds : []);
     const cveIds = rawCves.map((c: any) => String(c).toUpperCase()).filter((c: string) => CVE_ID_REGEX.test(c));
 
     const productImpacts: ProductImpactItem[] = [];
     const fixedVersions: string[] = [];
     const affectedProducts: string[] = [];
 
-    if (obj.releases && typeof obj.releases === 'object') {
+    if (Array.isArray(obj.releases)) {
+      for (const r of obj.releases) {
+        const prodName = `Debian ${r.release}`;
+        affectedProducts.push(prodName);
+        if (r.version) fixedVersions.push(r.version);
+        productImpacts.push({
+          product_name: prodName,
+          component: pkg,
+          state: 'Fixed',
+          justification: r.version || undefined,
+          errata: advisoryId,
+          release_date: publishedAt,
+        });
+      }
+    } else if (obj.releases && typeof obj.releases === 'object') {
       for (const [rel, data] of Object.entries(obj.releases)) {
         const prodName = `Debian ${rel}`;
         affectedProducts.push(prodName);

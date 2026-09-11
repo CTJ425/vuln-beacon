@@ -44,7 +44,11 @@ export class UbuntuAdapter implements VendorAdapter {
   ];
 
   noticeDetailUrl(noticeId: string): string {
-    return `${this.detailUrlBase}/${encodeURIComponent(noticeId)}.json`;
+    const trimmed = noticeId.trim();
+    const id = trimmed.toUpperCase().startsWith('USN-') || trimmed.toUpperCase().startsWith('LSN-')
+      ? trimmed
+      : `USN-${trimmed}`;
+    return `${this.detailUrlBase}/${encodeURIComponent(id)}.json`;
   }
 
   cveLookupUrl(cveId: string): string {
@@ -165,9 +169,18 @@ export class UbuntuAdapter implements VendorAdapter {
       }
 
       // Parse CVEs
-      const rawCves = Array.isArray(raw.cves)
+      let rawCves = Array.isArray(raw.cves)
         ? raw.cves
         : (Array.isArray(raw.cves_ids) ? raw.cves_ids.map((id: string) => ({ id })) : []);
+
+      if (rawCves.length === 0) {
+        const textToScan = `${raw.description || ''} ${raw.summary || ''}`;
+        const matched = textToScan.match(/CVE-\d{4}-\d{4,}/gi);
+        if (matched) {
+          const uniqueMatched = Array.from(new Set(matched.map((m) => m.toUpperCase())));
+          rawCves = uniqueMatched.map((id) => ({ id }));
+        }
+      }
 
       const parsedCves: NormalizedAdvisoryItem['cves'] = [];
       const seenCveIds = new Set<string>();
