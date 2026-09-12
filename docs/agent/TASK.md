@@ -356,5 +356,17 @@
   - **Verification**: `npm --prefix src run verify` passing 100% (89 test files, 614 tests, production build clean).
   - **Completed**: 2026-09-11 16:15:00 Asia/Taipei.
 
+- [x] **Task 30: Replace free-text schedule inputs with dropdown selects in ScheduleSettings (1.1.0)**
+  - [x] Added exported `TIME_OPTIONS` (48 entries, `00:00`–`23:30`, 30-minute grid).
+  - [x] Added exported `TIMEZONE_OPTIONS` (fixed IANA whitelist).
+  - [x] Schedule-times cell is now a MUI `Select multiple` rendering selected values as `Chip`s; timezone cell is a single `Select`.
+  - [x] Stored values outside the grid or the whitelist are merged into the option list so legacy data is never silently dropped.
+  - [x] Save now de-duplicates and sorts times ascending, and blocks an enabled schedule with zero times (`Select at least one time`).
+  - [x] Removed the now-unreachable comma-splitting and `TIME_FORMAT` / `Invalid time format` guard; `RowState.timesText: string` became `RowState.times: string[]`.
+  - **Files Changed**: `src/components/sync/ScheduleSettings.tsx` (production), `src/tests/unit/components/scheduleSettings.test.tsx` (tests — TDD Red before dispatch).
+  - **Verification**: `npm --prefix src test` — 89/89 test files, 622/622 tests passed; `npm --prefix src run verify` clean.
+  - **Reviewer Verdict**: PASS.
+  - **Completed**: 2026-09-12 22:45:00 Asia/Taipei.
+
 
 

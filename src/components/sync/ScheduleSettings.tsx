@@ -8,7 +8,6 @@ import {
   TableRow,
   Paper,
   Switch,
-  TextField,
   Button,
   Typography,
   Box,
@@ -16,6 +15,11 @@ import {
   Tooltip,
   Alert,
   Collapse,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from '@mui/material';
 import { Key, Copy, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { Vendor } from '@/types';
@@ -32,11 +36,35 @@ export interface ScheduleSettingsProps {
   initialExpanded?: boolean;
 }
 
-const TIME_FORMAT = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+// 30-minute grid: pg_cron ticks every 5 minutes and SCHEDULE_TICK_TOLERANCE_MINUTES is 10,
+// so finer steps would be false precision.
+export const TIME_OPTIONS: string[] = Array.from({ length: 48 }, (_, i) => {
+  const hour = Math.floor(i / 2)
+    .toString()
+    .padStart(2, '0');
+  const minute = i % 2 === 0 ? '00' : '30';
+  return `${hour}:${minute}`;
+});
+
+export const TIMEZONE_OPTIONS: string[] = [
+  'UTC',
+  'Asia/Taipei',
+  'Asia/Tokyo',
+  'Asia/Shanghai',
+  'Asia/Singapore',
+  'Asia/Seoul',
+  'Asia/Kolkata',
+  'Europe/London',
+  'Europe/Berlin',
+  'America/New_York',
+  'America/Chicago',
+  'America/Los_Angeles',
+  'Australia/Sydney',
+];
 
 interface RowState {
   enabled: boolean;
-  timesText: string;
+  times: string[];
   timezone: string;
   status: { kind: 'error' | 'success'; message: string } | null;
   saving: boolean;
@@ -45,7 +73,7 @@ interface RowState {
 function initialRowState(vendor: Vendor): RowState {
   return {
     enabled: vendor.schedule_enabled ?? false,
-    timesText: (vendor.schedule_times ?? []).join(', '),
+    times: vendor.schedule_times ?? [],
     timezone: vendor.schedule_timezone ?? 'Asia/Taipei',
     status: null,
     saving: false,
@@ -243,15 +271,27 @@ const ScheduleRow: React.FC<{ vendor: Vendor; onSave: ScheduleSettingsProps['onS
   const [row, setRow] = useState<RowState>(() => initialRowState(vendor));
   const isImplemented = isAdapterImplemented(vendor.code);
 
+  const timeOptions = useMemo(() => {
+    const merged = new Set([...TIME_OPTIONS, ...row.times]);
+    return Array.from(merged).sort();
+  }, [row.times]);
+
+  const timezoneOptions = useMemo(() => {
+    if (TIMEZONE_OPTIONS.includes(row.timezone)) return TIMEZONE_OPTIONS;
+    return [...TIMEZONE_OPTIONS, row.timezone];
+  }, [row.timezone]);
+
+  const timesLabelId = `schedule-times-label-${vendor.code}`;
+  const timesSelectId = `schedule-times-select-${vendor.code}`;
+  const timezoneLabelId = `schedule-timezone-label-${vendor.code}`;
+  const timezoneSelectId = `schedule-timezone-select-${vendor.code}`;
+
   const handleSave = async () => {
     if (!isImplemented) return;
-    const times = row.timesText
-      .split(',')
-      .map((t) => t.trim())
-      .filter((t) => t.length > 0);
+    const times = Array.from(new Set(row.times)).sort();
 
-    if (times.some((t) => !TIME_FORMAT.test(t))) {
-      setRow((prev) => ({ ...prev, status: { kind: 'error', message: 'Invalid time format' } }));
+    if (row.enabled && times.length === 0) {
+      setRow((prev) => ({ ...prev, status: { kind: 'error', message: 'Select at least one time' } }));
       return;
     }
 
@@ -310,26 +350,54 @@ const ScheduleRow: React.FC<{ vendor: Vendor; onSave: ScheduleSettingsProps['onS
       </TableCell>
 
       <TableCell sx={{ minWidth: 220 }}>
-        <TextField
-          disabled={!isImplemented}
-          label={`Schedule times for ${vendor.name}`}
-          value={row.timesText}
-          onChange={(e) => setRow((prev) => ({ ...prev, timesText: e.target.value }))}
-          size="small"
-          fullWidth
-          placeholder="08:00, 12:30, 18:30"
-        />
+        <FormControl disabled={!isImplemented} size="small" fullWidth>
+          <InputLabel id={timesLabelId}>{`Schedule times for ${vendor.name}`}</InputLabel>
+          <Select
+            labelId={timesLabelId}
+            id={timesSelectId}
+            multiple
+            value={row.times}
+            label={`Schedule times for ${vendor.name}`}
+            onChange={(e: SelectChangeEvent<string[]>) => {
+              const value = e.target.value;
+              const times = typeof value === 'string' ? value.split(',') : value;
+              setRow((prev) => ({ ...prev, times }));
+            }}
+            renderValue={(selected) => (
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                {(selected as string[]).map((time) => (
+                  <Chip key={time} label={time} size="small" />
+                ))}
+              </Box>
+            )}
+            MenuProps={{ PaperProps: { style: { maxHeight: 320 } } }}
+          >
+            {timeOptions.map((time) => (
+              <MenuItem key={time} value={time}>
+                {time}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </TableCell>
 
       <TableCell sx={{ minWidth: 160 }}>
-        <TextField
-          disabled={!isImplemented}
-          label={`Timezone for ${vendor.name}`}
-          value={row.timezone}
-          onChange={(e) => setRow((prev) => ({ ...prev, timezone: e.target.value }))}
-          size="small"
-          fullWidth
-        />
+        <FormControl disabled={!isImplemented} size="small" fullWidth>
+          <InputLabel id={timezoneLabelId}>{`Timezone for ${vendor.name}`}</InputLabel>
+          <Select
+            labelId={timezoneLabelId}
+            id={timezoneSelectId}
+            value={row.timezone}
+            label={`Timezone for ${vendor.name}`}
+            onChange={(e) => setRow((prev) => ({ ...prev, timezone: e.target.value }))}
+          >
+            {timezoneOptions.map((tz) => (
+              <MenuItem key={tz} value={tz}>
+                {tz}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       </TableCell>
 
       <TableCell sx={{ minWidth: 140 }}>
