@@ -388,17 +388,19 @@
   - **Verification**: 74 test files / 509 tests passed; build clean.
   - **Completed**: 2026-09-13 22:56:42 Asia/Taipei.
 
-- [ ] **Task 32: VMware / Broadcom Vendor Adapter (1.1.0 — NOT STARTED)**
-  - [ ] Implement `VmwareAdapter` (`src/adapters/vmware.ts`) adhering to `VendorAdapter` interface with list-layer Broadcom API integration.
-  - [ ] Fetch VMware advisories from `POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList` (segment=VC; no authentication; 341+ records as of 2026-09-13).
-  - [ ] Implement CVSS enrichment from NVD API 2.0 (`https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=<CVE>`) with rate-limiting (5 requests/30 seconds without API key).
-  - [ ] **Confirmed limitation**: API `supportProducts` field arrives truncated; no JSON detail endpoint exists. Therefore fixed versions and full affected-product lists not available. Use Broadcom `severity` field (never reverse to NVD; NVD lags Broadcom by ~10 days).
-  - [ ] Implement batch enrichment with NVD throttling and fallback to Broadcom severity when NVD is unavailable.
-  - [ ] Register in `ALL_ADAPTERS` and update `SYNCED_VENDOR_CODES` to 7 vendors.
-  - [ ] No new database migration needed (`vmware` vendor row already seeded in `public.vendors`).
-  - [ ] Add advisory URL builder in `src/utils/advisoryUrl.ts` for VMware advisory links (Broadcom `notificationUrl`).
-  - [ ] Create unit tests: `src/tests/unit/adapters/vmware.test.ts` (12+ tests) and fixtures (sample API responses).
-  - [ ] Regenerate `src/supabase/functions/_shared/ingest.bundle.js` via `build:edge`.
-  - [ ] Verify E2E integration with Dashboard metrics and Advisory/CVE tables.
-  - [ ] Design and integrate VMware icon in `VendorLogos.tsx` (existing SVG available in codebase).
+- [x] **Task 32: VMware / Broadcom Vendor Adapter (1.2.0 — COMPLETED)**
+  - [x] Implemented `VmwareAdapter` (`src/adapters/vmware.ts`) adhering to `VendorAdapter` interface with list-layer Broadcom API integration.
+  - [x] Fetch VMware advisories from `POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList` (segment=VC; no authentication; 341+ records as of 2026-09-13).
+  - [x] Implemented CVSS enrichment from NVD API 2.0 (`https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=<CVE>`) with rate-limiting (5 requests/30 seconds without API key).
+  - [x] Confirmed limitation: API `supportProducts` field arrives truncated; no JSON detail endpoint exists. Fixed versions and full affected-product lists not available. Used Broadcom `severity` field (never reverse to NVD).
+  - [x] Implemented sequential (non-batched) NVD enrichment with throttling and fallback to Broadcom severity.
+  - [x] Registered in `ALL_ADAPTERS` and updated `SYNCED_VENDOR_CODES` to 7 vendors.
+  - [x] No database migration needed (`vmware` vendor row already seeded).
+  - [x] Added advisory URL builder in `src/utils/advisoryUrl.ts` for VMware advisory links (Broadcom `notificationUrl`).
+  - [x] Created unit tests: `src/tests/unit/adapters/vmware.test.ts` (21 tests) and fixtures (sample Broadcom/NVD API responses).
+  - [x] Regenerated `src/supabase/functions/_shared/ingest.bundle.js` via `build:edge`.
+  - [x] Verified integration: unit 75 files / 530 tests passed; smoke 18 passed (live Broadcom fetch); build succeeded.
+  - [x] Seventh working adapter (redhat, nutanix, ubuntu, debian, suse, cisco, vmware).
+  - **Accepted Risks**: NVD enrichment coverage low without API key (~12% at 20 advisories, ~50 CVEs). No retry on Broadcom list fetch. Both recorded in BUG_FIX.md.
+  - **Completed**: 2026-09-13 23:28:39 Asia/Taipei.
 

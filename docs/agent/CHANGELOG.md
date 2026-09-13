@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.0 - 2026-09-13
+### Added
+- **Cisco CSAF Vendor Adapter (Task 31)**: Implemented `CiscoAdapter` (`src/adapters/cisco.ts`) parsing Cisco PSIRT advisories from the public CSAF 2.0 distribution at `https://www.cisco.com/.well-known/csaf/` (changes.csv index plus per-advisory JSON; no authentication required). Added 15 unit tests (`src/tests/unit/adapters/cisco.test.ts`) and 3 fixture files. Registered in `ALL_ADAPTERS` index; updated `SYNCED_VENDOR_CODES` to 6 vendors; regenerated `ingest.bundle.js`. Implemented advisory-level severity derivation (max of `cvss_v3.baseSeverity` across vulnerabilities).
+- **VMware / Broadcom Vendor Adapter (Task 32)**: Implemented `VmwareAdapter` (`src/adapters/vmware.ts`) ingesting VMware Security Advisories (VMSA) from the public Broadcom support-portal API (`POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList`, segment=VC, no authentication). Added 21 unit tests (`src/tests/unit/adapters/vmware.test.ts`) and fixtures (sample Broadcom advisory list and NVD API responses). CVSS scores and vectors enriched from NVD API 2.0 with sequential (non-batched) fetching due to rate-limit sensitivity. Registered in `ALL_ADAPTERS` and updated `SYNCED_VENDOR_CODES` to 7 vendors.
+- **Seventh Working Vendor Adapter**: Vendor coverage expanded from 5 (redhat, nutanix, ubuntu, debian, suse) to 7 with addition of Cisco CSAF and VMware/Broadcom adapters.
+
+### Changed
+- **NVD Enrichment Strategy for VMware Adapter**: Implemented sequential (non-batched) CVE enrichment from NVD API 2.0 to address rate-limiting sensitivity (5 requests/30 seconds without API key; 429 under concurrency). Broadcom severity field remains ground truth; NVD used for enrichment only, never reverse.
+- **Test Suite Hardening**: Updated 6 test files that previously hardcoded vendor lists from 5 to 6/7 vendors (redhat, nutanix, ubuntu, debian, suse, cisco, vmware). Re-pointed 3 tests (`adapterEndpoints.test.ts`, `feedSourceTable.test.tsx`, `scheduleSettings.test.tsx`) from `vmware` exemplar to `dell` (still seeded without adapter) to preserve unimplemented-adapter test coverage.
+
+### Fixed
+- (No breaking bugs fixed in this release; accepted risks recorded in BUG_FIX.md)
+
 ## 1.1.0 - 2026-09-11
 ### Added
 - **Ubuntu Threat Feed Ingestion (Task 26)**: Implemented `UbuntuAdapter` (`src/adapters/ubuntu.ts`) parsing Ubuntu Security Notices (USN), affected packages, CVE associations, CVSS metrics, and canonical announcement links.

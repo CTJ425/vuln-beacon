@@ -31,3 +31,20 @@
 - **Description**: Cisco CSAF advisories reference product ids (e.g., `CSAFPID-278404`) in vulnerabilities array that appear nowhere in the `product_tree` section. Example: `cisco-sa-tce-roomos-dos-9V9jrC2q` has 81 referenced product ids; 2 are missing from product_tree. Another: `cisco-sa-hardening-iosxr-qg64NcM` references 265 ids; 1 is missing. The adapter cannot resolve these ids to actual product names/versions, so resolves them to nothing.
 - **Impact**: Affected-product lists in the VulnBeacon UI for Cisco advisories may be incomplete relative to the source Cisco document. The adapter silently omits unresolved ids from `affectedProducts`, `fixedVersions`, and `productImpacts` to prevent raw `CSAFPID-*` strings from appearing in user-facing output. Consequence: a user viewing a Cisco advisory may see fewer affected products than listed in the original Cisco CSAF document.
 - **Recommendation**: Accepted. Leaking raw `CSAFPID-*` identifiers into the UI is worse than incomplete product lists (confusing to users). If Cisco fixes the product_tree completeness, or if a mapping table of missing ids to product names becomes available, revisit to enhance the product list completeness.
+
+## R9: NVD Enrichment Coverage Low Without API Key
+- **Status**: OPEN / ACCEPTED RISK (2026-09-13, TASK-32 decision)
+- **Severity**: MEDIUM (enrichment-quality, not data-loss)
+- **Location**: `src/adapters/vmware.ts` (CVE enrichment loop), NVD API 2.0 rate-limiting
+- **Description**: The National Vulnerability Database (NVD) rate-limit without an API key is 5 requests per 30 seconds. NVD enrichment for VMware adapter runs strictly sequentially (not batched) due to 429 failures under concurrency. Measured on 5 advisories / 14 CVEs: 6 of 14 were enriched before hitting rate-limit. At a 20-advisory sync (~50 CVEs), coverage would be approximately 12%. Cisco CSAF, Debian, Red Hat CSAF, and other adapters do not use NVD enrichment; this risk is specific to VMware adapter.
+- **Impact**: CVSS scores and vectors from NVD available for only ~12% of CVEs at scale, resulting in incomplete enrichment on the user dashboard. Broadcom's own `severity` field is always correct and serves as the ground truth; NVD scores are additive information. User decision 2026-09-13: accept for now given data quality vs quota tradeoff.
+- **Options for mitigation**: (1) Throttle requests to ~6 seconds between fetches (slowest run time, minimal implementation); (2) Obtain NVD API key (50 req/30s quota, requires user setup via Supabase vault secrets); (3) Enrich only CVEs lacking a score in the database (best fix, requires ingestion-layer state not available to adapter today).
+- **Recommendation**: Accepted for now. Revisit if user obtains NVD API key or if ingestion layer gains CVE deduplication state.
+
+## R10: No Retry on Broadcom Advisory List Fetch
+- **Status**: OPEN / ACCEPTED RISK (2026-09-13, TASK-32 decision)
+- **Severity**: LOW (transient failures; retry would increase reliability but is orthogonal to adapter logic)
+- **Location**: `src/adapters/vmware.ts` (fetchAdvisories method, Broadcom list API call)
+- **Description**: The VMware adapter fetches the advisory list from Broadcom's `POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList` endpoint once per sync run with no retry on transient failure. A single network failure, timeout, or temporary 5xx error causes the entire vmware sync to fail for that scheduled run.
+- **Impact**: A transient network blip or Broadcom API maintenance window during a scheduled vmware sync causes the sync to report FAILED and emit no CVEs from that run. No alerts are generated, but the sync log shows failure. Affects vmware vendor only; other vendors are unaffected.
+- **Recommendation**: Accepted. This matches every sibling adapter in the codebase (redhat, nutanix, ubuntu, debian, suse, cisco) which also have no retry loop on the primary list fetch. Retry logic is not unique to vmware and would be a cross-cutting concern better addressed as a framework enhancement to all adapters together, not in this change.

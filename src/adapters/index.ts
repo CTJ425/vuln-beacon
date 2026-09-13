@@ -6,6 +6,7 @@ import { UbuntuAdapter } from './ubuntu';
 import { DebianAdapter } from './debian';
 import { SuseAdapter } from './suse';
 import { CiscoAdapter } from './cisco';
+import { VmwareAdapter } from './vmware';
 
 export {
   RedHatAdapter,
@@ -15,6 +16,7 @@ export {
   DebianAdapter,
   SuseAdapter,
   CiscoAdapter,
+  VmwareAdapter,
 };
 
 // RedHatAdapter (legacy cve.json based adapter) also declares vendorCode
@@ -29,6 +31,7 @@ export const ALL_ADAPTERS: VendorAdapter[] = [
   new DebianAdapter(),
   new SuseAdapter(),
   new CiscoAdapter(),
+  new VmwareAdapter(),
 ];
 
 // Guard against silently-ambiguous vendorCode resolution: if a future change

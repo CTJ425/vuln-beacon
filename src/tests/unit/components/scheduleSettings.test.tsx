@@ -56,7 +56,7 @@ describe('ScheduleSettings', () => {
       <ScheduleSettings
         vendors={[
           vendor(),
-          vendor({ id: 'id-vmware', code: 'vmware', name: 'VMware', schedule_enabled: false, schedule_times: [] }),
+          vendor({ id: 'id-dell', code: 'dell', name: 'Dell', schedule_enabled: false, schedule_times: [] }),
         ]}
         onSave={vi.fn(ok)}
       />
@@ -67,8 +67,8 @@ describe('ScheduleSettings', () => {
     expect(timesSelect()).toHaveTextContent('18:30');
     expect(timezoneSelect()).toHaveTextContent('Asia/Taipei');
     expect(screen.getByLabelText('Enable schedule for Red Hat')).toBeChecked();
-    expect(screen.getByLabelText('Enable schedule for VMware')).not.toBeChecked();
-    expect(screen.getByLabelText('Enable schedule for VMware')).toBeDisabled();
+    expect(screen.getByLabelText('Enable schedule for Dell')).not.toBeChecked();
+    expect(screen.getByLabelText('Enable schedule for Dell')).toBeDisabled();
     expect(screen.getByText('Adapter not implemented')).toBeInTheDocument();
   });
 

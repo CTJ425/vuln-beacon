@@ -1,0 +1,92 @@
+{
+  "success": true,
+  "data": {
+    "list": [
+      {
+        "affectedCve": "CVE-2026-59346, CVE-2026-59347",
+        "alertType": "S",
+        "documentId": "VCDSA38288",
+        "notificationId": 38288,
+        "notificationUrl": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/38288",
+        "published": "03 September 2026",
+        "severity": "CRITICAL",
+        "status": "OPEN",
+        "supportProducts": "VMware Fusion,VMware Work...",
+        "title": "VMSA-2026-0007: VMware Workstation and Fusion updates address integer-overflow and buffer overflow vulnerabilities (CVE-2026-59346, CVE-2026-59347)",
+        "totalRecords": null,
+        "updated": "2026-09-03T08:58:26.960422",
+        "workAround": "None"
+      },
+      {
+        "affectedCve": "CVE-2026-41722, CVE-2026-41723 and CVE-2026-41724",
+        "alertType": "S",
+        "documentId": "VCDSA37513",
+        "notificationId": 37513,
+        "notificationUrl": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/37513",
+        "published": "08 June 2026",
+        "severity": "HIGH",
+        "status": "OPEN",
+        "supportProducts": "VCF Operations,VCF Operat...",
+        "title": "VMSA-2026-0004: VMware Cloud Foundation Operations updates address multiple vulnerabilities (CVE-2026-41722, CVE-2026-41723 and CVE-2026-41724)",
+        "totalRecords": null,
+        "updated": "2026-06-08T07:26:38.058026",
+        "workAround": "None"
+      },
+      {
+        "affectedCve": "CVE-2026-22715,\u00a0CVE-2026-22716,\u00a0CVE-2026-22717, CVE-2026-22722",
+        "alertType": "S",
+        "documentId": "VCDSA36986",
+        "notificationId": 36986,
+        "notificationUrl": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/36986",
+        "published": "26 February 2026",
+        "severity": "MEDIUM",
+        "status": "OPEN",
+        "supportProducts": "VMware Fusion,VMware Work...",
+        "title": "VMSA-2026-0002: VMware Workstation and Fusion updates address multiple vulnerabilities (CVE-2026-22715, CVE-2026-22716, CVE-2026-22717, CVE-2026-22722)",
+        "totalRecords": null,
+        "updated": "2026-02-26T10:12:12.766",
+        "workAround": "None"
+      },
+      {
+        "affectedCve": "",
+        "alertType": "S",
+        "documentId": "VCDSA25199",
+        "notificationId": 25199,
+        "notificationUrl": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/25199",
+        "published": "26 November 2024",
+        "severity": "HIGH",
+        "status": "OPEN",
+        "supportProducts": "VMware Cloud Foundation",
+        "title": "VMSA-2024-0022: VMware Aria Operations updates address multiple vulnerabilities(CVE-2024-38830, CVE-2024-38831, CVE-2024-38832, CVE-2024-38833, CVE-2024-38834)",
+        "totalRecords": null,
+        "updated": "2024-11-26T11:04:26.833",
+        "workAround": ""
+      },
+      {
+        "affectedCve": "CVE-2026-41702",
+        "alertType": "S",
+        "documentId": "VCDSA37454",
+        "notificationId": 37454,
+        "notificationUrl": "https://support.broadcom.com/web/ecx/support-content-notification/-/external/content/SecurityAdvisories/0/37454",
+        "published": "14 May 2026",
+        "severity": "HIGH",
+        "status": "OPEN",
+        "supportProducts": "VMware Fusion",
+        "title": "VMSA-2026-0003: VMware Fusion updates address privilege escalation vulnerability (CVE-2026-41702)",
+        "totalRecords": null,
+        "updated": "2026-05-14T16:29:08.652560",
+        "workAround": "None"
+      }
+    ],
+    "pageInfo": {
+      "totalCount": 341,
+      "currentPage": 0,
+      "sortBy": "UNSORTED",
+      "pageSize": 5,
+      "nextPage": 1,
+      "lastPage": 6,
+      "firstPage": 0
+    }
+  },
+  "correlationId": "fixture"
+}

@@ -1,5 +1,25 @@
 # Progress Log
 
+## 2026-09-13 23:28:39 Asia/Taipei - VMware / Broadcom Vendor Adapter & Release 1.2.0 Finalization
+- **VMware / Broadcom Adapter (Task 32 — COMPLETED)**:
+  - Implemented full `VendorAdapter` compliance for `vmware` vendor ingesting VMware Security Advisories (VMSA) from the public Broadcom support-portal API (`POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList`, segment=VC, no authentication).
+  - CVSS scores and vectors enriched from NVD API 2.0 with strict sequential (non-batched) fetching due to rate-limit sensitivity (429 under concurrency); NVD used for enrichment only, severity ground truth remains Broadcom.
+  - Added `src/adapters/vmware.ts`, `src/tests/unit/adapters/vmware.test.ts` (21 tests), fixtures (vmware-advisory-list-sample.json, nvd-cve-sample.json).
+  - Updated `src/adapters/index.ts`, `src/services/syncService.ts` (SYNCED_VENDOR_CODES now 7 vendors), `src/utils/advisoryUrl.ts`, `src/supabase/functions/_shared/ingest.bundle.js` (build:edge output), plus six tests re-pointed from vmware to dell as the unimplemented exemplar.
+  - No database migration: `vmware` vendor row already seeded in initial migration.
+  - **Verification**: unit 75 files / 530 passed / 0 failed; smoke 18 passed including live Broadcom fetch; build succeeded. Live `fetchAdvisories(5)` returned 5 advisories and 14 CVEs with 0 malformed CVE ids and correct UTC dates.
+  - **Reviewer verdict**: PASS.
+  - **Accepted Risks**: (1) NVD enrichment coverage low without API key (~12% at 20-advisory sync, ~50 CVEs); user accepted for now (Broadcom severity always correct, CVSS scores additive). (2) No retry on Broadcom list fetch (matches sibling adapters, not unique).
+  - **Completed**: 2026-09-13 23:28:39 Asia/Taipei.
+
+- **Release 1.2.0 — Multi-Vendor Adapter Expansion**:
+  - Finalized version bump to `1.2.0` in `src/package.json`, `src/package-lock.json`, `src/config/version.ts` (pre-set by main session).
+  - Documented both Cisco CSAF adapter (Task 31, committed as 6bf576e) and VMware/Broadcom adapter (Task 32) in comprehensive release notes.
+  - Vendor coverage: 5 working adapters → 7 (redhat, nutanix, ubuntu, debian, suse, cisco, vmware).
+  - Updated `CHANGELOG.md` with 1.2.0 entry covering Added/Changed/Fixed across both adapters.
+  - Recorded both adapters' accepted risks (Cisco incomplete product trees, VMware NVD coverage low) in `BUG_FIX.md`.
+  - **Completed**: 2026-09-13 23:28:39 Asia/Taipei.
+
 ## 2026-09-13 22:56:42 Asia/Taipei - Cisco CSAF Vendor Adapter & VMware/Broadcom Design (1.1.0)
 - **Cisco CSAF Vendor Adapter (Task 31 — COMPLETED)**:
   - Implemented full `VendorAdapter` compliance for `cisco` vendor ingesting Cisco PSIRT advisories from the public CSAF 2.0 distribution at `https://www.cisco.com/.well-known/csaf/` (changes.csv index + per-advisory JSON; no authentication required).
@@ -16,20 +36,3 @@
   - Constraint: API `supportProducts` field arrives truncated; no detail endpoint exists. Therefore fixed versions and full affected-product lists unavailable.
   - `vmware` vendor row already seeded in `public.vendors`; only adapter code and registration needed (no new migration).
   - NVD rate-limit: 5 requests/30 seconds without API key; batch enrichment needs throttling.
-
-## 2026-09-12 22:45:00 Asia/Taipei - Replace free-text schedule inputs with dropdown selects in ScheduleSettings (1.1.0)
-- **Replace free-text schedule inputs with dropdown selects in ScheduleSettings**:
-  - Added exported `TIME_OPTIONS` (48 entries, `00:00`–`23:30`, 30-minute grid).
-  - Added exported `TIMEZONE_OPTIONS` (fixed IANA whitelist).
-  - Schedule-times cell is now a MUI `Select multiple` rendering selected values as `Chip`s; timezone cell is a single `Select`.
-  - Stored values outside the grid or the whitelist are merged into the option list so legacy data is never silently dropped.
-  - Save now de-duplicates and sorts times ascending, and blocks an enabled schedule with zero times (`Select at least one time`).
-  - Removed the now-unreachable comma-splitting and `TIME_FORMAT` / `Invalid time format` guard; `RowState.timesText: string` became `RowState.times: string[]`.
-  - Discovered finding (not a bug): the "Sync Monitor" and "Webhooks & Config" sidebar entries were intentionally removed in commit `abb2f62` and consolidated into the authenticated Admin Console.
-- **Files Changed**:
-  - `src/components/sync/ScheduleSettings.tsx` (production)
-  - `src/tests/unit/components/scheduleSettings.test.tsx` (tests, written first — TDD Red before dispatch)
-- **Verification**:
-  - `npm --prefix src test` — 89/89 test files, 622/622 tests passed.
-  - `npm --prefix src run verify` — build:edge -> tsc -> vite build, clean.
-  - Reviewer verdict: PASS.

@@ -2,6 +2,23 @@
 
 Older progress entries, prepended from `PROGRESS.md`.
 
+## 2026-09-12 22:45:00 Asia/Taipei - Replace free-text schedule inputs with dropdown selects in ScheduleSettings (1.1.0)
+- **Replace free-text schedule inputs with dropdown selects in ScheduleSettings**:
+  - Added exported `TIME_OPTIONS` (48 entries, `00:00`–`23:30`, 30-minute grid).
+  - Added exported `TIMEZONE_OPTIONS` (fixed IANA whitelist).
+  - Schedule-times cell is now a MUI `Select multiple` rendering selected values as `Chip`s; timezone cell is a single `Select`.
+  - Stored values outside the grid or the whitelist are merged into the option list so legacy data is never silently dropped.
+  - Save now de-duplicates and sorts times ascending, and blocks an enabled schedule with zero times (`Select at least one time`).
+  - Removed the now-unreachable comma-splitting and `TIME_FORMAT` / `Invalid time format` guard; `RowState.timesText: string` became `RowState.times: string[]`.
+  - Discovered finding (not a bug): the "Sync Monitor" and "Webhooks & Config" sidebar entries were intentionally removed in commit `abb2f62` and consolidated into the authenticated Admin Console.
+- **Files Changed**:
+  - `src/components/sync/ScheduleSettings.tsx` (production)
+  - `src/tests/unit/components/scheduleSettings.test.tsx` (tests, written first — TDD Red before dispatch)
+- **Verification**:
+  - `npm --prefix src test` — 89/89 test files, 622/622 tests passed.
+  - `npm --prefix src run verify` — build:edge -> tsc -> vite build, clean.
+  - Reviewer verdict: PASS.
+
 ## 2026-09-11 16:15:00 Asia/Taipei - Version 1.1.0 Release Finalization & Documentation Sync (1.1.0)
 - **Version 1.1.0 Release Finalization & Documentation Sync**:
   - Restored and configured `.claude/skills/versioning/SKILL.md` matching VulnBeacon project paths, semver standards, and release checklist.

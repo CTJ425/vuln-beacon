@@ -34,6 +34,9 @@ export function getAdvisoryUrl(advisoryId: string, vendorCode?: string): string 
     if (v === 'cisco') {
       return `https://sec.cloudapps.cisco.com/security/center/cveListing.x?cve=${cveUpper}`;
     }
+    if (v === 'vmware') {
+      return `https://nvd.nist.gov/vuln/detail/${cveUpper}`;
+    }
     return `https://www.cve.org/CVERecord?id=${encodeURIComponent(cveUpper)}`;
   }
 
@@ -88,6 +91,12 @@ export function getAdvisoryUrl(advisoryId: string, vendorCode?: string): string 
   // Cisco security advisories: cisco-sa-... or cisco vendor
   if (/^cisco-sa-/i.test(adv) || v === 'cisco') {
     return `https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/${adv}`;
+  }
+
+  // VMware / Broadcom advisories: VMSA-... or vmware vendor. There is no detail
+  // endpoint or per-advisory URL pattern from the id alone, so fall back to the list.
+  if (adv.toUpperCase().startsWith('VMSA-') || v === 'vmware') {
+    return 'https://support.broadcom.com/web/ecx/security-advisories';
   }
 
   return '';

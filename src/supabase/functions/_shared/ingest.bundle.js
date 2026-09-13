@@ -1381,6 +1381,203 @@ var CiscoAdapter = class {
   }
 };
 
+// adapters/vmware.ts
+function normalizeSeverity4(severity) {
+  if (typeof severity !== "string") return "UNKNOWN";
+  const s = severity.trim().toUpperCase();
+  if (s === "CRITICAL") return "CRITICAL";
+  if (s === "HIGH") return "HIGH";
+  if (s === "MEDIUM") return "MEDIUM";
+  if (s === "LOW") return "LOW";
+  return "UNKNOWN";
+}
+var CVE_ID_GLOBAL_REGEX = /CVE-\d{4}-\d{4,}/gi;
+var VMSA_ID_REGEX = /VMSA-\d{4}-\d{4,}/i;
+var MONTH_NAMES = {
+  january: 0,
+  february: 1,
+  march: 2,
+  april: 3,
+  may: 4,
+  june: 5,
+  july: 6,
+  august: 7,
+  september: 8,
+  october: 9,
+  november: 10,
+  december: 11
+};
+var NVD_MAX_REQUESTS = 60;
+function extractCveIds(affectedCve) {
+  if (typeof affectedCve !== "string" || affectedCve.length === 0) return [];
+  const matches = affectedCve.match(CVE_ID_GLOBAL_REGEX) ?? [];
+  const seen = /* @__PURE__ */ new Set();
+  const ids = [];
+  for (const m of matches) {
+    const id = m.toUpperCase();
+    if (!seen.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+function parsePublishedDate(published) {
+  if (typeof published !== "string") return void 0;
+  const m = published.trim().match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if (!m) return void 0;
+  const day = parseInt(m[1], 10);
+  const month = MONTH_NAMES[m[2].toLowerCase()];
+  const year = parseInt(m[3], 10);
+  if (month === void 0 || Number.isNaN(day) || Number.isNaN(year)) return void 0;
+  const d = new Date(Date.UTC(year, month, day));
+  return Number.isNaN(d.getTime()) ? void 0 : d.toISOString();
+}
+function parseUpdatedAsUtc(updated) {
+  if (typeof updated !== "string") return void 0;
+  const trimmed = updated.trim();
+  const m = trimmed.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:?\d{2})?$/);
+  if (!m) return void 0;
+  const [, base, frac, tz] = m;
+  const millis = frac ? `.${frac.slice(1, 4).padEnd(3, "0")}` : ".000";
+  const timezone = tz ?? "Z";
+  const d = /* @__PURE__ */ new Date(`${base}${millis}${timezone}`);
+  return Number.isNaN(d.getTime()) ? void 0 : d.toISOString();
+}
+var VmwareAdapter = class {
+  vendorCode = "vmware";
+  vendorName = "VMware / Broadcom";
+  listUrl = "https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList";
+  nvdUrl = "https://services.nvd.nist.gov/rest/json/cves/2.0";
+  endpoints = [
+    { label: "Advisories list", url: this.listUrl },
+    { label: "NVD CVE lookup", url: `${this.nvdUrl}?cveId={cveId}` }
+  ];
+  async fetchAdvisories(limit = 20) {
+    const res = await fetch(this.listUrl, {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json" },
+      body: JSON.stringify({
+        pageNumber: 0,
+        pageSize: limit,
+        searchVal: "",
+        segment: "VC",
+        sortInfo: { column: "", order: "" }
+      })
+    });
+    if (!res.ok) {
+      const msg = res.statusText || `HTTP ${res.status}`;
+      throw new Error(`Failed to fetch VMware advisories list: ${msg}`);
+    }
+    const listData = await res.json();
+    const items = this.parse(listData).slice(0, limit);
+    await this.enrichWithNvd(items);
+    return items;
+  }
+  parse(rawPayload) {
+    if (!rawPayload || typeof rawPayload !== "object") {
+      return [];
+    }
+    let rows;
+    if (Array.isArray(rawPayload)) {
+      rows = rawPayload;
+    } else {
+      const data = rawPayload.data;
+      const list = Array.isArray(data?.list) ? data.list : Array.isArray(rawPayload.list) ? rawPayload.list : null;
+      if (!list) return [];
+      rows = list;
+    }
+    const normalizedItems = [];
+    for (const raw of rows) {
+      if (!raw || typeof raw !== "object") continue;
+      const row = raw;
+      const title = typeof row.title === "string" ? row.title : "";
+      const documentId = typeof row.documentId === "string" ? row.documentId : "";
+      const vmsaMatch = title.match(VMSA_ID_REGEX);
+      const advisoryId = vmsaMatch ? vmsaMatch[0].toUpperCase() : documentId;
+      const severity = normalizeSeverity4(row.severity);
+      const publishedAt = parsePublishedDate(row.published) ?? "";
+      const updatedAt = parseUpdatedAsUtc(row.updated);
+      const url = typeof row.notificationUrl === "string" ? row.notificationUrl : "";
+      const workAround = typeof row.workAround === "string" ? row.workAround.trim() : "";
+      const mitigation = workAround && workAround !== "None" ? workAround : void 0;
+      const cves = extractCveIds(row.affectedCve).map((cveId) => ({
+        cveId,
+        severity
+      }));
+      normalizedItems.push({
+        advisoryId,
+        title,
+        severity,
+        publishedAt,
+        updatedAt,
+        url,
+        mitigation,
+        cves,
+        rawPayload: row
+      });
+    }
+    return normalizedItems;
+  }
+  async enrichWithNvd(items) {
+    const uniqueCveIds = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const item of items) {
+      for (const cve of item.cves) {
+        if (!seen.has(cve.cveId)) {
+          seen.add(cve.cveId);
+          uniqueCveIds.push(cve.cveId);
+        }
+      }
+    }
+    const nvdResults = /* @__PURE__ */ new Map();
+    for (let i = 0; i < uniqueCveIds.length && i < NVD_MAX_REQUESTS; i++) {
+      const cveId = uniqueCveIds[i];
+      let res;
+      try {
+        res = await fetch(`${this.nvdUrl}?cveId=${encodeURIComponent(cveId)}`);
+      } catch {
+        continue;
+      }
+      if (res.status === 429) {
+        break;
+      }
+      if (!res.ok) {
+        continue;
+      }
+      let body;
+      try {
+        body = await res.json();
+      } catch {
+        continue;
+      }
+      if (body?.totalResults === 0) continue;
+      const cveEntry = body?.vulnerabilities?.[0]?.cve;
+      if (!cveEntry) continue;
+      const cvssData = cveEntry?.metrics?.cvssMetricV31?.[0]?.cvssData;
+      const description = cveEntry?.descriptions?.[0]?.value;
+      nvdResults.set(cveId, {
+        cvssScore: typeof cvssData?.baseScore === "number" ? cvssData.baseScore : void 0,
+        cvssVector: typeof cvssData?.vectorString === "string" ? cvssData.vectorString : void 0,
+        description: typeof description === "string" ? description : void 0,
+        severity: normalizeSeverity4(cvssData?.baseSeverity)
+      });
+    }
+    for (const item of items) {
+      for (const cve of item.cves) {
+        const result = nvdResults.get(cve.cveId);
+        if (!result) continue;
+        cve.cvssScore = result.cvssScore;
+        cve.cvssVector = result.cvssVector;
+        cve.description = result.description;
+        if (result.severity !== "UNKNOWN") {
+          cve.severity = result.severity;
+        }
+      }
+    }
+  }
+};
+
 // adapters/index.ts
 var ALL_ADAPTERS = [
   new RedHatCsafAdapter(),
@@ -1388,7 +1585,8 @@ var ALL_ADAPTERS = [
   new UbuntuAdapter(),
   new DebianAdapter(),
   new SuseAdapter(),
-  new CiscoAdapter()
+  new CiscoAdapter(),
+  new VmwareAdapter()
 ];
 var seenVendorCodes = /* @__PURE__ */ new Set();
 for (const adapter of ALL_ADAPTERS) {

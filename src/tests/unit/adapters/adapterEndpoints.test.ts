@@ -75,6 +75,6 @@ describe('RedHatCsafAdapter describes its own endpoints', () => {
   });
 
   it('has no adapter for a seeded vendor that is not implemented', () => {
-    expect(getAdapterByCode('vmware')).toBeUndefined();
+    expect(getAdapterByCode('dell')).toBeUndefined();
   });
 });

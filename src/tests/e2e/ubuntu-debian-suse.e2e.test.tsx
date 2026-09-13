@@ -22,9 +22,9 @@ describe('Ubuntu, Debian, and SUSE Multi-Vendor Ingestion & UI Integration (E2E)
     vi.unstubAllGlobals();
   });
 
-  it('verifies all 5 enterprise adapters are registered in ALL_ADAPTERS', () => {
+  it('verifies all 7 enterprise adapters are registered in ALL_ADAPTERS', () => {
     const codes = ALL_ADAPTERS.map((a) => a.vendorCode);
-    expect(codes).toEqual(['redhat', 'nutanix', 'ubuntu', 'debian', 'suse']);
+    expect(codes).toEqual(['redhat', 'nutanix', 'ubuntu', 'debian', 'suse', 'cisco', 'vmware']);
   });
 
   it('executes IngestionEngine end-to-end for Ubuntu, Debian, and SUSE', async () => {

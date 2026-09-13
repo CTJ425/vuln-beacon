@@ -17,7 +17,7 @@ const vendor = (code: string, name: string): Vendor => ({
   created_at: '2026-01-01T00:00:00.000Z',
 });
 
-const VENDORS = [vendor('redhat', 'Red Hat'), vendor('vmware', 'VMware / Broadcom')];
+const VENDORS = [vendor('redhat', 'Red Hat'), vendor('dell', 'Dell Technologies')];
 
 const log = (code: string, status: VendorSyncLog['status'], error: string | null): VendorSyncLog => ({
   id: `log-${code}-${status}`,
@@ -46,7 +46,7 @@ describe('FeedSourceTable shows the real feed sources', () => {
 
   it('marks a vendor with no adapter as not implemented and shows no endpoint', () => {
     render(<FeedSourceTable vendors={VENDORS} logs={[]} />);
-    const row = rowFor('VMware / Broadcom');
+    const row = rowFor('Dell Technologies');
 
     expect(within(row).getByText('Not implemented')).toBeTruthy();
     expect(within(row).getByText('No adapter implemented')).toBeTruthy();
@@ -74,7 +74,7 @@ describe('FeedSourceTable shows the real feed sources', () => {
 
   it('says Never for a vendor that has never synced', () => {
     render(<FeedSourceTable vendors={VENDORS} logs={[log('redhat', 'SUCCESS', null)]} />);
-    const row = rowFor('VMware / Broadcom');
+    const row = rowFor('Dell Technologies');
 
     expect(within(row).getByText('Never')).toBeTruthy();
   });
