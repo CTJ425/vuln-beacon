@@ -1,0 +1,216 @@
+{
+  "document": {
+    "acknowledgments": [
+      {
+        "summary": "This vulnerability was found during internal security testing."
+      }
+    ],
+    "category": "csaf_security_advisory",
+    "csaf_version": "2.0",
+    "notes": [
+      {
+        "category": "summary",
+        "title": "Summary",
+        "text": "A vulnerability in the text rendering subsystem of Cisco TelePresence Collaboration Endpoint (CE) Software and Cisco RoomOS Software could allow an unauthenticated, remote attacker to cause a denial of service (DoS) condition on an affected device.\r\n\r\nThis vulnerability is due to insufficient validation of input received by an affected device. An attacker could exploit this vulnerability by getting the affected device to render crafted text, for example, a crafted meeting invitation. As indicated in the CVSS score, no user interaction is required, such as accepting the meeting invitation. A successful exploit could allow the attacker to cause the affected device to reload, resulting in a DoS condition.\r\n\r\nCisco has released software updates that address this vulnerability. There are no workarounds that address this vulnerability.\r\n\r\n"
+      },
+      {
+        "category": "general",
+        "title": "Vulnerable Products",
+        "text": "This vulnerability affects Cisco TelePresence CE Software and Cisco RoomOS Software, regardless of device configuration.\r\n\r\nFor information about which Cisco software releases are vulnerable, see the Fixed Software [\"#fs\"] section of this advisory."
+      },
+      {
+        "category": "general",
+        "title": "Products Confirmed Not Vulnerable",
+        "text": "Only products listed in the Vulnerable Products [\"#vp\"] section of this advisory are known to be affected by this vulnerability."
+      },
+      {
+        "category": "general",
+        "title": "Workarounds",
+        "text": "There are no workarounds that address this vulnerability."
+      },
+      {
+        "category": "general",
+        "title": "Fixed Software",
+        "text": "Cisco considers any workarounds and mitigations (if applicable) to be temporary solutions until an upgrade to a fixed software release is available. To fully remediate this vulnerability and avoid future exposure as described in this advisory, Cisco strongly recommends that customers upgrade to the fixed software indicated in this advisory.\r\n      Fixed Releases\r\nIn the following table, the left column lists Cisco software releases. The center and right columns indicate whether a release is affected by the vulnerability that is described in this advisory and the releases that include the fix for this vulnerability. Customers are advised to upgrade to an appropriate fixed software release [\"https://sec.cloudapps.cisco.com/security/center/resources/security_vulnerability_policy.html#fixes\"] as indicated in this section.\r\n\r\nNote: For releases earlier than Release 10, the software for on-premises devices was called Cisco TelePresence CE Software, and the software for cloud deployments was called Cisco RoomOS Software. For releases 10 and later, the software for both on-premises and cloud deployments is called Cisco RoomOS Software. Cloud deployments of Cisco RoomOS Software do not use standard release numbers. Instead, the name of the release includes the month in which the release was made available, such as RoomOS December 2025.\r\n        Cisco TelePresence CE Software and RoomOS Software Release  Fixed Releases for TelePresence CE Software and RoomOS Software in On-Premises Operation  Fixed Releases for RoomOS Software in Cloud-Aware Operation          10 and earlier  Migrate to a fixed release.  RoomOS October 2025 Release (11.33.1.10)\r\nRoomOS November 2025 Release (26.0.1.5)      11  11.27.5.0\r\n11.32.3.0  RoomOS October 2025 Release (11.33.1.10)\r\nRoomOS November 2025 Release (26.0.1.5)\r\nThe Cisco Product Security Incident Response Team (PSIRT) validates only the affected and fixed release information that is documented in this advisory."
+      },
+      {
+        "category": "general",
+        "title": "Vulnerability Policy",
+        "text": "To learn about Cisco security vulnerability disclosure policies and publications, see the Security Vulnerability Policy [\"http://www.cisco.com/web/about/security/psirt/security_vulnerability_policy.html\"]. This document also contains instructions for obtaining fixed software and receiving security vulnerability information from Cisco."
+      },
+      {
+        "category": "general",
+        "title": "Exploitation and Public Announcements",
+        "text": "The Cisco PSIRT is not aware of any public announcements or malicious use of the vulnerability that is described in this advisory."
+      },
+      {
+        "category": "general",
+        "title": "Source",
+        "text": "This vulnerability was found during internal security testing."
+      },
+      {
+        "category": "legal_disclaimer",
+        "title": "Legal Disclaimer",
+        "text": "SOFTWARE DOWNLOADS AND TECHNICAL SUPPORT\r\n\r\nThe Cisco Support and Downloads [\"https://www.cisco.com/c/en/us/support/index.html\"] page on Cisco.com provides information about licensing and downloads. T"
+      }
+    ],
+    "publisher": {
+      "category": "vendor",
+      "contact_details": "psirt@cisco.com",
+      "issuing_authority": "Cisco PSIRT",
+      "name": "Cisco",
+      "namespace": "https://wwww.cisco.com"
+    },
+    "references": [
+      {
+        "category": "self",
+        "summary": "Cisco TelePresence Collaboration Endpoint Software and RoomOS Software Denial of Service Vulnerability",
+        "url": "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/cisco-sa-tce-roomos-dos-9V9jrC2q"
+      },
+      {
+        "category": "external",
+        "summary": "Cisco Security Vulnerability Policy",
+        "url": "https://sec.cloudapps.cisco.com/security/center/resources/security_vulnerability_policy.html"
+      }
+    ],
+    "title": "Cisco TelePresence Collaboration Endpoint Software and RoomOS Software Denial of Service Vulnerability",
+    "tracking": {
+      "current_release_date": "2026-02-12T17:37:39+00:00",
+      "generator": {
+        "date": "2026-08-08T01:33:17+00:00",
+        "engine": {
+          "name": "TVCE"
+        }
+      },
+      "id": "cisco-sa-tce-roomos-dos-9V9jrC2q",
+      "initial_release_date": "2026-02-04T16:00:00+00:00",
+      "revision_history": [
+        {
+          "date": "2026-02-04T15:55:37+00:00",
+          "number": "1.0.0",
+          "summary": "Initial public release."
+        },
+        {
+          "date": "2026-02-10T17:38:10+00:00",
+          "number": "1.1.0",
+          "summary": "Removed extraneous text from Fixed Releases."
+        },
+        {
+          "date": "2026-02-12T17:37:39+00:00",
+          "number": "1.2.0",
+          "summary": "Updated fixed releases."
+        }
+      ],
+      "status": "final",
+      "version": "1.2.0"
+    }
+  },
+  "product_tree": {
+    "branches": [
+      {
+        "name": "Cisco",
+        "category": "vendor",
+        "branches": [
+          {
+            "name": "Cisco RoomOS Software",
+            "category": "product_family",
+            "branches": [
+              {
+                "name": "RoomOS.10",
+                "category": "product_version",
+                "branches": [
+                  {
+                    "name": "RoomOS 10.3.2.0",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "RoomOS 10.3.2.0",
+                      "product_id": "CSAFPID-284328"
+                    }
+                  },
+                  {
+                    "name": "RoomOS 10.3.4.0",
+                    "category": "service_pack",
+                    "product": {
+                      "name": "RoomOS 10.3.4.0",
+                      "product_id": "CSAFPID-286475"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "category": "installed_on",
+        "full_product_name": {
+          "name": "Cisco RoomOS Software RoomOS 10.3.2.0 when installed on Cisco Room Series",
+          "product_id": "CSAFPID-284328:277408"
+        },
+        "product_reference": "CSAFPID-284328",
+        "relates_to_product_reference": "CSAFPID-277408"
+      },
+      {
+        "category": "installed_on",
+        "full_product_name": {
+          "name": "Cisco RoomOS Software RoomOS 10.3.2.0 when installed on Cisco Board Series",
+          "product_id": "CSAFPID-284328:277480"
+        },
+        "product_reference": "CSAFPID-284328",
+        "relates_to_product_reference": "CSAFPID-277480"
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2026-20119",
+      "ids": [
+        {
+          "system_name": "Cisco Bug ID",
+          "text": "CSCws04170"
+        }
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "title": "Affected Product Comprehensiveness",
+          "text": "Complete."
+        }
+      ],
+      "product_status": {
+        "known_affected": [
+          "CSAFPID-284328",
+          "CSAFPID-286475"
+        ]
+      },
+      "remediations": [
+        {
+          "category": "vendor_fix",
+          "details": "Cisco has released software updates that address this vulnerability.",
+          "product_ids": [
+            "CSAFPID-284328",
+            "CSAFPID-286475"
+          ],
+          "url": "https://software.cisco.com"
+        }
+      ],
+      "scores": [
+        {
+          "cvss_v3": {
+            "baseScore": 7.5,
+            "baseSeverity": "HIGH",
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+            "version": "3.1"
+          },
+          "products": [
+            "CSAFPID-284328",
+            "CSAFPID-286475"
+          ]
+        }
+      ],
+      "title": "Cisco TelePresence Collaboration Endpoint Software and RoomOS Software Denial of Service Vulnerability"
+    }
+  ]
+}

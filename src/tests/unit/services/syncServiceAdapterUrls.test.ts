@@ -41,7 +41,7 @@ describe('SyncService builds its request URLs from the adapter', () => {
   });
 
   it('publishes the vendor codes it actually syncs', () => {
-    expect([...SYNCED_VENDOR_CODES]).toEqual(['redhat', 'nutanix', 'ubuntu', 'debian', 'suse']);
+    expect([...SYNCED_VENDOR_CODES]).toEqual(['redhat', 'nutanix', 'ubuntu', 'debian', 'suse', 'cisco']);
   });
 
   it('looks a CVE up through the adapter reverse-lookup url', async () => {

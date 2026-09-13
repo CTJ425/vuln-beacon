@@ -34,6 +34,7 @@ export const VENDOR_COLORS: Record<string, string> = {
   ubuntu: '#E95420',
   debian: '#D70A53',
   suse: '#30BA78',
+  cisco: '#1BA0D7',
 };
 
 export const VENDOR_NAMES: Record<string, string> = {
@@ -48,6 +49,7 @@ export const VENDOR_NAMES: Record<string, string> = {
   ubuntu: 'Ubuntu',
   debian: 'Debian',
   suse: 'SUSE',
+  cisco: 'Cisco',
 };
 
 export const VendorIcon: React.FC<VendorIconProps> = ({

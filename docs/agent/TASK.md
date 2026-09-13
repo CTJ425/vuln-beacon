@@ -370,3 +370,35 @@
 
 
 
+
+- [x] **Task 31: Cisco CSAF Vendor Adapter (1.1.0)**
+  - [x] Implement `CiscoAdapter` (`src/adapters/cisco.ts`) adhering to `VendorAdapter` interface with CSAF 2.0 parsing.
+  - [x] Fetch Cisco PSIRT advisories from `https://www.cisco.com/.well-known/csaf/` (changes.csv index + per-advisory JSON; no authentication).
+  - [x] Implement advisory-level severity derivation (max of `cvss_v3.baseSeverity` across vulnerabilities).
+  - [x] Sort `changes.csv` entries descending by timestamp before slicing to limit (source not strictly ordered).
+  - [x] Register in `ALL_ADAPTERS` and update `SYNCED_VENDOR_CODES` to 6 vendors.
+  - [x] Add database migration `20260913000000_add_cisco_vendor.sql` seeding `cisco` vendor.
+  - [x] Design and integrate Cisco icon in `VendorLogos.tsx` and `VendorIcon.tsx` (uses DefaultVendorLogo pending SVG).
+  - [x] Add advisory URL builder in `src/utils/advisoryUrl.ts` for Cisco advisory and CVE links.
+  - [x] Regenerate `src/supabase/functions/_shared/ingest.bundle.js` via `build:edge` (Edge Function requirement).
+  - [x] Create unit tests: `src/tests/unit/adapters/cisco.test.ts` (15 tests) and fixtures (sample CSAF documents, changes.csv).
+  - [x] Update sync-service tests (`syncServiceAdapterUrls.test.ts`, `nutanixSyncService.test.ts`, `syncServiceServerMode.test.ts`, `adapters.smoke.test.ts`) hardcoded vendor lists from 5 to 6.
+  - [x] Live smoke test against real Cisco CSAF feed: emitted 202 product strings with 0 raw `CSAFPID-` leaks.
+  - [x] **Accepted Risk**: Cisco advisories reference 2–8 product ids appearing nowhere in `product_tree`. Adapter silently omits these from `affectedProducts`, `fixedVersions`, `productImpacts` to prevent raw `CSAFPID-*` strings in output. Consequence: affected-product lists may be incomplete relative to source document. Risk recorded in BUG_FIX.md.
+  - **Verification**: 74 test files / 509 tests passed; build clean.
+  - **Completed**: 2026-09-13 22:56:42 Asia/Taipei.
+
+- [ ] **Task 32: VMware / Broadcom Vendor Adapter (1.1.0 — NOT STARTED)**
+  - [ ] Implement `VmwareAdapter` (`src/adapters/vmware.ts`) adhering to `VendorAdapter` interface with list-layer Broadcom API integration.
+  - [ ] Fetch VMware advisories from `POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList` (segment=VC; no authentication; 341+ records as of 2026-09-13).
+  - [ ] Implement CVSS enrichment from NVD API 2.0 (`https://services.nvd.nist.gov/rest/json/cves/2.0?cveId=<CVE>`) with rate-limiting (5 requests/30 seconds without API key).
+  - [ ] **Confirmed limitation**: API `supportProducts` field arrives truncated; no JSON detail endpoint exists. Therefore fixed versions and full affected-product lists not available. Use Broadcom `severity` field (never reverse to NVD; NVD lags Broadcom by ~10 days).
+  - [ ] Implement batch enrichment with NVD throttling and fallback to Broadcom severity when NVD is unavailable.
+  - [ ] Register in `ALL_ADAPTERS` and update `SYNCED_VENDOR_CODES` to 7 vendors.
+  - [ ] No new database migration needed (`vmware` vendor row already seeded in `public.vendors`).
+  - [ ] Add advisory URL builder in `src/utils/advisoryUrl.ts` for VMware advisory links (Broadcom `notificationUrl`).
+  - [ ] Create unit tests: `src/tests/unit/adapters/vmware.test.ts` (12+ tests) and fixtures (sample API responses).
+  - [ ] Regenerate `src/supabase/functions/_shared/ingest.bundle.js` via `build:edge`.
+  - [ ] Verify E2E integration with Dashboard metrics and Advisory/CVE tables.
+  - [ ] Design and integrate VMware icon in `VendorLogos.tsx` (existing SVG available in codebase).
+

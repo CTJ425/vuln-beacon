@@ -1166,13 +1166,229 @@ var SuseAdapter = class {
   }
 };
 
+// adapters/cisco.ts
+var CVE_ID_REGEX5 = /^CVE-\d{4}-\d{4,}$/i;
+function normalizeCiscoSeverity(text, cvssScore) {
+  if (typeof text === "string") {
+    const s = text.trim().toUpperCase();
+    if (s === "CRITICAL") return "CRITICAL";
+    if (s === "HIGH") return "HIGH";
+    if (s === "MEDIUM") return "MEDIUM";
+    if (s === "LOW") return "LOW";
+  }
+  if (cvssScore !== void 0 && !isNaN(cvssScore)) {
+    if (cvssScore >= 9) return "CRITICAL";
+    if (cvssScore >= 7) return "HIGH";
+    if (cvssScore >= 4) return "MEDIUM";
+    if (cvssScore > 0) return "LOW";
+  }
+  return "UNKNOWN";
+}
+var SEVERITY_RANK = {
+  CRITICAL: 4,
+  HIGH: 3,
+  MEDIUM: 2,
+  LOW: 1,
+  UNKNOWN: 0
+};
+function buildProductIdMap(productTree) {
+  const map = /* @__PURE__ */ new Map();
+  function walk(node) {
+    if (!node || typeof node !== "object") return;
+    const n = node;
+    const product = n.product;
+    if (product && typeof product === "object") {
+      const p = product;
+      if (typeof p.product_id === "string" && typeof p.name === "string") {
+        map.set(p.product_id, p.name);
+      }
+    }
+    if (Array.isArray(n.branches)) {
+      for (const child of n.branches) walk(child);
+    }
+  }
+  if (productTree && typeof productTree === "object") {
+    const branches = productTree.branches;
+    if (Array.isArray(branches)) {
+      for (const branch of branches) walk(branch);
+    }
+  }
+  return map;
+}
+var CiscoAdapter = class {
+  vendorCode = "cisco";
+  vendorName = "Cisco";
+  baseUrl = "https://www.cisco.com/.well-known/csaf";
+  changesCsvUrl = "https://www.cisco.com/.well-known/csaf/changes.csv";
+  advisoryBaseUrl = "https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory";
+  endpoints = [
+    { label: "CSAF changes index", url: this.changesCsvUrl },
+    { label: "CSAF advisory detail", url: `${this.baseUrl}/{advisoryFile}` },
+    { label: "Cisco Security Advisory", url: `${this.advisoryBaseUrl}/{advisoryId}` }
+  ];
+  async fetchAdvisories(limit = 20) {
+    const res = await fetch(this.changesCsvUrl);
+    if (!res.ok) {
+      const msg = res.statusText || `HTTP ${res.status}`;
+      throw new Error(`Failed to fetch Cisco changes index: ${msg}`);
+    }
+    const csvText = await res.text();
+    const lines = csvText.split(/\r?\n/).filter(Boolean);
+    const entries = [];
+    for (const line of lines) {
+      const match = line.trim().match(/^([^",]+\.json),(.+)$/i);
+      if (match) {
+        entries.push({ path: match[1], time: match[2] });
+      }
+    }
+    entries.sort((a, b) => b.time.localeCompare(a.time));
+    const paths = entries.slice(0, limit).map((e) => e.path);
+    if (paths.length === 0) return [];
+    const detailDocuments = [];
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < paths.length; i += BATCH_SIZE) {
+      const batch = paths.slice(i, i + BATCH_SIZE);
+      const batchDocs = await Promise.all(
+        batch.map(async (path) => {
+          try {
+            const detailRes = await fetch(`${this.baseUrl}/${path}`);
+            if (detailRes.ok) {
+              return await detailRes.json();
+            }
+          } catch {
+          }
+          return null;
+        })
+      );
+      for (const doc of batchDocs) {
+        if (doc !== null) detailDocuments.push(doc);
+      }
+    }
+    return this.parse(detailDocuments);
+  }
+  parse(rawPayload) {
+    if (!rawPayload || typeof rawPayload !== "object") {
+      return [];
+    }
+    const docs = Array.isArray(rawPayload) ? rawPayload : [rawPayload];
+    const normalizedItems = [];
+    for (const doc of docs) {
+      if (!doc || typeof doc !== "object") continue;
+      const d = doc;
+      const document = d.document;
+      if (!document || typeof document !== "object") continue;
+      const tracking = document.tracking;
+      const advisoryId = typeof tracking?.id === "string" ? tracking.id.trim() : "";
+      if (!advisoryId) continue;
+      const title = typeof document.title === "string" ? document.title.trim() : `[Cisco] ${advisoryId}`;
+      const publishedAt = (typeof tracking?.initial_release_date === "string" ? tracking.initial_release_date : void 0) || (typeof tracking?.current_release_date === "string" ? tracking.current_release_date : void 0) || (/* @__PURE__ */ new Date()).toISOString();
+      const updatedAt = typeof tracking?.current_release_date === "string" ? tracking.current_release_date : void 0;
+      let url = `${this.advisoryBaseUrl}/${advisoryId}`;
+      if (Array.isArray(document.references)) {
+        const selfRef = document.references.find(
+          (r) => r && typeof r === "object" && r.category === "self"
+        );
+        if (selfRef && typeof selfRef.url === "string") {
+          url = selfRef.url;
+        }
+      }
+      const summary = Array.isArray(document.notes) ? document.notes.find(
+        (n) => n && typeof n === "object" && n.category === "summary"
+      )?.text : void 0;
+      const productIdMap = buildProductIdMap(d.product_tree);
+      const rawVulns = Array.isArray(d.vulnerabilities) ? d.vulnerabilities : [];
+      const parsedCves = [];
+      let overallSeverity = "UNKNOWN";
+      for (const rawVuln of rawVulns) {
+        if (!rawVuln || typeof rawVuln !== "object") continue;
+        const v = rawVuln;
+        const cveId = typeof v.cve === "string" ? v.cve.trim().toUpperCase() : "";
+        if (!CVE_ID_REGEX5.test(cveId)) continue;
+        let cvssScore;
+        let cvssVector;
+        let vulnSeverity = "UNKNOWN";
+        if (Array.isArray(v.scores) && v.scores.length > 0) {
+          const score0 = v.scores[0];
+          const s = score0 && typeof score0 === "object" ? score0.cvss_v3 : void 0;
+          if (s && typeof s === "object") {
+            const cvss = s;
+            if (typeof cvss.baseScore === "number") cvssScore = cvss.baseScore;
+            if (typeof cvss.vectorString === "string") cvssVector = cvss.vectorString;
+            if (typeof cvss.baseSeverity === "string") vulnSeverity = normalizeCiscoSeverity(cvss.baseSeverity, cvssScore);
+          }
+        }
+        if (vulnSeverity === "UNKNOWN") {
+          vulnSeverity = normalizeCiscoSeverity(void 0, cvssScore);
+        }
+        if (SEVERITY_RANK[vulnSeverity] > SEVERITY_RANK[overallSeverity]) {
+          overallSeverity = vulnSeverity;
+        }
+        const description = typeof v.title === "string" ? v.title : title;
+        const affectedProducts = [];
+        const productStatus = v.product_status;
+        const knownAffected = Array.isArray(productStatus?.known_affected) ? productStatus.known_affected : [];
+        for (const pid of knownAffected) {
+          if (typeof pid !== "string") continue;
+          const name = productIdMap.get(pid);
+          if (!name) continue;
+          if (!affectedProducts.includes(name)) affectedProducts.push(name);
+        }
+        let solution = "";
+        const fixedVersions = [];
+        if (Array.isArray(v.remediations)) {
+          const remediations = v.remediations;
+          const fixRem = remediations.find(
+            (r) => r && typeof r === "object" && r.category === "vendor_fix"
+          ) || remediations[0];
+          if (fixRem && typeof fixRem.details === "string") {
+            solution = fixRem.details.trim();
+          }
+          if (fixRem && Array.isArray(fixRem.product_ids)) {
+            for (const pid of fixRem.product_ids) {
+              if (typeof pid !== "string") continue;
+              const name = productIdMap.get(pid);
+              if (!name) continue;
+              if (!fixedVersions.includes(name)) fixedVersions.push(name);
+            }
+          }
+        }
+        parsedCves.push({
+          cveId,
+          description,
+          cvssScore,
+          cvssVector,
+          severity: vulnSeverity,
+          affectedProducts,
+          fixedVersions,
+          solution: solution || void 0
+        });
+      }
+      if (parsedCves.length === 0) continue;
+      normalizedItems.push({
+        advisoryId,
+        title,
+        severity: overallSeverity,
+        publishedAt,
+        updatedAt,
+        url,
+        summary: (typeof summary === "string" ? summary : void 0) || title,
+        solution: parsedCves[0]?.solution,
+        cves: parsedCves,
+        rawPayload: d
+      });
+    }
+    return normalizedItems;
+  }
+};
+
 // adapters/index.ts
 var ALL_ADAPTERS = [
   new RedHatCsafAdapter(),
   new NutanixAdapter(),
   new UbuntuAdapter(),
   new DebianAdapter(),
-  new SuseAdapter()
+  new SuseAdapter(),
+  new CiscoAdapter()
 ];
 var seenVendorCodes = /* @__PURE__ */ new Set();
 for (const adapter of ALL_ADAPTERS) {

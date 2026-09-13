@@ -78,7 +78,7 @@ import { SuseAdapter } from '@/adapters/suse';
 
 // The vendors SyncService actually contacts today. Kept as the single source
 // of truth so the UI can state sync coverage truthfully instead of guessing.
-export const SYNCED_VENDOR_CODES = ['redhat', 'nutanix', 'ubuntu', 'debian', 'suse'] as const;
+export const SYNCED_VENDOR_CODES = ['redhat', 'nutanix', 'ubuntu', 'debian', 'suse', 'cisco'] as const;
 
 // BUG-003: a full vendor run can build a functions.invoke body of tens of MB,
 // which the self-hosted Edge Runtime supervisor kills. Bound the size of each

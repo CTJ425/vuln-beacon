@@ -101,7 +101,7 @@ describe('SyncService — Server-Side Manual Sync Trigger (Task 11c, TDD)', () =
       expect.objectContaining({
         body: {
           action: 'trigger_manual_sync',
-          vendorCodes: ['redhat', 'nutanix', 'ubuntu', 'debian', 'suse'],
+          vendorCodes: ['redhat', 'nutanix', 'ubuntu', 'debian', 'suse', 'cisco'],
         },
       })
     );

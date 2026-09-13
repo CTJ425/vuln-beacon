@@ -31,6 +31,9 @@ export function getAdvisoryUrl(advisoryId: string, vendorCode?: string): string 
     if (v === 'nutanix') {
       return `https://portal.nutanix.com/page/documents/security-advisories/release-advisories/details?id=${encodeURIComponent(adv)}`;
     }
+    if (v === 'cisco') {
+      return `https://sec.cloudapps.cisco.com/security/center/cveListing.x?cve=${cveUpper}`;
+    }
     return `https://www.cve.org/CVERecord?id=${encodeURIComponent(cveUpper)}`;
   }
 
@@ -80,6 +83,11 @@ export function getAdvisoryUrl(advisoryId: string, vendorCode?: string): string 
     v === 'redhat'
   ) {
     return `https://access.redhat.com/errata/${adv}`;
+  }
+
+  // Cisco security advisories: cisco-sa-... or cisco vendor
+  if (/^cisco-sa-/i.test(adv) || v === 'cisco') {
+    return `https://sec.cloudapps.cisco.com/security/center/content/CiscoSecurityAdvisory/${adv}`;
   }
 
   return '';

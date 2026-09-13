@@ -174,6 +174,9 @@ describe('SyncService — Nutanix integration', () => {
       if (urlStr.includes('suse.com')) {
         return { ok: true, status: 200, text: async () => '' };
       }
+      if (urlStr.includes('cisco.com')) {
+        return { ok: true, status: 200, text: async () => '' };
+      }
       return { ok: false, status: 404 };
     });
     vi.stubGlobal('fetch', fetchSpy);

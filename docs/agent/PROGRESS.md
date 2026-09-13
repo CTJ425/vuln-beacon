@@ -1,5 +1,22 @@
 # Progress Log
 
+## 2026-09-13 22:56:42 Asia/Taipei - Cisco CSAF Vendor Adapter & VMware/Broadcom Design (1.1.0)
+- **Cisco CSAF Vendor Adapter (Task 31 — COMPLETED)**:
+  - Implemented full `VendorAdapter` compliance for `cisco` vendor ingesting Cisco PSIRT advisories from the public CSAF 2.0 distribution at `https://www.cisco.com/.well-known/csaf/` (changes.csv index + per-advisory JSON; no authentication required).
+  - Added 15 unit tests (`src/tests/unit/adapters/cisco.test.ts`), 3 fixture files (sample CSAF documents and changes.csv), and live smoke test verifying 202 product strings emitted with no raw `CSAFPID-` leaks.
+  - Registered in `ALL_ADAPTERS` index; updated `SYNCED_VENDOR_CODES` to 6 vendors; regenerated `ingest.bundle.js` (Edge Function requirement).
+  - Implemented advisory-level severity derivation (max of `cvss_v3.baseSeverity` across vulnerabilities); sorts `changes.csv` descending by timestamp before slicing (source is not strictly ordered).
+  - **Accepted Risk**: Cisco CSAF advisories reference 2–8 product ids per advisory that appear nowhere in `product_tree` (e.g., `CSAFPID-tce-roomos-dos`). Adapter silently omits these ids from `affectedProducts`, `fixedVersions`, and `productImpacts` to prevent raw `CSAFPID-*` strings in user-facing output. Consequence: affected-product lists may be incomplete relative to source document.
+  - **Verification**: 74 test files / 509 tests passed; smoke test live feed fetch; build succeeded.
+  - **Completed**: 2026-09-13 22:56:42 Asia/Taipei.
+
+- **VMware / Broadcom Adapter (Task 32 — OPEN, NOT STARTED)**:
+  - Design finalized: list layer only via `POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList` (no authentication; segment=VC covers 341+ VMware advisories as of 2026-09-13).
+  - CVSS enrichment from NVD API 2.0 with acknowledged lag risk: `CVE-2026-59346` (Broadcom 2026-09-03, NVD still unresolved 2026-09-13). Design: severity from Broadcom field; NVD as enrichment only, never reverse. No HTML scraping.
+  - Constraint: API `supportProducts` field arrives truncated; no detail endpoint exists. Therefore fixed versions and full affected-product lists unavailable.
+  - `vmware` vendor row already seeded in `public.vendors`; only adapter code and registration needed (no new migration).
+  - NVD rate-limit: 5 requests/30 seconds without API key; batch enrichment needs throttling.
+
 ## 2026-09-12 22:45:00 Asia/Taipei - Replace free-text schedule inputs with dropdown selects in ScheduleSettings (1.1.0)
 - **Replace free-text schedule inputs with dropdown selects in ScheduleSettings**:
   - Added exported `TIME_OPTIONS` (48 entries, `00:00`–`23:30`, 30-minute grid).
@@ -16,18 +33,3 @@
   - `npm --prefix src test` — 89/89 test files, 622/622 tests passed.
   - `npm --prefix src run verify` — build:edge -> tsc -> vite build, clean.
   - Reviewer verdict: PASS.
-
-## 2026-09-11 16:15:00 Asia/Taipei - Version 1.1.0 Release Finalization & Documentation Sync (1.1.0)
-- **Version 1.1.0 Release Finalization & Documentation Sync**:
-  - Restored and configured `.claude/skills/versioning/SKILL.md` matching VulnBeacon project paths, semver standards, and release checklist.
-  - Bumped application version to `1.1.0` in `src/package.json`, `src/package-lock.json`, and fallback in `src/config/version.ts`.
-  - Updated `README.md` to highlight enterprise multi-vendor threat feed ingestion (Red Hat, Nutanix, Ubuntu, Debian, SUSE).
-  - Authored comprehensive release notes for `1.1.0` in `docs/agent/CHANGELOG.md` covering all features, changes, and bug fixes since `1.0.0`.
-  - Tracked Task 29 completion in `docs/agent/TASK.md`.
-  - Created git tags `1.0.0` and `1.1.0` for verifiable release provenance.
-- **Deep Verification**:
-  - Unit tests: 73/73 files passed (484/484 tests).
-  - Smoke tests: 3/3 files passed (16/16 tests).
-  - E2E tests: 13/13 files passed (114/114 tests).
-  - Total test pyramid: 89/89 test files passed (614/614 tests 100%).
-  - Production build: `npm --prefix src run verify` (`build:edge` -> `tsc` -> `vite build`) completed cleanly with 0 errors.
