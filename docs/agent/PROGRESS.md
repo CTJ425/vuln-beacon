@@ -1,5 +1,42 @@
 # Progress Log
 
+## 2026-09-14 23:12:06 Asia/Taipei - UI/UX Hardening: Mobile Horizontal Overflow, Page States, & Bundle Code Splitting
+
+- **UX-1: Mobile Horizontal Overflow Fix (COMPLETED)**:
+  - Root cause: `<main>` Box in App.tsx is a flex child beside fixed-width Sidebar (`flexShrink: 0`, 240/64px) but had no `minWidth: 0`. Flex item defaults to `min-width: auto`, preventing shrink below content width. Explorer tables declare `minWidth: 700`, widening `main` past viewport and producing document-level horizontal scrolling. MUI `TableContainer` ships `overflow-x: auto`, so wrapper was never the problem.
+  - Change: added `minWidth: 0` and responsive padding `p: { xs: 2, sm: 3.5 }` (was flat `p: 3.5`) to the `<main>` Box.
+  - Files: `src/App.tsx`.
+  - Test added: `src/tests/e2e/responsive-layout.e2e.test.tsx` (1 test, red before / green after).
+  - Lane 0 justification: file region and root cause in main-session context from audit; fix was single sx property; verification command named before editing.
+  - **Completed**: 2026-09-14 23:12:06 Asia/Taipei.
+
+- **UX-2: Unified Page States & Missing Error State (COMPLETED)**:
+  - Root cause: `loadData` in App.tsx caught failed initial load and only called `console.error`. Set no error state, so unreachable Supabase rendered same "Database initialized, sign in and run first ingestion" prompt as genuinely empty database — operator instructed to run sync when real fault was connectivity.
+  - Change: new presentational `PageState` component (variants loading / empty / error, `data-testid="page-state-<variant>"`), plus `loadError` state in App.tsx cleared on every `loadData` entry and set in existing catch. Render precedence in `<main>` is loading -> error -> empty, mutually exclusive. Error state offers `Retry` button calling `loadData`; dashboard content below not blanked. All existing copy kept verbatim.
+  - Files: `src/components/common/PageState.tsx` (new), `src/App.tsx`.
+  - Tests added: `src/tests/e2e/page-state.e2e.test.tsx` (3 tests, red before / green after).
+  - Reviewer verdict: PASS with one RISK (R12: partial-failure masking in `loadData`'s single `Promise.all`; see BUG_FIX.md).
+  - **Completed**: 2026-09-14 23:12:06 Asia/Taipei.
+
+- **UX-4: Bundle Code Splitting (COMPLETED after Reviewer FAIL round 1)**:
+  - Change: `React.lazy` + Suspense for ExplorerPage, VendorPage, AdminPage, AdminLoginModal, CveDetailDrawer, AdvisoryDetailDrawer; DashboardPage stays eager. Added `build.rollupOptions.output.manualChunks` splitting `react-vendor` and `mui-vendor`.
+  - Files: `src/App.tsx`, `src/vite.config.ts`.
+  - Reviewer verdict round 1: FAIL, 2 blockers —
+    - (a) both drawers rendered unconditionally inside Suspense, so `lazy()` resolved modules on first render: chunks downloaded on initial load, `minHeight: 300` spinner box appeared in document flow under main content on every page load.
+    - (b) all three overlays shared one Suspense boundary, so AdminLoginModal suspending would hide already-open drawer behind fallback.
+  - Fix applied: per-drawer mount latches (`hasOpenedCveDrawer`, `hasOpenedAdvisoryDrawer`) never unmount on close, preserving MUI close transition; three independent Suspense boundaries with `fallback={null}` for overlays; `LazyFallback` retained only for lazy-pages boundary.
+  - Reviewer verdict round 2: PASS — verified by direct code read; both blockers resolved.
+  - Measured result: largest single chunk 950.78 kB -> 361.63 kB. Initial eager payload index 361.63 + mui-vendor 346.90 + react-vendor 143.38 = 851.9 kB raw (~250 kB gzip), down from 950.78 kB / 271.24 kB gzip (~100 kB raw / 21 kB gzip less on first paint). On-demand chunks (~100 kB total: AdminPage 54.18, ExplorerPage 14.86, CveDetailDrawer 13.15, AdvisoryDetailDrawer 9.57, AdminLoginModal 2.92, VendorPage 1.85). Vite 500 kB chunk warning no longer fires.
+  - **Completed**: 2026-09-14 23:12:06 Asia/Taipei.
+
+- **Test Adaptation (main session)**:
+  - `src/tests/e2e/vendor-logos-and-vault-guide.e2e.test.tsx:136,169` — `screen.getByLabelText(/Email/i)` changed to `await screen.findByLabelText(/Email/i)` in both tests. AdminLoginModal now code-split, entering DOM a tick after Admin Console click. Surfaced intermittent failure after UX-4.
+  - **Completed**: 2026-09-14 23:12:06 Asia/Taipei.
+
+- **Verification**:
+  - `npm test` (from src/): 93 test files, 664 tests, all passing.
+  - `npm run build`: exits 0, no chunk-size warning.
+
 ## 2026-09-13 23:28:39 Asia/Taipei - VMware / Broadcom Vendor Adapter & Release 1.2.0 Finalization
 - **VMware / Broadcom Adapter (Task 32 — COMPLETED)**:
   - Implemented full `VendorAdapter` compliance for `vmware` vendor ingesting VMware Security Advisories (VMSA) from the public Broadcom support-portal API (`POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList`, segment=VC, no authentication).
@@ -19,20 +56,3 @@
   - Updated `CHANGELOG.md` with 1.2.0 entry covering Added/Changed/Fixed across both adapters.
   - Recorded both adapters' accepted risks (Cisco incomplete product trees, VMware NVD coverage low) in `BUG_FIX.md`.
   - **Completed**: 2026-09-13 23:28:39 Asia/Taipei.
-
-## 2026-09-13 22:56:42 Asia/Taipei - Cisco CSAF Vendor Adapter & VMware/Broadcom Design (1.1.0)
-- **Cisco CSAF Vendor Adapter (Task 31 — COMPLETED)**:
-  - Implemented full `VendorAdapter` compliance for `cisco` vendor ingesting Cisco PSIRT advisories from the public CSAF 2.0 distribution at `https://www.cisco.com/.well-known/csaf/` (changes.csv index + per-advisory JSON; no authentication required).
-  - Added 15 unit tests (`src/tests/unit/adapters/cisco.test.ts`), 3 fixture files (sample CSAF documents and changes.csv), and live smoke test verifying 202 product strings emitted with no raw `CSAFPID-` leaks.
-  - Registered in `ALL_ADAPTERS` index; updated `SYNCED_VENDOR_CODES` to 6 vendors; regenerated `ingest.bundle.js` (Edge Function requirement).
-  - Implemented advisory-level severity derivation (max of `cvss_v3.baseSeverity` across vulnerabilities); sorts `changes.csv` descending by timestamp before slicing (source is not strictly ordered).
-  - **Accepted Risk**: Cisco CSAF advisories reference 2–8 product ids per advisory that appear nowhere in `product_tree` (e.g., `CSAFPID-tce-roomos-dos`). Adapter silently omits these ids from `affectedProducts`, `fixedVersions`, and `productImpacts` to prevent raw `CSAFPID-*` strings in user-facing output. Consequence: affected-product lists may be incomplete relative to source document.
-  - **Verification**: 74 test files / 509 tests passed; smoke test live feed fetch; build succeeded.
-  - **Completed**: 2026-09-13 22:56:42 Asia/Taipei.
-
-- **VMware / Broadcom Adapter (Task 32 — OPEN, NOT STARTED)**:
-  - Design finalized: list layer only via `POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList` (no authentication; segment=VC covers 341+ VMware advisories as of 2026-09-13).
-  - CVSS enrichment from NVD API 2.0 with acknowledged lag risk: `CVE-2026-59346` (Broadcom 2026-09-03, NVD still unresolved 2026-09-13). Design: severity from Broadcom field; NVD as enrichment only, never reverse. No HTML scraping.
-  - Constraint: API `supportProducts` field arrives truncated; no detail endpoint exists. Therefore fixed versions and full affected-product lists unavailable.
-  - `vmware` vendor row already seeded in `public.vendors`; only adapter code and registration needed (no new migration).
-  - NVD rate-limit: 5 requests/30 seconds without API key; batch enrichment needs throttling.

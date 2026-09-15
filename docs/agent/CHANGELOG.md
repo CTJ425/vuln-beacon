@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.3.0-dev.1 - 2026-09-15
+### Fixed
+- **Mobile horizontal overflow**: the `<main>` container is a flex child beside the fixed-width sidebar and lacked `minWidth: 0`, so it could not shrink below the Explorer tables' `minWidth: 700` and the whole document scrolled sideways. Added `minWidth: 0` plus responsive padding `p: { xs: 2, sm: 3.5 }`.
+- **Failed initial data load indistinguishable from empty database**: `loadData` swallowed the failure into `console.error` and the dashboard still showed the "database is initialized, sign in and run the first ingestion" prompt. Added a `loadError` state and a dedicated error page state with a Retry action.
+
+### Added
+- **PageState Component (`src/components/common/PageState.tsx`)**: Presentational component unifying the loading / empty / error treatments that were previously duplicated inline in `App.tsx`.
+- **Responsive Layout E2E Test (`src/tests/e2e/responsive-layout.e2e.test.tsx`)**: 1 test verifying `<main>` container shrink behavior on mobile viewports.
+- **Page State E2E Tests (`src/tests/e2e/page-state.e2e.test.tsx`)**: 3 tests covering loading, empty, and error state rendering with Retry action verification.
+
+### Changed
+- **Route-level code splitting**: `ExplorerPage`, `VendorPage`, `AdminPage`, `AdminLoginModal`, `CveDetailDrawer` and `AdvisoryDetailDrawer` are now `React.lazy`; `DashboardPage` stays eager. Each overlay has its own `Suspense` boundary with `fallback={null}`, and the two drawers use mount latches so they load on first open and never unmount on close (preserving the MUI close transition).
+- **Vite build optimization**: `vite.config.ts` gains `build.rollupOptions.output.manualChunks`, splitting `react-vendor` and `mui-vendor`. Largest single chunk 950.78 kB -> 361.63 kB; initial eager payload 950.78 kB -> 851.9 kB raw (271.24 kB -> ~250 kB gzip), with ~100 kB moved to on-demand chunks. The Vite 500 kB chunk warning no longer fires.
+- **AdminLoginModal async loading in E2E tests**: `src/tests/e2e/vendor-logos-and-vault-guide.e2e.test.tsx` now awaits `findByLabelText` for the login modal, which is code-split and no longer enters the DOM synchronously.
+
+**Verification**: `npm test` 93 files / 664 tests passing; `npm run build` exits 0 with no chunk-size warning.
+
+**Known risks** (recorded in `BUG_FIX.md`): R11 (VendorPage statically imports the lazily-split ExplorerPage), R12 (`Promise.all` in `loadData` discards partial results).
+
 ## 1.2.0 - 2026-09-13
 ### Added
 - **Cisco CSAF Vendor Adapter (Task 31)**: Implemented `CiscoAdapter` (`src/adapters/cisco.ts`) parsing Cisco PSIRT advisories from the public CSAF 2.0 distribution at `https://www.cisco.com/.well-known/csaf/` (changes.csv index plus per-advisory JSON; no authentication required). Added 15 unit tests (`src/tests/unit/adapters/cisco.test.ts`) and 3 fixture files. Registered in `ALL_ADAPTERS` index; updated `SYNCED_VENDOR_CODES` to 6 vendors; regenerated `ingest.bundle.js`. Implemented advisory-level severity derivation (max of `cvss_v3.baseSeverity` across vulnerabilities).
