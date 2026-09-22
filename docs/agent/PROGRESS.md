@@ -18,6 +18,12 @@
   - Verified on both projects: migrations 20260909/20260911/20260913 present; vendors ubuntu, debian, suse, cisco, vmware present. Dev: sync-cve v8, scheduled-sync v7. Prod: sync-cve v3, scheduled-sync v4. All verify_jwt=false.
   - **Open**: first data sync not yet run (manual sync needs admin login in UI); dev scheduled sync fails with "Missing vault secrets: scheduled_sync_url or scheduled_sync_key not configured"; prod has no sync log after 2026-09-11 (scheduler cause not investigated).
 
+- **Release 1.2.1 and scheduler diagnosis (2026-09-22 — IN PROGRESS)**:
+  - Version bumped to `1.2.1` in `src/package.json`, `src/package-lock.json`, `src/config/version.ts`. Sidebar made sticky so the version label stays visible.
+  - Verification: unit 77 files / 539 passed; e2e 13 files / 112 passed; smoke 3 files / 18 passed; build succeeded.
+  - Scheduler diagnosis: pg_cron job `vuln-beacon-scheduled-sync` runs every 5 minutes on both projects, but no scheduled sync succeeded after 2026-09-11. Prod: `scheduled-sync` returns 401 because vault `scheduled_sync_key` does not equal the runtime `SUPABASE_SERVICE_ROLE_KEY` (legacy service_role JWT); the 401 is not written to `vendor_sync_logs`. Dev: vault secrets missing.
+  - Open: vault secrets must be reset to the legacy service_role key on both projects (user action; agent secret-store writes are blocked by auto mode). `origin/dev` has commit `62c384a` not on `main`, so `dev` was not synced to `main`.
+
 ## 2026-09-13 23:28:39 Asia/Taipei - VMware / Broadcom Vendor Adapter & Release 1.2.0 Finalization
 - **VMware / Broadcom Adapter (Task 32 — COMPLETED)**:
   - Implemented full `VendorAdapter` compliance for `vmware` vendor ingesting VMware Security Advisories (VMSA) from the public Broadcom support-portal API (`POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList`, segment=VC, no authentication).

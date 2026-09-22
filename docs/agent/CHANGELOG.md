@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.1 - 2026-09-22
+### Added
+- **Cisco / VMware frontend coverage**: `CiscoLogo` and the `cisco` case in `VendorIcon`; Cisco CSAF and Broadcom VMware feeds in `SystemHealthMonitor`; vendor-specific solution text for Cisco and VMware in `AdvisoryService` and `CveService`. Tests: `src/tests/unit/components/ciscoVmwareUi.test.tsx` (8).
+
+### Changed
+- **Sidebar version always visible**: the sidebar is now `position: sticky` below the 64px sticky header, so the bottom-left version label no longer scrolls away with the page. Test: `src/tests/unit/components/sidebarStickyVersion.test.tsx`.
+
+### Fixed
+- Advisories and CVEs with `cisco-sa-*` or `VMSA-*` IDs and no vendor join were classified as `redhat` and showed Red Hat `dnf/yum` guidance.
+- `CveDetailDrawer` linked Cisco and VMware CVEs to `access.redhat.com`; it now uses `getAdvisoryUrl`.
+- Stale `SYNCED_VENDOR_CODES` mock (5 vendors) in `src/tests/e2e/vendor-logos-and-vault-guide.e2e.test.tsx`.
+
+### Operations
+- Applied pending migrations (`20260909000000`, `20260911000000`, `20260913000000`) and redeployed `sync-cve` / `scheduled-sync` on `vuln-beacon` and `vuln-beacon-dev` with `--use-api --no-verify-jwt`.
+
 ## 1.2.0 - 2026-09-13
 ### Added
 - **Cisco CSAF Vendor Adapter (Task 31)**: Implemented `CiscoAdapter` (`src/adapters/cisco.ts`) parsing Cisco PSIRT advisories from the public CSAF 2.0 distribution at `https://www.cisco.com/.well-known/csaf/` (changes.csv index plus per-advisory JSON; no authentication required). Added 15 unit tests (`src/tests/unit/adapters/cisco.test.ts`) and 3 fixture files. Registered in `ALL_ADAPTERS` index; updated `SYNCED_VENDOR_CODES` to 6 vendors; regenerated `ingest.bundle.js`. Implemented advisory-level severity derivation (max of `cvss_v3.baseSeverity` across vulnerabilities).

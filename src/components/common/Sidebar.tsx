@@ -112,6 +112,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       sx={{
         width: effectiveCollapsed ? 64 : 240,
         flexShrink: 0,
+        // Pin below the sticky 64px header so the bottom-left version stays
+        // visible while the window scrolls.
+        position: 'sticky',
+        top: 64,
+        alignSelf: 'flex-start',
         bgcolor: 'background.paper',
         borderRight: 1,
         borderColor: 'divider',
