@@ -11,6 +11,13 @@
   - **Known gaps (not done)**: drawers show no copy-command block for Cisco/VMware (no package-manager command applies); `src/tests/e2e/vendor-logos-and-vault-guide.e2e.test.tsx:93` mocks `SYNCED_VENDOR_CODES` with 5 vendors (stale).
   - **Completed**: 2026-09-22 14:43:12 Asia/Taipei.
 
+- **Supabase deployment catch-up (2026-09-22 16:30 Asia/Taipei — COMPLETED)**:
+  - Root cause of missing Ubuntu/Debian/SUSE/Cisco data: migrations `20260911000000_add_ubuntu_debian_suse_vendors` and `20260913000000_add_cisco_vendor` were never applied (no vendor rows), and `sync-cve` / `scheduled-sync` were last deployed 2026-09-11 (before the Cisco/VMware adapters). Dev also lacked `20260909000000_server_side_sync_lock`.
+  - Applied pending migrations via `supabase db push` to `vuln-beacon-dev` (egofadbvftmbwodjneoy) and `vuln-beacon` (baizoisgkgwqccqjwnxg); prod was dry-run first.
+  - Deployed functions with `supabase functions deploy sync-cve scheduled-sync --use-api --no-verify-jwt`. `--use-api` is required (local bundling fails under podman: "entrypoint path does not exist"). `--no-verify-jwt` preserves the existing `verify_jwt=false`; the CLI default would switch it to true.
+  - Verified on both projects: migrations 20260909/20260911/20260913 present; vendors ubuntu, debian, suse, cisco, vmware present. Dev: sync-cve v8, scheduled-sync v7. Prod: sync-cve v3, scheduled-sync v4. All verify_jwt=false.
+  - **Open**: first data sync not yet run (manual sync needs admin login in UI); dev scheduled sync fails with "Missing vault secrets: scheduled_sync_url or scheduled_sync_key not configured"; prod has no sync log after 2026-09-11 (scheduler cause not investigated).
+
 ## 2026-09-13 23:28:39 Asia/Taipei - VMware / Broadcom Vendor Adapter & Release 1.2.0 Finalization
 - **VMware / Broadcom Adapter (Task 32 — COMPLETED)**:
   - Implemented full `VendorAdapter` compliance for `vmware` vendor ingesting VMware Security Advisories (VMSA) from the public Broadcom support-portal API (`POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList`, segment=VC, no authentication).
