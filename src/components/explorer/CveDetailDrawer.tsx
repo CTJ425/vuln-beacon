@@ -256,6 +256,8 @@ export const CveDetailDrawer: React.FC<CveDetailDrawerProps> = ({
                 ? `https://security-tracker.debian.org/tracker/${item.cve_id}`
                 : item.vendor_code === 'suse'
                 ? `https://www.suse.com/security/cve/${item.cve_id}`
+                : item.vendor_code === 'cisco' || item.vendor_code === 'vmware'
+                ? getAdvisoryUrl(item.cve_id, item.vendor_code)
                 : `https://access.redhat.com/security/cve/${item.cve_id}`
             }
             target="_blank"

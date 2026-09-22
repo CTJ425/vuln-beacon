@@ -140,6 +140,10 @@ export class AdvisoryService {
             ? 'debian'
             : advId.startsWith('SUSE-') || advId.startsWith('openSUSE-')
             ? 'suse'
+            : /^cisco-sa-/i.test(advId)
+            ? 'cisco'
+            : advId.toUpperCase().startsWith('VMSA-')
+            ? 'vmware'
             : 'redhat');
 
         let solution = '';
@@ -168,6 +172,18 @@ export class AdvisoryService {
             solution = `請使用 Zypper 執行更新：sudo zypper update -y <package>`;
           } else {
             solution = `SUSE 官方目前正在處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新。`;
+          }
+        } else if (vendorCode === 'cisco') {
+          if (!isFixPending) {
+            solution = `請依據 Cisco 官方公告 (${row.advisory_id}) 升級至修復版本 (${fixedVersions.join(', ')})。詳情請參閱 Cisco Security Advisory。`;
+          } else {
+            solution = `Cisco 官方目前正在處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新，並依公告採取緩解措施。`;
+          }
+        } else if (vendorCode === 'vmware') {
+          if (!isFixPending) {
+            solution = `請依據 Broadcom VMware 官方公告 (${row.advisory_id}) 升級至修復版本 (${fixedVersions.join(', ')})。詳情請參閱 VMware Security Advisory。`;
+          } else {
+            solution = `Broadcom VMware 官方目前正在處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新，並依公告採取緩解措施。`;
           }
         } else if (!isFixPending) {
           solution = `請依據官方發佈之資安更新公告 (${fixedVersions.join(', ')}) 執行升級更新 (例如 dnf/yum update)。詳情請參閱官方指引：https://access.redhat.com/articles/11258`;

@@ -12,6 +12,7 @@ import {
   UbuntuLogo,
   DebianLogo,
   SuseLogo,
+  CiscoLogo,
   DefaultVendorLogo,
 } from '@/components/icons/VendorLogos';
 
@@ -75,6 +76,7 @@ export const VendorIcon: React.FC<VendorIconProps> = ({
       case 'ubuntu': return <UbuntuLogo size={size} color={color} />;
       case 'debian': return <DebianLogo size={size} color={color} />;
       case 'suse': return <SuseLogo size={size} color={color} />;
+      case 'cisco': return <CiscoLogo size={size} color={color} />;
       default: return <DefaultVendorLogo size={size} color={color} />;
     }
   };

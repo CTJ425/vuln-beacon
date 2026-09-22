@@ -1,5 +1,16 @@
 # Progress Log
 
+## 2026-09-22 14:43:12 Asia/Taipei - Cisco / VMware Frontend UI Coverage
+- **Cisco / VMware UI wiring (Lane 1 — COMPLETED)**:
+  - Problem: Cisco and VMware adapters ingested data (1.2.0), but the frontend had no vendor-specific UI. Cisco rendered the generic fallback logo; advisories/CVEs without a vendor join were inferred as `redhat` (Red Hat `dnf/yum` solution text); the CVE detail drawer linked Cisco/VMware CVEs to `access.redhat.com`; System Health Monitor listed no Cisco/VMware feeds.
+  - Ubuntu and Debian were already wired in all the same UI surfaces; no change needed.
+  - Changes: added `CiscoLogo` (`src/components/icons/VendorLogos.tsx`) and `case 'cisco'` (`src/components/common/VendorIcon.tsx`); `cisco-sa-*` → `cisco` and `VMSA-*` → `vmware` inference plus vendor-specific solution text in `src/services/advisoryService.ts` and `src/services/cveService.ts`; Cisco/VMware official link via `getAdvisoryUrl` in `src/components/explorer/CveDetailDrawer.tsx`; Cisco CSAF and Broadcom VMware feeds in `src/components/admin/SystemHealthMonitor.tsx`.
+  - Tests: new `src/tests/unit/components/ciscoVmwareUi.test.tsx` (8 tests; red 8/8 before, green after).
+  - **Verification**: `npm --prefix src test` 92 files / 668 passed / 0 failed; `npm --prefix src run build` succeeded.
+  - **Reviewer**: skipped under risk policy (red-green covered; no persisted state, auth, boundary, or control-flow change).
+  - **Known gaps (not done)**: drawers show no copy-command block for Cisco/VMware (no package-manager command applies); `src/tests/e2e/vendor-logos-and-vault-guide.e2e.test.tsx:93` mocks `SYNCED_VENDOR_CODES` with 5 vendors (stale).
+  - **Completed**: 2026-09-22 14:43:12 Asia/Taipei.
+
 ## 2026-09-13 23:28:39 Asia/Taipei - VMware / Broadcom Vendor Adapter & Release 1.2.0 Finalization
 - **VMware / Broadcom Adapter (Task 32 — COMPLETED)**:
   - Implemented full `VendorAdapter` compliance for `vmware` vendor ingesting VMware Security Advisories (VMSA) from the public Broadcom support-portal API (`POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList`, segment=VC, no authentication).
@@ -19,20 +30,3 @@
   - Updated `CHANGELOG.md` with 1.2.0 entry covering Added/Changed/Fixed across both adapters.
   - Recorded both adapters' accepted risks (Cisco incomplete product trees, VMware NVD coverage low) in `BUG_FIX.md`.
   - **Completed**: 2026-09-13 23:28:39 Asia/Taipei.
-
-## 2026-09-13 22:56:42 Asia/Taipei - Cisco CSAF Vendor Adapter & VMware/Broadcom Design (1.1.0)
-- **Cisco CSAF Vendor Adapter (Task 31 — COMPLETED)**:
-  - Implemented full `VendorAdapter` compliance for `cisco` vendor ingesting Cisco PSIRT advisories from the public CSAF 2.0 distribution at `https://www.cisco.com/.well-known/csaf/` (changes.csv index + per-advisory JSON; no authentication required).
-  - Added 15 unit tests (`src/tests/unit/adapters/cisco.test.ts`), 3 fixture files (sample CSAF documents and changes.csv), and live smoke test verifying 202 product strings emitted with no raw `CSAFPID-` leaks.
-  - Registered in `ALL_ADAPTERS` index; updated `SYNCED_VENDOR_CODES` to 6 vendors; regenerated `ingest.bundle.js` (Edge Function requirement).
-  - Implemented advisory-level severity derivation (max of `cvss_v3.baseSeverity` across vulnerabilities); sorts `changes.csv` descending by timestamp before slicing (source is not strictly ordered).
-  - **Accepted Risk**: Cisco CSAF advisories reference 2–8 product ids per advisory that appear nowhere in `product_tree` (e.g., `CSAFPID-tce-roomos-dos`). Adapter silently omits these ids from `affectedProducts`, `fixedVersions`, and `productImpacts` to prevent raw `CSAFPID-*` strings in user-facing output. Consequence: affected-product lists may be incomplete relative to source document.
-  - **Verification**: 74 test files / 509 tests passed; smoke test live feed fetch; build succeeded.
-  - **Completed**: 2026-09-13 22:56:42 Asia/Taipei.
-
-- **VMware / Broadcom Adapter (Task 32 — OPEN, NOT STARTED)**:
-  - Design finalized: list layer only via `POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList` (no authentication; segment=VC covers 341+ VMware advisories as of 2026-09-13).
-  - CVSS enrichment from NVD API 2.0 with acknowledged lag risk: `CVE-2026-59346` (Broadcom 2026-09-03, NVD still unresolved 2026-09-13). Design: severity from Broadcom field; NVD as enrichment only, never reverse. No HTML scraping.
-  - Constraint: API `supportProducts` field arrives truncated; no detail endpoint exists. Therefore fixed versions and full affected-product lists unavailable.
-  - `vmware` vendor row already seeded in `public.vendors`; only adapter code and registration needed (no new migration).
-  - NVD rate-limit: 5 requests/30 seconds without API key; batch enrichment needs throttling.

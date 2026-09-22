@@ -303,6 +303,31 @@ export const SuseLogo: React.FC<VendorLogoProps> = ({
 );
 
 /**
+ * Cisco official bridge bars logo
+ */
+export const CiscoLogo: React.FC<VendorLogoProps> = ({
+  size = 20,
+  color = '#1BA0D7',
+  ...props
+}) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    role="img"
+    aria-label="Cisco logo"
+    {...props}
+  >
+    {[2, 5, 8, 11, 14, 17, 20].map((x, i) => {
+      const h = [4, 8, 12, 16, 12, 8, 4][i];
+      return <rect key={x} x={x} y={12 - h / 2} width="2" height={h} rx="1" fill={color} />;
+    })}
+  </svg>
+);
+
+/**
  * Generic Fallback Logo
  */
 export const DefaultVendorLogo: React.FC<VendorLogoProps> = ({

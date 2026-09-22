@@ -116,6 +116,22 @@ export const SystemHealthMonitor: React.FC = () => {
       endpoint: 'https://ftp.suse.com/pub/projects/security/csaf/changes.csv',
       status: 'checking',
     },
+    {
+      id: 'cisco_csaf',
+      name: 'Cisco CSAF Feed',
+      category: 'external',
+      description: 'Cisco 官方 CSAF 2.0 資安公告來源',
+      endpoint: 'https://www.cisco.com/.well-known/csaf/changes.csv',
+      status: 'checking',
+    },
+    {
+      id: 'vmware_advisories',
+      name: 'Broadcom VMware Security Advisories',
+      category: 'external',
+      description: 'Broadcom VMware 官方資安公告來源',
+      endpoint: 'https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList',
+      status: 'checking',
+    },
   ]);
 
   const runDiagnostics = useCallback(async () => {
@@ -314,6 +330,18 @@ export const SystemHealthMonitor: React.FC = () => {
         name: 'SUSE CSAF Feed',
         description: 'SUSE 官方 CSAF 2.0 資安公告來源',
         endpoint: 'https://ftp.suse.com/pub/projects/security/csaf/changes.csv',
+      },
+      {
+        id: 'cisco_csaf',
+        name: 'Cisco CSAF Feed',
+        description: 'Cisco 官方 CSAF 2.0 資安公告來源',
+        endpoint: 'https://www.cisco.com/.well-known/csaf/changes.csv',
+      },
+      {
+        id: 'vmware_advisories',
+        name: 'Broadcom VMware Security Advisories',
+        description: 'Broadcom VMware 官方資安公告來源',
+        endpoint: 'https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList',
       },
     ];
 
