@@ -48,3 +48,20 @@
 - **Description**: The VMware adapter fetches the advisory list from Broadcom's `POST https://support.broadcom.com/web/ecx/security-advisory/-/securityadvisory/getSecurityAdvisoryList` endpoint once per sync run with no retry on transient failure. A single network failure, timeout, or temporary 5xx error causes the entire vmware sync to fail for that scheduled run.
 - **Impact**: A transient network blip or Broadcom API maintenance window during a scheduled vmware sync causes the sync to report FAILED and emit no CVEs from that run. No alerts are generated, but the sync log shows failure. Affects vmware vendor only; other vendors are unaffected.
 - **Recommendation**: Accepted. This matches every sibling adapter in the codebase (redhat, nutanix, ubuntu, debian, suse, cisco) which also have no retry loop on the primary list fetch. Retry logic is not unique to vmware and would be a cross-cutting concern better addressed as a framework enhancement to all adapters together, not in this change.
+
+## R11: VendorPage Eagerly Pulls ExplorerPage Chunk
+- **Status**: OPEN / ACCEPTED RISK (2026-09-14, UX-4 decision)
+- **Severity**: LOW (payload overhead; trivial size impact)
+- **Location**: `src/pages/VendorPage.tsx:4` (static import of ExplorerPage)
+- **Description**: `VendorPage.tsx` statically imports `ExplorerPage` at the top of the file, which is separately lazy-loaded in `App.tsx`. Visiting the Vendor page therefore eagerly loads and bundles the ExplorerPage chunk (14.86 kB) whether or not the user ever opens the Explorer view within that page.
+- **Impact**: Initial Vendor page load pulls 14.86 kB of ExplorerPage bundle even if the user never navigates to Explorer. Payload is modest but represents unnecessary coupling between page layouts.
+- **Recommendation**: Accepted. Decoupling the static import requires restructuring VendorPage's internal component hierarchy (extracting the Explorer preview to a separate lazy-loaded component or context provider). Current 14.86 kB overhead is trivial relative to the overall bundle and refactoring cost is high; revisit if bundle budget becomes a constraint.
+
+## R12: Promise.all Discards Partial Results on Single-Source Failure
+- **Status**: OPEN / ACCEPTED RISK (2026-09-14, UX-2 decision)
+- **Severity**: MEDIUM (observability; new error UI may mask partial outages)
+- **Location**: `src/App.tsx` (loadData function, Promise.all orchestration)
+- **Description**: `loadData` fetches four services (vendors, sync logs, webhooks, advisories) via a single `Promise.all()`. If one service rejects while the others resolve, the Promise.all rejects entirely, no setter runs, and all three successful results are discarded. The new UX-2 error banner now displays this as a total outage visually indistinguishable from a partial failure.
+- **Impact**: On a partial outage (e.g., advisories fetch fails but vendors, logs, webhooks succeed), the user sees an error message suggesting complete system failure (`loadError` state is true), but actually 75% of the data loaded successfully. Retrying the load via the error banner's Retry button may succeed if the transient failure resolves, masking that the initial failure was partial.
+- **Recommendation**: Accepted for now. Fix requires rewriting `loadData` to use `Promise.allSettled()` with per-source status tracking and the error banner to report which specific service(s) failed. Current behavior (all-or-nothing) is conservative — when ambiguous, showing an error is safer than silently accepting partial data. Revisit as a post-release improvement if users report confusion on network hiccups.
+- **Measurement**: This is pre-existing `Promise.all` behavior not introduced by UX-2; however, UX-2's new error UI makes the limitation more visible to users.

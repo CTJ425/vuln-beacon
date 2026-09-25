@@ -1,15 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
 import { Box, CircularProgress, Typography, Alert, Button } from '@mui/material';
 import { ThemeProvider } from '@/theme/ThemeContext';
 import { Header } from '@/components/common/Header';
 import { Sidebar, NavState } from '@/components/common/Sidebar';
+import { PageState } from '@/components/common/PageState';
 import { DashboardPage } from '@/pages/DashboardPage';
-import { ExplorerPage } from '@/pages/ExplorerPage';
-import { VendorPage } from '@/pages/VendorPage';
-import { AdminPage } from '@/pages/AdminPage';
-import { AdminLoginModal } from '@/components/admin/AdminLoginModal';
-import { CveDetailDrawer } from '@/components/explorer/CveDetailDrawer';
-import { AdvisoryDetailDrawer } from '@/components/explorer/AdvisoryDetailDrawer';
 import { CveTableRowItem } from '@/components/explorer/CveTable';
 import { WebhookConfig, VendorSyncLog, Vendor } from '@/types';
 import { CveService } from '@/services/cveService';
@@ -20,6 +15,19 @@ import { AdvisoryService, AdvisoryRowItem } from '@/services/advisoryService';
 import { deriveTaxonomy } from '@/services/productTaxonomy';
 import { supabase } from '@/lib/supabase';
 import { RefreshCw } from 'lucide-react';
+
+const ExplorerPage = lazy(() => import('@/pages/ExplorerPage').then((m) => ({ default: m.ExplorerPage })));
+const VendorPage = lazy(() => import('@/pages/VendorPage').then((m) => ({ default: m.VendorPage })));
+const AdminPage = lazy(() => import('@/pages/AdminPage').then((m) => ({ default: m.AdminPage })));
+const AdminLoginModal = lazy(() => import('@/components/admin/AdminLoginModal').then((m) => ({ default: m.AdminLoginModal })));
+const CveDetailDrawer = lazy(() => import('@/components/explorer/CveDetailDrawer').then((m) => ({ default: m.CveDetailDrawer })));
+const AdvisoryDetailDrawer = lazy(() => import('@/components/explorer/AdvisoryDetailDrawer').then((m) => ({ default: m.AdvisoryDetailDrawer })));
+
+const LazyFallback: React.FC = () => (
+  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 2 }}>
+    <CircularProgress size={36} color="primary" />
+  </Box>
+);
 
 export const AppContent: React.FC = () => {
   const [currentNav, setCurrentNav] = useState<NavState>({ section: 'dashboard' });
@@ -34,8 +42,11 @@ export const AppContent: React.FC = () => {
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
   const [selectedCve, setSelectedCve] = useState<CveTableRowItem | null>(null);
   const [selectedAdvisory, setSelectedAdvisory] = useState<AdvisoryRowItem | null>(null);
+  const [hasOpenedCveDrawer, setHasOpenedCveDrawer] = useState(false);
+  const [hasOpenedAdvisoryDrawer, setHasOpenedAdvisoryDrawer] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -59,6 +70,18 @@ export const AppContent: React.FC = () => {
     }
   }, [isSidebarCollapsed]);
 
+  useEffect(() => {
+    if (selectedCve && !hasOpenedCveDrawer) {
+      setHasOpenedCveDrawer(true);
+    }
+  }, [selectedCve, hasOpenedCveDrawer]);
+
+  useEffect(() => {
+    if (selectedAdvisory && !hasOpenedAdvisoryDrawer) {
+      setHasOpenedAdvisoryDrawer(true);
+    }
+  }, [selectedAdvisory, hasOpenedAdvisoryDrawer]);
+
   const handleToggleSidebar = useCallback(() => {
     setIsSidebarCollapsed((prev) => !prev);
   }, []);
@@ -74,6 +97,7 @@ export const AppContent: React.FC = () => {
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
+      setLoadError(null);
       const [fetchedCves, fetchedLogs, fetchedWebhooks, fetchedAdvisories] = await Promise.all([
         cveService.fetchCves(),
         syncService.fetchSyncLogs(),
@@ -87,6 +111,7 @@ export const AppContent: React.FC = () => {
       setAdvisories(fetchedAdvisories);
     } catch (err) {
       console.error('Error loading Supabase live data:', err);
+      setLoadError('Unable to load security data from Supabase. Check the connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -303,7 +328,19 @@ export const AppContent: React.FC = () => {
           onToggleCollapse={handleToggleSidebar}
         />
 
-        <Box component="main" sx={{ flexGrow: 1, p: 3.5, overflowY: 'auto', bgcolor: 'background.default' }}>
+        {/* minWidth: 0 lets this flex child shrink below its content width, so the
+            Explorer tables scroll inside their own TableContainer instead of
+            widening the document on narrow viewports. */}
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            minWidth: 0,
+            p: { xs: 2, sm: 3.5 },
+            overflowY: 'auto',
+            bgcolor: 'background.default',
+          }}
+        >
           {syncMessage && (
             <Alert
               severity={syncMessage.includes('failed') ? 'error' : 'success'}
@@ -315,17 +352,25 @@ export const AppContent: React.FC = () => {
           )}
 
           {isLoading ? (
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, gap: 2 }}>
-              <CircularProgress size={36} color="primary" />
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Connecting to live Supabase database...
-              </Typography>
-            </Box>
+            <PageState variant="loading" message="Connecting to live Supabase database..." />
           ) : (
             <>
-              {cves.length === 0 && advisories.length === 0 && currentNav.section === 'dashboard' && (
-                <Alert
-                  severity="info"
+              {loadError && (
+                <PageState
+                  variant="error"
+                  message={loadError}
+                  action={
+                    <Button color="inherit" size="small" onClick={loadData}>
+                      Retry
+                    </Button>
+                  }
+                />
+              )}
+
+              {!loadError && cves.length === 0 && advisories.length === 0 && currentNav.section === 'dashboard' && (
+                <PageState
+                  variant="empty"
+                  message="Connected to Supabase live project. Database is initialized. Sign in to the Admin Console to start the first multi-vendor security disclosure ingestion."
                   action={
                     <Button
                       color="inherit"
@@ -341,10 +386,7 @@ export const AppContent: React.FC = () => {
                       Go to Admin Console
                     </Button>
                   }
-                  sx={{ mb: 3 }}
-                >
-                  Connected to Supabase live project. Database is initialized. Sign in to the Admin Console to start the first multi-vendor security disclosure ingestion.
-                </Alert>
+                />
               )}
 
               {currentNav.section === 'dashboard' && (
@@ -358,50 +400,54 @@ export const AppContent: React.FC = () => {
                   onSelectVendor={(vendorCode) => setCurrentNav({ section: 'vendor', vendorCode })}
                 />
               )}
-              {currentNav.section === 'explorer' && (
-                <ExplorerPage
-                  cves={cves}
-                  advisories={advisories}
-                  onSelectCve={setSelectedCve}
-                  onSelectAdvisory={setSelectedAdvisory}
-                  onRefreshCves={loadData}
-                  taxonomy={taxonomy}
-                  isAuthenticated={!!currentUser}
-                />
-              )}
+              {/* Suspense scoped to the lazy pages only, so a pending chunk never
+                  unmounts the sidebar, header, or this <main> element. */}
+              <Suspense fallback={<LazyFallback />}>
+                {currentNav.section === 'explorer' && (
+                  <ExplorerPage
+                    cves={cves}
+                    advisories={advisories}
+                    onSelectCve={setSelectedCve}
+                    onSelectAdvisory={setSelectedAdvisory}
+                    onRefreshCves={loadData}
+                    taxonomy={taxonomy}
+                    isAuthenticated={!!currentUser}
+                  />
+                )}
 
-              {currentNav.section === 'vendor' && (
-                <VendorPage
-                  vendorCode={currentNav.vendorCode}
-                  advisories={advisories}
-                  cves={cves}
-                  taxonomy={taxonomy}
-                  onSelectCve={setSelectedCve}
-                  onSelectAdvisory={setSelectedAdvisory}
-                  onRefreshCves={loadData}
-                  isAuthenticated={!!currentUser}
-                />
-              )}
+                {currentNav.section === 'vendor' && (
+                  <VendorPage
+                    vendorCode={currentNav.vendorCode}
+                    advisories={advisories}
+                    cves={cves}
+                    taxonomy={taxonomy}
+                    onSelectCve={setSelectedCve}
+                    onSelectAdvisory={setSelectedAdvisory}
+                    onRefreshCves={loadData}
+                    isAuthenticated={!!currentUser}
+                  />
+                )}
 
-              {currentNav.section === 'admin' && (
-                <AdminPage
-                  userEmail={currentUser?.email}
-                  webhooks={webhooks}
-                  onAddWebhook={handleAddWebhook}
-                  onDeleteWebhook={handleDeleteWebhook}
-                  onTestWebhook={handleTestWebhook}
-                  logs={syncLogs}
-                  onRefreshLogs={handleRefreshLogs}
-                  isRefreshingLogs={isRefreshingLogs}
-                  onSignOut={handleSignOut}
-                  vendors={vendors}
-                  onManualSync={handleManualSync}
-                  isSyncing={isSyncing}
-                  onSaveSchedule={handleSaveSchedule}
-                  activeTab={adminTab}
-                  onTabChange={setAdminTab}
-                />
-              )}
+                {currentNav.section === 'admin' && (
+                  <AdminPage
+                    userEmail={currentUser?.email}
+                    webhooks={webhooks}
+                    onAddWebhook={handleAddWebhook}
+                    onDeleteWebhook={handleDeleteWebhook}
+                    onTestWebhook={handleTestWebhook}
+                    logs={syncLogs}
+                    onRefreshLogs={handleRefreshLogs}
+                    isRefreshingLogs={isRefreshingLogs}
+                    onSignOut={handleSignOut}
+                    vendors={vendors}
+                    onManualSync={handleManualSync}
+                    isSyncing={isSyncing}
+                    onSaveSchedule={handleSaveSchedule}
+                    activeTab={adminTab}
+                    onTabChange={setAdminTab}
+                  />
+                )}
+              </Suspense>
 
               {!['dashboard', 'explorer', 'vendor', 'admin'].includes(currentNav.section) && (
                 <Box sx={{ p: 4, textAlign: 'center' }} data-testid="nav-fallback-container">
@@ -418,25 +464,35 @@ export const AppContent: React.FC = () => {
         </Box>
       </Box>
 
-      <CveDetailDrawer
-        open={Boolean(selectedCve)}
-        item={selectedCve}
-        onClose={() => setSelectedCve(null)}
-      />
-
-      <AdvisoryDetailDrawer
-        open={Boolean(selectedAdvisory)}
-        item={selectedAdvisory}
-        onClose={() => setSelectedAdvisory(null)}
-      />
-
-      {showAdminLogin && (
-        <AdminLoginModal
-          open={showAdminLogin}
-          onClose={() => setShowAdminLogin(false)}
-          onSuccess={handleAdminLoginSuccess}
-        />
+      {hasOpenedCveDrawer && (
+        <Suspense fallback={null}>
+          <CveDetailDrawer
+            open={Boolean(selectedCve)}
+            item={selectedCve}
+            onClose={() => setSelectedCve(null)}
+          />
+        </Suspense>
       )}
+
+      {hasOpenedAdvisoryDrawer && (
+        <Suspense fallback={null}>
+          <AdvisoryDetailDrawer
+            open={Boolean(selectedAdvisory)}
+            item={selectedAdvisory}
+            onClose={() => setSelectedAdvisory(null)}
+          />
+        </Suspense>
+      )}
+
+      <Suspense fallback={null}>
+        {showAdminLogin && (
+          <AdminLoginModal
+            open={showAdminLogin}
+            onClose={() => setShowAdminLogin(false)}
+            onSuccess={handleAdminLoginSuccess}
+          />
+        )}
+      </Suspense>
     </Box>
   );
 };

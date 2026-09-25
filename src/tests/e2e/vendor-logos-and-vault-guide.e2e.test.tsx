@@ -133,7 +133,8 @@ describe('E2E: Authentic Vendor Logos & Vault Secrets Diagnostics Flow', () => {
     await userEvent.click(adminNavBtn);
 
     // Sign in through modal
-    const emailInput = screen.getByLabelText(/Email/i);
+    // AdminLoginModal is code-split, so it enters the DOM a tick after the click.
+    const emailInput = await screen.findByLabelText(/Email/i);
     const passInput = screen.getByLabelText(/Password|密碼/i);
     await userEvent.type(emailInput, 'admin@example.com');
     await userEvent.type(passInput, 'password123');
@@ -166,7 +167,8 @@ describe('E2E: Authentic Vendor Logos & Vault Secrets Diagnostics Flow', () => {
     const adminNavBtn = await screen.findByRole('button', { name: 'Admin Console' });
     await userEvent.click(adminNavBtn);
 
-    const emailInput = screen.getByLabelText(/Email/i);
+    // AdminLoginModal is code-split, so it enters the DOM a tick after the click.
+    const emailInput = await screen.findByLabelText(/Email/i);
     const passInput = screen.getByLabelText(/Password|密碼/i);
     await userEvent.type(emailInput, 'admin@example.com');
     await userEvent.type(passInput, 'password123');
