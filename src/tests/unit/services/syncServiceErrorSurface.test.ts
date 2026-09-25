@@ -87,7 +87,7 @@ describe('SyncService returns the failure reason even when it cannot be persiste
   it('reports the transport error when every invoke fails, so no log row exists', async () => {
     mockInvoke.mockRejectedValue(new Error('Failed to send a request to the Edge Function'));
 
-    const result = await new SyncService().syncVendors();
+    const result = await new SyncService().syncVendors(undefined, { mode: 'client' });
 
     expect(result.success).toBe(false);
     expect(result.newLogs).toEqual([]);
@@ -100,7 +100,7 @@ describe('SyncService returns the failure reason even when it cannot be persiste
       error: new Error('Edge Function returned a non-2xx status code'),
     });
 
-    const result = await new SyncService().syncVendors();
+    const result = await new SyncService().syncVendors(undefined, { mode: 'client' });
 
     expect(result.success).toBe(false);
     expect(result.errors).toEqual(['Edge Function returned a non-2xx status code']);
@@ -119,7 +119,7 @@ describe('SyncService returns the failure reason even when it cannot be persiste
     mockGetAdvisories.mockReturnValue([]);
     mockInvoke.mockRejectedValue(new Error('Failed to send a request to the Edge Function'));
 
-    const result = await new SyncService().syncVendors();
+    const result = await new SyncService().syncVendors(undefined, { mode: 'client' });
 
     // Exactly one entry: the ingest reason is the root cause, and the transport
     // error that followed must not add a second slot for the same vendor.
@@ -133,7 +133,7 @@ describe('SyncService returns the failure reason even when it cannot be persiste
       error: null,
     });
 
-    const result = await new SyncService().syncVendors();
+    const result = await new SyncService().syncVendors(undefined, { mode: 'client' });
 
     expect(result.success).toBe(true);
     expect(result.errors ?? []).toEqual([]);
@@ -153,7 +153,7 @@ describe('SyncService returns the failure reason even when it cannot be persiste
       error: errorWithContext,
     });
 
-    const result = await new SyncService().syncVendors();
+    const result = await new SyncService().syncVendors(undefined, { mode: 'client' });
 
     expect(result.success).toBe(false);
     expect(result.errors).toEqual(['Unauthorized: missing or invalid Authorization or apikey header']);
@@ -173,7 +173,7 @@ describe('SyncService returns the failure reason even when it cannot be persiste
       error: errorWithContext,
     });
 
-    const result = await new SyncService().syncVendors();
+    const result = await new SyncService().syncVendors(undefined, { mode: 'client' });
 
     expect(result.success).toBe(false);
     expect(result.errors).toEqual(['Database connection failed']);

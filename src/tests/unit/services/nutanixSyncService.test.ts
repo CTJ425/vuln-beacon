@@ -134,7 +134,7 @@ describe('SyncService — Nutanix integration', () => {
     vi.stubGlobal('fetch', fetchSpy);
 
     const service = new SyncService();
-    const result = await service.syncVendors(['nutanix']);
+    const result = await service.syncVendors(['nutanix'], { mode: 'client' });
 
     expect(result.success).toBe(true);
     expect(mockInvoke).toHaveBeenCalled();
@@ -185,7 +185,7 @@ describe('SyncService — Nutanix integration', () => {
     vi.stubGlobal('fetch', fetchSpy);
 
     const service = new SyncService();
-    const result = await service.syncVendors();
+    const result = await service.syncVendors(undefined, { mode: 'client' });
 
     expect(result.success).toBe(true);
     // Verified both redhat and nutanix invoked

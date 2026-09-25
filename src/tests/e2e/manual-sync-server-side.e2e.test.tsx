@@ -9,7 +9,7 @@ import { AdvisoryService } from '@/services/advisoryService';
 import { VendorService } from '@/services/vendorService';
 
 describe('E2E: Server-Side Manual Threat Feed Sync (Task 11c)', () => {
-  const mockUser = { id: 'admin-e2e-1', email: 'admin@vulnbeacon.com' };
+  const mockUser = { id: 'admin-e2e-1', email: 'admin@vulnbeacon.com', app_metadata: { role: 'admin' } };
 
   beforeEach(() => {
     vi.restoreAllMocks();

@@ -11,7 +11,7 @@ vi.mock('@/lib/supabase', () => ({
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
       signInWithPassword: vi.fn().mockResolvedValue({
-        data: { session: { user: { id: 'admin-1', email: 'admin@example.com' } }, user: { id: 'admin-1', email: 'admin@example.com' } },
+        data: { session: { user: { id: 'admin-1', email: 'admin@example.com', app_metadata: { role: 'admin' } } }, user: { id: 'admin-1', email: 'admin@example.com', app_metadata: { role: 'admin' } } },
         error: null,
       }),
       onAuthStateChange: vi.fn().mockReturnValue({

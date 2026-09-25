@@ -9,7 +9,7 @@ import { AdvisoryService } from '@/services/advisoryService';
 import { VendorService } from '@/services/vendorService';
 
 describe('E2E: Navigation & Access Boundaries (R1, R2)', () => {
-  const mockAdminUser = { id: 'admin-test-uid', email: 'admin@vulnbeacon.com' };
+  const mockAdminUser = { id: 'admin-test-uid', email: 'admin@vulnbeacon.com', app_metadata: { role: 'admin' } };
 
   beforeEach(() => {
     vi.restoreAllMocks();

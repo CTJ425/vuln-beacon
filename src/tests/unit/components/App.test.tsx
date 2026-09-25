@@ -135,7 +135,7 @@ describe('App Root Component', () => {
 
   it('routes legacy sync section to Admin Console with Sync Monitor tab active when authenticated', async () => {
     vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
-      data: { session: { user: { id: 'admin-1', email: 'admin@vulnbeacon.com' } } },
+      data: { session: { user: { id: 'admin-1', email: 'admin@vulnbeacon.com', app_metadata: { role: 'admin' } } } },
       error: null,
     } as any);
 
@@ -163,5 +163,17 @@ describe('App Root Component', () => {
     // The container should not be visible for valid routes
     expect(screen.queryByTestId('nav-fallback-container')).not.toBeInTheDocument();
   });
-});
 
+  it('treats a restored session without the admin role as signed out', async () => {
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({
+      data: { session: { user: { id: 'u-2', email: 'viewer@user.com', app_metadata: {} } } },
+      error: null,
+    } as any);
+
+    render(<App />);
+    expect(await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Admin Console'));
+    expect(await screen.findByText(/後台系統身分驗證/i)).toBeInTheDocument();
+  });
+});

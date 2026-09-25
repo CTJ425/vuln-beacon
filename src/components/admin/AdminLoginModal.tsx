@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { ShieldCheck, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { isAdminUser } from '@/lib/adminAuth';
 
 interface AdminLoginModalProps {
   open: boolean;
@@ -50,6 +51,13 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({ open, onClose,
 
       if (data?.session) {
         const loggedInUser = (data as any)?.user || data.session?.user || { email: email.trim() };
+        if (!isAdminUser(loggedInUser)) {
+          // A valid account is not an admin grant; drop the session so the
+          // browser does not keep a token the backstage would reject anyway.
+          await supabase.auth.signOut();
+          setErrorMessage('此帳號沒有管理員權限 (This account is not an administrator)');
+          return;
+        }
         setEmail('');
         setPassword('');
         onSuccess(loggedInUser);

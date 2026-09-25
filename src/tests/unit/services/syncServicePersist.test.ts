@@ -131,7 +131,7 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
 
   it('syncVendors() calls the sync-cve edge function with action=persist_ingestion', async () => {
     const service = new SyncService();
-    await service.syncVendors();
+    await service.syncVendors(undefined, { mode: 'client' });
 
     expect(mockInvoke).toHaveBeenCalledWith(
       'sync-cve',
@@ -146,7 +146,7 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
 
   it('syncVendors() never writes directly to protected tables', async () => {
     const service = new SyncService();
-    await service.syncVendors();
+    await service.syncVendors(undefined, { mode: 'client' });
 
     const protectedWrites = protectedOps.filter(
       (op) => PROTECTED_TABLES.includes(op.table) && WRITE_METHODS.includes(op.method)

@@ -83,7 +83,7 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
   });
 
   it('restricts public navigation to overview and explorer, and accesses sync monitor within authenticated admin console', async () => {
-    const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com' };
+    const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com', app_metadata: { role: 'admin' } };
     vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValue({
       data: {
         user: mockUser as any,
@@ -132,7 +132,7 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
   });
 
   it('requires password only when clicking Admin Console, unlocks 4 admin tabs upon sign-in, and signs out', async () => {
-    const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com' };
+    const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com', app_metadata: { role: 'admin' } };
     vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValue({
       data: {
         user: mockUser as any,
@@ -202,7 +202,7 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
       return { data: { subscription: { unsubscribe: vi.fn() } } };
     }) as any);
 
-    const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com' };
+    const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com', app_metadata: { role: 'admin' } };
     vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValue({
       data: {
         user: mockUser as any,

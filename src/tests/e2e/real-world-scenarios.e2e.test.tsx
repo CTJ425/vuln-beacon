@@ -10,7 +10,7 @@ import { VendorService } from '@/services/vendorService';
 import { APP_VERSION } from '@/config/version';
 
 describe('E2E: Cross-Feature Interactions & Real-World Scenarios (Tiers 3 & 4)', () => {
-  const mockAdminUser = { id: 'admin-e2e-super', email: 'secops-admin@vulnbeacon.com' };
+  const mockAdminUser = { id: 'admin-e2e-super', email: 'secops-admin@vulnbeacon.com', app_metadata: { role: 'admin' } };
 
   beforeEach(() => {
     vi.restoreAllMocks();

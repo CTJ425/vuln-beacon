@@ -14,6 +14,7 @@ import { WebhookConfigService } from '@/services/webhookConfigService';
 import { AdvisoryService, AdvisoryRowItem } from '@/services/advisoryService';
 import { deriveTaxonomy } from '@/services/productTaxonomy';
 import { supabase } from '@/lib/supabase';
+import { isAdminUser } from '@/lib/adminAuth';
 import { RefreshCw } from 'lucide-react';
 
 const ExplorerPage = lazy(() => import('@/pages/ExplorerPage').then((m) => ({ default: m.ExplorerPage })));
@@ -28,6 +29,10 @@ const LazyFallback: React.FC = () => (
     <CircularProgress size={36} color="primary" />
   </Box>
 );
+
+// The backstage and every write path require an admin, so a signed-in
+// account without the admin role is treated exactly like a signed-out one.
+const adminOrNull = (user: any) => (isAdminUser(user) ? user : null);
 
 export const AppContent: React.FC = () => {
   const [currentNav, setCurrentNav] = useState<NavState>({ section: 'dashboard' });
@@ -165,20 +170,30 @@ export const AppContent: React.FC = () => {
     if (supabase?.auth?.getSession) {
       supabase.auth.getSession().then(({ data }) => {
         if (data?.session?.user) {
-          setCurrentUser(data.session.user);
+          setCurrentUser(adminOrNull(data.session.user));
         }
       }).catch(() => {});
     }
 
     if (supabase?.auth?.onAuthStateChange) {
       const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-        setCurrentUser(session?.user ?? null);
+        setCurrentUser(adminOrNull(session?.user));
       });
       return () => {
         authListener?.subscription?.unsubscribe();
       };
     }
   }, []);
+
+  // webhook_configs is admin-only under RLS: an anonymous load returns no
+  // rows, so re-read it whenever the admin session appears or goes away.
+  useEffect(() => {
+    if (!currentUser) {
+      setWebhooks([]);
+      return;
+    }
+    webhookConfigService.fetchWebhooks().then(setWebhooks).catch(() => {});
+  }, [currentUser, webhookConfigService]);
 
   const handleSelectNav = (nav: NavState) => {
     if (nav.section === 'sync' || nav.section === 'settings') {
@@ -206,11 +221,11 @@ export const AppContent: React.FC = () => {
   const handleAdminLoginSuccess = (user?: any) => {
     setShowAdminLogin(false);
     if (user) {
-      setCurrentUser(user);
+      setCurrentUser(adminOrNull(user));
     } else if (supabase?.auth?.getSession) {
       supabase.auth.getSession().then(({ data }) => {
         if (data?.session?.user) {
-          setCurrentUser(data.session.user);
+          setCurrentUser(adminOrNull(data.session.user));
         }
       }).catch(() => {});
     }

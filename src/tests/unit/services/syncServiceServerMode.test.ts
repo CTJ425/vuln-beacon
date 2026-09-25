@@ -46,7 +46,7 @@ describe('SyncService — Server-Side Manual Sync Trigger (Task 11c, TDD)', () =
       data: {
         session: {
           access_token: 'fake-jwt-token',
-          user: { id: 'admin-user-1', email: 'admin@vulnbeacon.com' },
+          user: { id: 'admin-user-1', email: 'admin@vulnbeacon.com', app_metadata: { role: 'admin' } },
         },
       },
     });
@@ -221,28 +221,19 @@ describe('SyncService — Server-Side Manual Sync Trigger (Task 11c, TDD)', () =
     );
   });
 
-  it('falls back to client-side ingestion when user is unauthenticated in auto mode', async () => {
+  it('refuses to sync without an admin session in auto mode instead of falling back to client', async () => {
     mockGetSession.mockResolvedValue({
       data: { session: null },
     });
-    mockInvoke.mockResolvedValue({
-      data: { log: { id: 'anon-log-1', status: 'SUCCESS' } },
-      error: null,
-    });
 
     const service = new SyncService();
-    await service.syncVendors(['redhat'], { mode: 'auto' });
+    const result = await service.syncVendors(['redhat'], { mode: 'auto' });
 
-    // Should call persist_ingestion, NOT trigger_manual_sync
-    expect(mockInvoke).toHaveBeenCalledWith(
-      'sync-cve',
-      expect.objectContaining({
-        body: expect.objectContaining({
-          action: 'persist_ingestion',
-          vendorCode: 'redhat',
-        }),
-      })
-    );
+    // Persisting now requires an admin on the server, so an anonymous client
+    // run could only fail after fetching every feed. Stop before any work.
+    expect(result.success).toBe(false);
+    expect(result.errors?.[0]).toMatch(/admin/i);
+    expect(mockInvoke).not.toHaveBeenCalled();
   });
 
   it('falls back to client-side ingestion in auto mode when server invocation returns FunctionsFetchError', async () => {

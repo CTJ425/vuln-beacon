@@ -160,13 +160,11 @@ describe('sync-cve edge function', () => {
     expect(src).toContain('delete_webhook');
   });
 
-  it('enforces bearer authorization header or apikey header', () => {
+  it('requires an admin bearer token rather than any apikey header', () => {
     const src = read(syncCvePath);
-    expect(src).toMatch(/Bearer /);
-    expect(src).toContain('apikey');
+    expect(src).toContain('authorizeAdminRequest(');
     expect(src).toContain('401');
-    expect(src).toMatch(/hasBearer/);
-    expect(src).toMatch(/hasApiKey/);
+    expect(src).not.toMatch(/hasApiKey/);
   });
 
   it('supports health_check action', () => {

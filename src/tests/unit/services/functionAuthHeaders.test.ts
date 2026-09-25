@@ -119,7 +119,7 @@ describe('Function Auth Headers and Client Services Integration', () => {
   describe('SyncService passes Authorization headers', () => {
     it('syncVendors passes headers with Authorization token to invoke', async () => {
       const service = new SyncService();
-      await service.syncVendors();
+      await service.syncVendors(undefined, { mode: 'client' });
 
       expect(mockInvoke).toHaveBeenCalled();
       for (const call of mockInvoke.mock.calls) {

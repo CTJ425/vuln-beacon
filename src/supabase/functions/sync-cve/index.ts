@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
-import { IngestionEngine, WebhookService } from "../_shared/ingest.bundle.js";
+import { IngestionEngine, WebhookService, authorizeAdminRequest } from "../_shared/ingest.bundle.js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -158,30 +158,11 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
-  const apiKey = req.headers.get('apikey') ?? req.headers.get('ApiKey') ?? req.headers.get('x-api-key');
-
-  const hasBearer = Boolean(
-    authHeader &&
-    (authHeader.startsWith('Bearer ') || authHeader.startsWith('bearer ')) &&
-    authHeader.slice(7).trim().length > 0
-  );
-  const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
-
-  if (!hasBearer && !hasApiKey) {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Unauthorized: missing or invalid Authorization or apikey header' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-    );
-  }
-
   try {
     // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are reserved names injected
     // automatically by the Supabase Edge Function runtime — do not rename these.
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabaseClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', serviceRoleKey);
 
     const body = await req.json().catch(() => ({}));
     const { action, vendorCode, advisories, cves, mappings, syncMeta } = body;
@@ -193,29 +174,21 @@ serve(async (req) => {
       );
     }
 
+    // Every action below writes with the service-role client, so the caller
+    // must be an admin (or hold the service-role key). The publishable key is
+    // public and never authorizes anything here.
+    const isAdmin = await authorizeAdminRequest(req.headers.get('Authorization'), {
+      serviceRoleKey,
+      getUser: (token: string) => supabaseClient.auth.getUser(token),
+    });
+    if (!isAdmin) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized: admin authentication required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+
     if (action === 'trigger_manual_sync') {
-      const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization') ?? '';
-      const token = authHeader.replace(/^bearer\s+/i, '').trim();
-      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-
-      // D2: Role-Gated Admin Authorization
-      let isAuthorized = false;
-      if (serviceRoleKey && token === serviceRoleKey) {
-        isAuthorized = true;
-      } else if (token) {
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-        if (!userError && user) {
-          isAuthorized = true;
-        }
-      }
-
-      if (!isAuthorized) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Unauthorized: Admin authentication required for manual sync' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
-        );
-      }
-
       // D3: Mutual Exclusion & Concurrency Protection
       let lockAcquired = false;
       try {

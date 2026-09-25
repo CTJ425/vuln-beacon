@@ -28,7 +28,7 @@ const failedLog = (errorMessage: string | null) => ({
 // R2: manual sync is reachable only from the authenticated Admin Console, so the
 // BUG-003 assertions below must sign in first. The behaviour under test is unchanged.
 const triggerSync = async () => {
-  const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com' };
+  const mockUser = { id: 'admin-1', email: 'admin@vulnbeacon.com', app_metadata: { role: 'admin' } };
   vi.spyOn(supabase.auth, 'signInWithPassword').mockResolvedValue({
     data: {
       user: mockUser as any,

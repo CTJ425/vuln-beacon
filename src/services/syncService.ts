@@ -290,7 +290,12 @@ export class SyncService {
           canAttemptServer = true;
         }
       } catch {
-        // Fall back to client
+        // Treated as no session below.
+      }
+      // sync-cve only persists for an admin, so a client run without a
+      // session would fetch every feed and then be rejected on write.
+      if (!canAttemptServer) {
+        return { success: false, newLogs: [], errors: ['Admin sign-in required to run a sync.'] };
       }
     }
 

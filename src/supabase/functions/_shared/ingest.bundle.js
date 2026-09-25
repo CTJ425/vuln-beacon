@@ -2177,10 +2177,28 @@ var WebhookService = class {
     return results.filter((r) => r.status === "fulfilled" && r.value).length;
   }
 };
+
+// lib/adminAuth.ts
+var ADMIN_ROLE = "admin";
+function isAdminUser(user) {
+  return user?.app_metadata?.role === ADMIN_ROLE;
+}
+async function authorizeAdminRequest(authHeader, { serviceRoleKey, getUser }) {
+  const token = (authHeader ?? "").replace(/^bearer\s+/i, "").trim();
+  if (!token) return false;
+  if (serviceRoleKey && token === serviceRoleKey) return true;
+  try {
+    const { data, error } = await getUser(token);
+    return !error && isAdminUser(data?.user);
+  } catch {
+    return false;
+  }
+}
 export {
   IngestionEngine,
   SCHEDULE_TICK_TOLERANCE_MINUTES,
   WebhookService,
+  authorizeAdminRequest,
   getAdapterByCode,
   isVendorDue
 };

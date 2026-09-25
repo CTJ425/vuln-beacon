@@ -139,7 +139,7 @@ describe('SyncService bounds the persist payload (BUG-003)', () => {
   it('splits a large run into several data calls, each under the byte budget', async () => {
     loadRun(buildRun(300, 3));
 
-    const result = await new SyncService().syncVendors(['redhat']);
+    const result = await new SyncService().syncVendors(['redhat'], { mode: 'client' });
 
     expect(result.success).toBe(true);
     expect(dataCalls().length).toBeGreaterThan(1);
@@ -152,7 +152,7 @@ describe('SyncService bounds the persist payload (BUG-003)', () => {
     const run = buildRun(300, 3);
     loadRun(run);
 
-    await new SyncService().syncVendors(['redhat']);
+    await new SyncService().syncVendors(['redhat'], { mode: 'client' });
 
     const sentAdv = dataCalls().flatMap((b: any) => b.advisories.map((a: any) => a.id));
     const sentMap = dataCalls().flatMap((b: any) => b.mappings.map((m: any) => m.id));
@@ -168,7 +168,7 @@ describe('SyncService bounds the persist payload (BUG-003)', () => {
   it('keeps each mapping in the same call as the advisory it belongs to', async () => {
     loadRun(buildRun(300, 3));
 
-    await new SyncService().syncVendors(['redhat']);
+    await new SyncService().syncVendors(['redhat'], { mode: 'client' });
 
     for (const body of dataCalls()) {
       const advIds = new Set(body.advisories.map((a: any) => a.id));
@@ -186,7 +186,7 @@ describe('SyncService bounds the persist payload (BUG-003)', () => {
     const run = buildRun(300, 3);
     loadRun(run);
 
-    await new SyncService().syncVendors(['redhat']);
+    await new SyncService().syncVendors(['redhat'], { mode: 'client' });
 
     const meta = metaCalls();
     expect(meta).toHaveLength(1);
@@ -203,7 +203,7 @@ describe('SyncService bounds the persist payload (BUG-003)', () => {
   it('still uses one data call plus one log call for a small run', async () => {
     loadRun(buildRun(1, 1));
 
-    await new SyncService().syncVendors(['redhat']);
+    await new SyncService().syncVendors(['redhat'], { mode: 'client' });
 
     expect(dataCalls()).toHaveLength(1);
     expect(metaCalls()).toHaveLength(1);
@@ -224,7 +224,7 @@ describe('SyncService bounds the persist payload (BUG-003)', () => {
       return { data: { success: true, log: null }, error: null };
     });
 
-    const result = await new SyncService().syncVendors(['redhat']);
+    const result = await new SyncService().syncVendors(['redhat'], { mode: 'client' });
 
     expect(result.success).toBe(false);
     expect(dataCallCount).toBe(2);

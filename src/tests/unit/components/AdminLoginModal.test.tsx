@@ -7,6 +7,7 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     auth: {
       signInWithPassword: vi.fn(),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
     },
   },
 }));
@@ -27,7 +28,7 @@ describe('AdminLoginModal Component', () => {
 
   it('submits credentials to supabase.auth.signInWithPassword', async () => {
     vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-      data: { user: { id: 'admin-1', email: 'admin@vulnbeacon.com' } as any, session: {} as any },
+      data: { user: { id: 'admin-1', email: 'admin@vulnbeacon.com', app_metadata: { role: 'admin' } } as any, session: {} as any },
       error: null,
     });
 
@@ -78,5 +79,23 @@ describe('AdminLoginModal Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /登入後台/i }));
 
     expect(await screen.findByText(/登入未完成，帳號可能需要先完成信箱驗證/i)).toBeInTheDocument();
+  });
+
+  it('rejects a signed-in account without the admin role and signs it back out', async () => {
+    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+      data: { user: { id: 'u-2', email: 'viewer@user.com', app_metadata: {} } as any, session: {} as any },
+      error: null,
+    });
+
+    const handleSuccess = vi.fn();
+    render(<AdminLoginModal open={true} onClose={vi.fn()} onSuccess={handleSuccess} />);
+
+    fireEvent.change(screen.getByLabelText(/Email/i), { target: { value: 'viewer@user.com' } });
+    fireEvent.change(screen.getByLabelText(/Password/i), { target: { value: 'pass123' } });
+    fireEvent.click(screen.getByRole('button', { name: /登入後台/i }));
+
+    expect(await screen.findByText(/此帳號沒有管理員權限/)).toBeInTheDocument();
+    expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
+    expect(handleSuccess).not.toHaveBeenCalled();
   });
 });

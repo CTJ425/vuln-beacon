@@ -13,7 +13,7 @@ import { Vendor, VendorSyncLog } from '@/types';
 import nutanixFixture from '../fixtures/nutanix/nutanix-advisory-sample.json';
 
 const { mockAdminUser } = vi.hoisted(() => ({
-  mockAdminUser: { id: 'admin-nutanix', email: 'secops-admin@vulnbeacon.com' },
+  mockAdminUser: { id: 'admin-nutanix', email: 'secops-admin@vulnbeacon.com', app_metadata: { role: 'admin' } },
 }));
 
 vi.mock('@/lib/supabase', () => ({
@@ -22,7 +22,7 @@ vi.mock('@/lib/supabase', () => ({
       getSession: vi.fn().mockResolvedValue({
         data: {
           session: {
-            user: { id: 'admin-nutanix', email: 'secops-admin@vulnbeacon.com' },
+            user: { id: 'admin-nutanix', email: 'secops-admin@vulnbeacon.com', app_metadata: { role: 'admin' } },
           },
         },
       }),
@@ -425,7 +425,7 @@ describe('E2E: Comprehensive Nutanix Integration Lifecycle', () => {
     vi.stubGlobal('fetch', fetchSpy);
 
     const service = new SyncService();
-    const result = await service.syncVendors(['redhat', 'nutanix']);
+    const result = await service.syncVendors(['redhat', 'nutanix'], { mode: 'client' });
 
     expect(result.success).toBe(true);
 
