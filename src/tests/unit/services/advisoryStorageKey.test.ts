@@ -49,7 +49,7 @@ describe('BUG-008: advisory storage key stays backward compatible', () => {
     expect(sanitiseAdvisoryKey('a\\b')).not.toContain('\\');
   });
 
-  it('is defined identically in the Deno edge function and the Node script', () => {
+  it('is defined identically in the shared persist module and the Node script', () => {
     const root = resolve(__dirname, '../../..');
     const extract = (file: string) => {
       const src = readFileSync(resolve(root, file), 'utf8');
@@ -61,7 +61,7 @@ describe('BUG-008: advisory storage key stays backward compatible', () => {
         .replace(/\):\s*string\s*{/, ') {');
     };
 
-    expect(extract('supabase/functions/sync-cve/index.ts')).toBe(
+    expect(extract('engine/persistIngestion.ts')).toBe(
       extract('scripts/backfillAdvisoryStorage.mjs')
     );
   });

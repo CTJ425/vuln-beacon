@@ -14,6 +14,7 @@ const mockIngestVendor = vi.fn();
 const mockGetAdvisories = vi.fn();
 const mockGetCves = vi.fn();
 const mockGetMappings = vi.fn();
+const mockDispatchPendingAlerts = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/engine/ingestion', () => ({
   IngestionEngine: vi.fn().mockImplementation(() => ({
@@ -21,6 +22,7 @@ vi.mock('@/engine/ingestion', () => ({
     getAdvisories: mockGetAdvisories,
     getCves: mockGetCves,
     getMappings: mockGetMappings,
+    dispatchPendingAlerts: mockDispatchPendingAlerts,
   })),
 }));
 

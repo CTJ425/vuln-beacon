@@ -23,6 +23,9 @@ describe('E2E: Webhook Alert Dispatch Flow', () => {
 
     // Ingest Red Hat advisories (contains CRITICAL CVE-2024-38812)
     await engine.ingestVendor('redhat', redhatFixture);
+    // Alerts are held until the caller has persisted the run.
+    expect(dispatchSpy).not.toHaveBeenCalled();
+    await engine.dispatchPendingAlerts();
 
     // Should have triggered webhook dispatch for critical/high vulnerabilities
     expect(dispatchSpy).toHaveBeenCalled();

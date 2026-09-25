@@ -655,8 +655,8 @@ var DebianAdapter = class {
     const lineStart = text.lastIndexOf("\n", idx);
     const start = lineStart === -1 ? 0 : lineStart + 1;
     const nextEntry = text.indexOf("\n[", start + 1);
-    const chunk = nextEntry === -1 ? text.slice(start) : text.slice(start, nextEntry);
-    const items = this.parse(chunk);
+    const chunk2 = nextEntry === -1 ? text.slice(start) : text.slice(start, nextEntry);
+    const items = this.parse(chunk2);
     return items.find((item) => item.advisoryId.toUpperCase() === cleanId) || items[0] || null;
   }
   async fetchAdvisoryByCve(cveId) {
@@ -672,8 +672,8 @@ var DebianAdapter = class {
         const prevEntry = text.lastIndexOf("\n[", idx);
         const start = prevEntry === -1 ? 0 : prevEntry + 1;
         const nextEntry = text.indexOf("\n[", idx);
-        const chunk = nextEntry === -1 ? text.slice(start) : text.slice(start, nextEntry);
-        const items = this.parse(chunk);
+        const chunk2 = nextEntry === -1 ? text.slice(start) : text.slice(start, nextEntry);
+        const items = this.parse(chunk2);
         const match = items.find((item) => item.cves.some((c) => c.cveId === cleanCve));
         if (match) return match;
       } catch {
@@ -1607,6 +1607,7 @@ var IngestionEngine = class {
   syncLogs = [];
   webhookService;
   knownCveIds;
+  pendingAlerts = [];
   constructor(options) {
     this.webhookService = options?.webhookService;
     this.knownCveIds = new Set(options?.knownCveIds ?? []);
@@ -1649,7 +1650,6 @@ var IngestionEngine = class {
       const items = rawPayload !== void 0 ? adapter.parse(rawPayload) : await adapter.fetchAdvisories();
       let newCvesCount = 0;
       let totalCves = 0;
-      const pendingAlerts = [];
       for (const item of items) {
         const advKey = `${vendorCode}:${item.advisoryId}`;
         const advisoryRecord = {
@@ -1678,7 +1678,8 @@ var IngestionEngine = class {
           const cveRecord = {
             id: `cve-${cveKey}`,
             cve_id: cve.cveId,
-            description: cve.description || item.title,
+            description: cve.description || null,
+            description_fallback: item.title,
             cvss_v3_score: cve.cvssScore ?? null,
             cvss_v3_vector: cve.cvssVector ?? null,
             severity: cve.severity || item.severity,
@@ -1711,8 +1712,8 @@ var IngestionEngine = class {
               created_at: (/* @__PURE__ */ new Date()).toISOString()
             });
           }
-          if (this.webhookService && isTrulyNew && (cveRecord.severity === "CRITICAL" || cveRecord.severity === "HIGH")) {
-            pendingAlerts.push({
+          if (this.webhookService && isTrulyNew) {
+            this.pendingAlerts.push({
               vendorName: adapter.vendorName,
               advisoryId: item.advisoryId,
               advisoryTitle: item.title,
@@ -1726,9 +1727,6 @@ var IngestionEngine = class {
             });
           }
         }
-      }
-      if (this.webhookService && pendingAlerts.length > 0) {
-        await Promise.allSettled(pendingAlerts.map((alert) => this.webhookService.notifyAll(alert)));
       }
       const durationMs = Date.now() - startTime;
       const details = {
@@ -1794,6 +1792,17 @@ var IngestionEngine = class {
         details
       };
     }
+  }
+  /**
+   * Sends the alerts queued by ingestVendor. Callers invoke this only after the
+   * run is persisted: alerting first meant a failed write re-alerted the same
+   * CVEs on the next run, because they were still unknown to the database.
+   */
+  async dispatchPendingAlerts() {
+    const alerts = this.pendingAlerts;
+    this.pendingAlerts = [];
+    if (!this.webhookService || alerts.length === 0) return;
+    await Promise.allSettled(alerts.map((alert) => this.webhookService.notifyAll(alert)));
   }
   getAdvisories() {
     return Array.from(this.advisories.values());
@@ -2194,11 +2203,125 @@ async function authorizeAdminRequest(authHeader, { serviceRoleKey, getUser }) {
     return false;
   }
 }
+
+// engine/persistIngestion.ts
+var ADVISORY_BUCKET = "advisory-documents";
+var DB_BATCH_SIZE = 1e3;
+var MAX_RAW_PAYLOAD_BYTES = 5 * 1024 * 1024;
+var CVE_ID_REGEX6 = /^CVE-\d{4}-\d{4,}$/i;
+function sanitiseAdvisoryKey(advisoryId) {
+  return String(advisoryId).replace(/:/g, "_").replace(/\.\./g, "_").replace(/[\\/]/g, "_");
+}
+function chunk(items, size) {
+  const out = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
+}
+async function persistIngestion(client, input) {
+  const { vendorId, vendorCode } = input;
+  const uniqueCves = Array.from(
+    new Map(
+      (input.cves || []).filter((c) => c?.cve_id && CVE_ID_REGEX6.test(c.cve_id)).map((c) => [c.cve_id, c])
+    ).values()
+  );
+  const localCveIdByCveId = new Map(uniqueCves.map((c) => [c.cve_id, c.id]));
+  const cveIdMap = /* @__PURE__ */ new Map();
+  for (const batch of chunk(uniqueCves, DB_BATCH_SIZE)) {
+    const { data, error } = await client.rpc("upsert_cves", {
+      p_rows: batch.map((c) => ({
+        cve_id: c.cve_id,
+        description: c.description ?? null,
+        description_fallback: c.description_fallback ?? null,
+        cvss_v3_score: c.cvss_v3_score ?? null,
+        cvss_v3_vector: c.cvss_v3_vector ?? null,
+        severity: c.severity ?? null,
+        is_known_exploited: !!c.is_known_exploited,
+        published_date: c.published_date ?? null
+      }))
+    });
+    if (error) throw error;
+    for (const row of data || []) {
+      const localId = localCveIdByCveId.get(row.cve_id);
+      if (localId) cveIdMap.set(localId, row.id);
+    }
+  }
+  const uniqueAdvisories = Array.from(
+    new Map((input.advisories || []).map((a) => [a.advisory_id, a])).values()
+  );
+  const advisoryIdMap = /* @__PURE__ */ new Map();
+  for (const batch of chunk(uniqueAdvisories, DB_BATCH_SIZE)) {
+    const rawPayloadPaths = /* @__PURE__ */ new Map();
+    for (const adv of batch) {
+      if (!adv.raw_payload || Object.keys(adv.raw_payload).length === 0) continue;
+      const payload = JSON.stringify(adv.raw_payload);
+      if (new TextEncoder().encode(payload).length > MAX_RAW_PAYLOAD_BYTES) {
+        console.error(`Raw payload for advisory ${adv.advisory_id} (vendor ${vendorCode}) exceeds 5MB; not stored`);
+        continue;
+      }
+      const path = `${vendorCode}/${sanitiseAdvisoryKey(adv.advisory_id)}.json`;
+      try {
+        const { error: uploadError } = await client.storage.from(ADVISORY_BUCKET).upload(path, payload, { contentType: "application/json", upsert: true });
+        if (uploadError) throw uploadError;
+        rawPayloadPaths.set(adv.advisory_id, path);
+      } catch (uploadErr) {
+        console.error(`Failed to upload raw payload for advisory ${adv.advisory_id} (vendor ${vendorCode}):`, uploadErr);
+      }
+    }
+    const { data, error } = await client.from("advisories").upsert(
+      batch.map((adv) => ({
+        vendor_id: vendorId,
+        advisory_id: adv.advisory_id,
+        title: adv.title,
+        severity: adv.severity,
+        published_at: adv.published_at,
+        url: adv.url,
+        summary: adv.summary,
+        raw_payload: {},
+        raw_payload_path: rawPayloadPaths.get(adv.advisory_id) ?? null
+      })),
+      { onConflict: "vendor_id, advisory_id" }
+    ).select("id, advisory_id");
+    if (error) {
+      const paths = Array.from(rawPayloadPaths.values());
+      if (paths.length > 0) {
+        try {
+          await client.storage.from(ADVISORY_BUCKET).remove(paths);
+        } catch {
+        }
+      }
+      throw error;
+    }
+    for (const row of data || []) {
+      const original = batch.find((a) => a.advisory_id === row.advisory_id);
+      if (original) advisoryIdMap.set(original.id, row.id);
+    }
+  }
+  const merged = /* @__PURE__ */ new Map();
+  for (const m of input.mappings || []) {
+    const advisoryId = advisoryIdMap.get(m.advisory_id);
+    const cveId = cveIdMap.get(m.cve_id);
+    if (!advisoryId || !cveId) continue;
+    const products = m.product_impacts && m.product_impacts.length > 0 ? m.product_impacts : m.affected_products || [];
+    const key = `${advisoryId}:${cveId}`;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { advisory_id: advisoryId, cve_id: cveId, affected_products: products, fixed_versions: m.fixed_versions || [] });
+    } else {
+      existing.affected_products = Array.from(/* @__PURE__ */ new Set([...existing.affected_products, ...products]));
+      existing.fixed_versions = Array.from(/* @__PURE__ */ new Set([...existing.fixed_versions, ...m.fixed_versions || []]));
+    }
+  }
+  for (const batch of chunk(Array.from(merged.values()), DB_BATCH_SIZE)) {
+    const { error } = await client.from("advisory_cve_map").upsert(batch, { onConflict: "advisory_id, cve_id" });
+    if (error) throw error;
+  }
+}
 export {
   IngestionEngine,
   SCHEDULE_TICK_TOLERANCE_MINUTES,
   WebhookService,
   authorizeAdminRequest,
   getAdapterByCode,
-  isVendorDue
+  isVendorDue,
+  persistIngestion
 };

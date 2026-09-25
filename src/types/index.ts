@@ -40,7 +40,10 @@ export interface Advisory {
 export interface CveRecord {
   id: string;
   cve_id: string;
-  description: string;
+  description: string | null;
+  // Advisory title used only when a new CVE row has no description at all;
+  // never overwrites a description another vendor already stored.
+  description_fallback?: string | null;
   cvss_v3_score?: number | null;
   cvss_v3_vector?: string | null;
   severity: SeverityLevel;

@@ -216,6 +216,7 @@ describe('E2E: Comprehensive Nutanix Integration Lifecycle', () => {
 
     const engine = new IngestionEngine({ webhookService });
     const result = await engine.ingestVendor('nutanix', [nutanixFixture]);
+    await engine.dispatchPendingAlerts();
 
     expect(result.status).toBe('SUCCESS');
     expect(result.advisoriesCount).toBe(1);

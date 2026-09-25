@@ -14,6 +14,7 @@ const mockIngestVendor = vi.fn();
 const mockGetAdvisories = vi.fn();
 const mockGetCves = vi.fn();
 const mockGetMappings = vi.fn();
+const mockDispatchPendingAlerts = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('@/engine/ingestion', () => ({
   IngestionEngine: vi.fn().mockImplementation(() => ({
@@ -21,6 +22,7 @@ vi.mock('@/engine/ingestion', () => ({
     getAdvisories: mockGetAdvisories,
     getCves: mockGetCves,
     getMappings: mockGetMappings,
+    dispatchPendingAlerts: mockDispatchPendingAlerts,
   })),
 }));
 
@@ -227,5 +229,31 @@ describe('SyncService persists via the sync-cve edge function, not direct table 
         webhookService: expect.anything(),
       })
     );
+  });
+
+  it('sends alerts only after the run and its log row are persisted', async () => {
+    mockDispatchPendingAlerts.mockClear();
+    const order: string[] = [];
+    mockInvoke.mockImplementation(async (_fn: string, opts: any) => {
+      order.push(opts.body.syncMeta ? 'log' : 'data');
+      return { data: { success: true, log: { id: 'log-1', vendor_code: 'redhat', status: 'SUCCESS' } }, error: null };
+    });
+    mockDispatchPendingAlerts.mockImplementation(async () => {
+      order.push('alerts');
+    });
+
+    await new SyncService().syncVendors(['redhat'], { mode: 'client' });
+
+    expect(order[order.length - 1]).toBe('alerts');
+    expect(order.filter((o) => o === 'alerts')).toHaveLength(1);
+  });
+
+  it('sends no alerts when persisting the run fails', async () => {
+    mockDispatchPendingAlerts.mockClear();
+    mockInvoke.mockResolvedValue({ data: null, error: new Error('persist failed') });
+
+    await new SyncService().syncVendors(['redhat'], { mode: 'client' });
+
+    expect(mockDispatchPendingAlerts).not.toHaveBeenCalled();
   });
 });

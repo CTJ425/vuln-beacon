@@ -202,6 +202,7 @@ describe('BUG-003: alerts are not re-sent for already-persisted CVEs', () => {
       knownCveIds ? { webhookService, knownCveIds } : { webhookService }
     );
     await engine.ingestVendor('redhat', redhatFixture);
+    await engine.dispatchPendingAlerts();
     return spy.mock.calls.map(([payload]) => (payload as WebhookAlertPayload).cveId);
   };
 

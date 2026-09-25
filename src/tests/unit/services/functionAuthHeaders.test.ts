@@ -25,6 +25,7 @@ vi.mock('@/engine/ingestion', () => ({
     getAdvisories: vi.fn().mockReturnValue([]),
     getCves: vi.fn().mockReturnValue([]),
     getMappings: vi.fn().mockReturnValue([]),
+    dispatchPendingAlerts: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 

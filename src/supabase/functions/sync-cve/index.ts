@@ -1,20 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
-import { IngestionEngine, WebhookService, authorizeAdminRequest } from "../_shared/ingest.bundle.js";
+import { IngestionEngine, WebhookService, authorizeAdminRequest, persistIngestion } from "../_shared/ingest.bundle.js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const DB_BATCH_SIZE = 1000;
 const SUPABASE_PAGE_SIZE = 1000;
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
-}
 
 async function fetchAllCveIds(supabaseClient: any): Promise<string[]> {
   const ids: string[] = [];
@@ -33,21 +26,6 @@ async function fetchAllCveIds(supabaseClient: any): Promise<string[]> {
     from += SUPABASE_PAGE_SIZE;
   }
   return ids;
-}
-
-const ADVISORY_BUCKET = 'advisory-documents';
-
-// BUG-008: keeps the storage key byte-identical to what the ~50 already-stored
-// objects use (`advisory_id.replace(/:/g, '_')`) for every id made only of
-// [A-Za-z0-9._:-]. Only adds handling for characters current data never has:
-// path separators and '..' traversal. This helper is duplicated (not shared)
-// with src/scripts/backfillAdvisoryStorage.mjs because that is a separate
-// Node runtime — keep both copies in sync.
-function sanitiseAdvisoryKey(advisoryId: unknown): string {
-  return String(advisoryId)
-    .replace(/:/g, '_')
-    .replace(/\.\./g, '_')
-    .replace(/[\\/]/g, '_');
 }
 
 const SCHEDULE_TIME_FORMAT = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
@@ -261,144 +239,14 @@ serve(async (req) => {
               throw new Error(result.errorMessage || `Ingestion failed for vendor ${code}`);
             }
 
-            const advisories = engine.getAdvisories().filter((a: any) => a.vendor_id === code);
             const cves = engine.getCves();
-            const mappings = engine.getMappings();
-
-            const uniqueCves = Array.from(new Map(cves.map((c: any) => [c.cve_id, c])).values());
-            const cveIdMap = new Map<string, string>();
-            for (const batch of chunk(uniqueCves, DB_BATCH_SIZE)) {
-              const { data: insertedCves, error: cveError } = await supabaseClient
-                .from('cves')
-                .upsert(
-                  batch.map((c: any) => ({
-                    cve_id: c.cve_id,
-                    description: c.description,
-                    cvss_v3_score: c.cvss_v3_score,
-                    cvss_v3_vector: c.cvss_v3_vector,
-                    severity: c.severity,
-                    is_known_exploited: c.is_known_exploited,
-                    published_date: c.published_date,
-                  })),
-                  { onConflict: 'cve_id' }
-                )
-                .select('id, cve_id');
-
-              if (cveError) throw cveError;
-              for (const row of insertedCves || []) {
-                const original = batch.find((c: any) => c.cve_id === row.cve_id);
-                if (original) cveIdMap.set(original.id, row.id);
-              }
-            }
-
-            const uniqueAdvisories = Array.from(new Map(advisories.map((a: any) => [a.advisory_id, a])).values());
-            const rawPayloadPaths = new Map<string, string>();
-            const advisoryIdMap = new Map<string, string>();
-            for (const batch of chunk(uniqueAdvisories, DB_BATCH_SIZE)) {
-              for (const adv of batch as any[]) {
-                const hasPayload = adv.raw_payload && Object.keys(adv.raw_payload).length > 0;
-                if (!hasPayload) continue;
-                const path = `${code}/${sanitiseAdvisoryKey(adv.advisory_id)}.json`;
-                try {
-                  const { error: uploadError } = await supabaseClient.storage
-                    .from(ADVISORY_BUCKET)
-                    .upload(path, JSON.stringify(adv.raw_payload), {
-                      contentType: 'application/json',
-                      upsert: true,
-                    });
-                  if (uploadError) throw uploadError;
-                  rawPayloadPaths.set(adv.advisory_id, path);
-                } catch (uploadErr: any) {
-                  console.error(
-                    `Failed to upload raw payload for advisory ${adv.advisory_id} (vendor ${code}):`,
-                    uploadErr
-                  );
-                }
-              }
-
-              const { data: insertedAdvisories, error: advError } = await supabaseClient
-                .from('advisories')
-                .upsert(
-                  batch.map((adv: any) => ({
-                    vendor_id: vendor.id,
-                    advisory_id: adv.advisory_id,
-                    title: adv.title,
-                    severity: adv.severity,
-                    published_at: adv.published_at,
-                    url: adv.url,
-                    summary: adv.summary,
-                    raw_payload: {},
-                    raw_payload_path: rawPayloadPaths.get(adv.advisory_id) ?? null,
-                  })),
-                  { onConflict: 'vendor_id, advisory_id' }
-                )
-                .select('id, advisory_id');
-
-              if (advError) {
-                const batchPaths = batch
-                  .map((adv: any) => rawPayloadPaths.get(adv.advisory_id))
-                  .filter((path): path is string => !!path);
-                if (batchPaths.length > 0) {
-                  try {
-                    await supabaseClient.storage
-                      .from(ADVISORY_BUCKET)
-                      .remove(batchPaths);
-                  } catch {}
-                }
-                throw advError;
-              }
-
-              for (const row of insertedAdvisories || []) {
-                const original = batch.find((a: any) => a.advisory_id === row.advisory_id);
-                if (original) advisoryIdMap.set(original.id, row.id);
-              }
-            }
-
-            const mappingRows = mappings
-              .map((m: any) => {
-                const realAdvisoryId = advisoryIdMap.get(m.advisory_id);
-                const realCveId = cveIdMap.get(m.cve_id);
-                if (!realAdvisoryId || !realCveId) return null;
-                return {
-                  advisory_id: realAdvisoryId,
-                  cve_id: realCveId,
-                  affected_products: (m.product_impacts && m.product_impacts.length > 0)
-                    ? m.product_impacts
-                    : m.affected_products,
-                  fixed_versions: m.fixed_versions,
-                };
-              })
-              .filter((m: any) => m !== null);
-
-            const dedupedMappings = Array.from(
-              mappingRows.reduce((acc: Map<string, any>, m: any) => {
-                const key = `${m.advisory_id}:${m.cve_id}`;
-                if (!acc.has(key)) {
-                  acc.set(key, m);
-                } else {
-                  const existing = acc.get(key);
-                  const mergedProducts = Array.from(
-                    new Set([...(existing.affected_products || []), ...(m.affected_products || [])])
-                  );
-                  const mergedVersions = Array.from(
-                    new Set([...(existing.fixed_versions || []), ...(m.fixed_versions || [])])
-                  );
-                  acc.set(key, {
-                    ...existing,
-                    affected_products: mergedProducts,
-                    fixed_versions: mergedVersions,
-                  });
-                }
-                return acc;
-              }, new Map<string, any>()).values()
-            );
-
-            for (const batch of chunk(dedupedMappings, DB_BATCH_SIZE)) {
-              const { error: mapError } = await supabaseClient
-                .from('advisory_cve_map')
-                .upsert(batch, { onConflict: 'advisory_id, cve_id' });
-              if (mapError) throw mapError;
-            }
+            await persistIngestion(supabaseClient, {
+              vendorId: vendor.id,
+              vendorCode: code,
+              advisories: engine.getAdvisories().filter((a: any) => a.vendor_id === code),
+              cves,
+              mappings: engine.getMappings(),
+            });
 
             const finishedAt = new Date().toISOString();
             const { data: logRow, error: logError } = await supabaseClient
@@ -422,6 +270,7 @@ serve(async (req) => {
 
             ran.push(code);
             logs.push(logRow);
+            await engine.dispatchPendingAlerts();
 
             for (const c of cves) {
               if (!knownCveIds.includes(c.cve_id)) {
@@ -630,119 +479,13 @@ serve(async (req) => {
       );
     }
 
-    const vendorId = vendor.id;
-
-    // Upsert CVEs, keeping a map from client-local correlation id -> real DB id.
-    const CVE_ID_REGEX = /^CVE-\d{4}-\d{4,}$/i;
-    const cveIdMap = new Map<string, string>();
-    for (const cveObj of (cves || [])) {
-      if (!cveObj?.cve_id || !CVE_ID_REGEX.test(cveObj.cve_id)) {
-        continue;
-      }
-      const { data: insertedCve, error: cveError } = await supabaseClient
-        .from('cves')
-        .upsert(
-          {
-            cve_id: cveObj.cve_id,
-            description: cveObj.description,
-            cvss_v3_score: cveObj.cvss_v3_score,
-            cvss_v3_vector: cveObj.cvss_v3_vector,
-            severity: cveObj.severity,
-            is_known_exploited: cveObj.is_known_exploited,
-            published_date: cveObj.published_date,
-          },
-          { onConflict: 'cve_id' }
-        )
-        .select('id')
-        .single();
-
-      if (cveError) throw cveError;
-
-      if (insertedCve) {
-        cveIdMap.set(cveObj.id, insertedCve.id);
-      }
-    }
-
-    // Upsert advisories, then their mappings to CVEs.
-    for (const adv of (advisories || [])) {
-      let rawPayloadPath: string | null = null;
-      const hasPayload = adv.raw_payload && Object.keys(adv.raw_payload).length > 0;
-
-      if (hasPayload) {
-        const payloadStr = JSON.stringify(adv.raw_payload);
-        const payloadBytes = new TextEncoder().encode(payloadStr).length;
-        if (payloadBytes > 5 * 1024 * 1024) {
-          throw new Error(`Payload for advisory ${adv.advisory_id} exceeds 5MB limit`);
-        }
-        const path = `${vendorCode}/${sanitiseAdvisoryKey(adv.advisory_id)}.json`;
-        const { error: uploadError } = await supabaseClient.storage
-          .from(ADVISORY_BUCKET)
-          .upload(path, payloadStr, {
-            contentType: 'application/json',
-            upsert: true,
-          });
-
-        if (uploadError) throw uploadError;
-        rawPayloadPath = path;
-      }
-
-      const { data: insertedAdv, error: advError } = await supabaseClient
-        .from('advisories')
-        .upsert(
-          {
-            vendor_id: vendorId,
-            advisory_id: adv.advisory_id,
-            title: adv.title,
-            severity: adv.severity,
-            published_at: adv.published_at,
-            url: adv.url,
-            summary: adv.summary,
-            raw_payload: {},
-            raw_payload_path: rawPayloadPath,
-          },
-          { onConflict: 'vendor_id, advisory_id' }
-        )
-        .select('id')
-        .single();
-
-      if (advError) {
-        // BUG-009: the upsert failed after a successful upload, so the
-        // object is now orphaned. Best-effort remove it; never let a
-        // cleanup failure mask or replace the original error.
-        if (rawPayloadPath) {
-          try {
-            await supabaseClient.storage.from(ADVISORY_BUCKET).remove([rawPayloadPath]);
-          } catch {
-            // best-effort only
-          }
-        }
-        throw advError;
-      }
-
-      if (!insertedAdv) continue;
-
-      const advMappings = (mappings || []).filter((m: any) => m.advisory_id === adv.id);
-      for (const map of advMappings) {
-        const realCveId = cveIdMap.get(map.cve_id);
-        if (!realCveId) continue;
-
-        const { error: mapError } = await supabaseClient
-          .from('advisory_cve_map')
-          .upsert(
-            {
-              advisory_id: insertedAdv.id,
-              cve_id: realCveId,
-              affected_products: (map.product_impacts && map.product_impacts.length > 0)
-                ? map.product_impacts
-                : map.affected_products,
-              fixed_versions: map.fixed_versions,
-            },
-            { onConflict: 'advisory_id, cve_id' }
-          );
-
-        if (mapError) throw mapError;
-      }
-    }
+    await persistIngestion(supabaseClient, {
+      vendorId: vendor.id,
+      vendorCode,
+      advisories: advisories || [],
+      cves: cves || [],
+      mappings: mappings || [],
+    });
 
     // BUG-003: a run is now split into chunks with no syncMeta, closed by one
     // syncMeta-only call. Only write a vendor_sync_logs row for that closing
@@ -763,7 +506,7 @@ serve(async (req) => {
       const { data, error: logError } = await supabaseClient
         .from('vendor_sync_logs')
         .insert({
-          vendor_id: vendorId,
+          vendor_id: vendor.id,
           vendor_code: vendorCode,
           status: syncMeta.status,
           items_fetched: syncMeta.itemsFetched ?? (advisories || []).length,

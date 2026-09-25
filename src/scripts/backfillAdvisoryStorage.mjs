@@ -19,8 +19,8 @@ const ADVISORY_BUCKET = 'advisory-documents';
 // objects use (`advisory_id.replace(/:/g, '_')`) for every id made only of
 // [A-Za-z0-9._:-]. Only adds handling for characters current data never has:
 // path separators and '..' traversal. This helper is duplicated (not shared)
-// with src/supabase/functions/sync-cve/index.ts because that is a separate
-// Deno runtime — keep both copies in sync.
+// with src/engine/persistIngestion.ts (bundled into the Deno Edge Functions)
+// because this script runs in plain Node — keep both copies in sync.
 export function sanitiseAdvisoryKey(advisoryId) {
   return String(advisoryId)
     .replace(/:/g, '_')

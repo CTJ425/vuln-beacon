@@ -433,6 +433,10 @@ export class SyncService {
           newLogs.push(data.log as VendorSyncLog);
         }
 
+        // Alerts go out only once the run is stored, so a failed write
+        // cannot make the next run re-alert the same CVEs.
+        await engine.dispatchPendingAlerts();
+
         // Record newly ingested CVEs so subsequent vendors in the same run do not re-count or re-alert them.
         for (const c of cves) {
           knownCveIdSet.add(c.cve_id);
@@ -741,6 +745,7 @@ export class SyncService {
         }
       }
 
+      await engine.dispatchPendingAlerts();
       return true;
     } catch (e) {
       console.error('On-demand fetch error:', e);

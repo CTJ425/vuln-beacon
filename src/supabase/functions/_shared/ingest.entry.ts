@@ -8,3 +8,4 @@ export { getAdapterByCode } from '@/adapters';
 export { isVendorDue, SCHEDULE_TICK_TOLERANCE_MINUTES } from '@/services/scheduleWindow';
 export { WebhookService } from '@/services/webhook';
 export { authorizeAdminRequest } from '@/lib/adminAuth';
+export { persistIngestion } from '@/engine/persistIngestion';

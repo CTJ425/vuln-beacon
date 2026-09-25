@@ -78,9 +78,9 @@ describe('scheduled-sync edge function', () => {
     expect(around).toMatch(/catch/);
   });
 
-  it('persists the raw advisory payload the same way the manual path does', () => {
-    const src = read(scheduledSyncPath);
-    expect(src).toContain('raw_payload_path');
+  it('delegates raw payload storage, orphan cleanup and batching to persistIngestion', () => {
+    // Behaviour is covered in tests/unit/engine/persistIngestion.test.ts.
+    expect(read(scheduledSyncPath)).toContain('persistIngestion(supabaseClient');
   });
 
   it('never discards the error half of a write result', () => {
@@ -91,22 +91,6 @@ describe('scheduled-sync edge function', () => {
 
   it('seeds the engine with already known cve ids so new_items_count stays honest', () => {
     expect(read(scheduledSyncPath)).toContain('knownCveIds');
-  });
-
-  it('removes uploaded raw payloads when the advisory upsert fails', () => {
-    const src = read(scheduledSyncPath);
-    expect(src).toMatch(/storage[\s\S]{0,200}?\.remove\(/);
-  });
-
-  it('uploads raw payloads inside the batch loop so no batch can be orphaned', () => {
-    // Uploading every advisory up front means a failure on a middle batch leaves the
-    // later batches' objects in the bucket with nothing to remove them.
-    const src = read(scheduledSyncPath);
-    const advisoryBatchAt = src.search(/for\s*\(\s*const\s+batch\s+of\s+chunk\(\s*advisories/);
-    const uploadAt = src.indexOf('.upload(');
-    expect(advisoryBatchAt).toBeGreaterThan(-1);
-    expect(uploadAt).toBeGreaterThan(-1);
-    expect(uploadAt).toBeGreaterThan(advisoryBatchAt);
   });
 
   it('throws on FAILED result status so failed vendor is tracked and not stamped', () => {

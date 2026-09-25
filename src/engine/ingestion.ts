@@ -34,6 +34,7 @@ export class IngestionEngine {
   private syncLogs: VendorSyncLog[] = [];
   private webhookService?: WebhookService;
   private knownCveIds: Set<string>;
+  private pendingAlerts: WebhookAlertPayload[] = [];
 
   constructor(options?: IngestionEngineOptions) {
     this.webhookService = options?.webhookService;
@@ -83,7 +84,6 @@ export class IngestionEngine {
 
       let newCvesCount = 0;
       let totalCves = 0;
-      const pendingAlerts: WebhookAlertPayload[] = [];
 
       for (const item of items) {
         const advKey = `${vendorCode}:${item.advisoryId}`;
@@ -116,7 +116,8 @@ export class IngestionEngine {
           const cveRecord: CveRecord = {
             id: `cve-${cveKey}`,
             cve_id: cve.cveId,
-            description: cve.description || item.title,
+            description: cve.description || null,
+            description_fallback: item.title,
             cvss_v3_score: cve.cvssScore ?? null,
             cvss_v3_vector: cve.cvssVector ?? null,
             severity: cve.severity || item.severity,
@@ -152,11 +153,11 @@ export class IngestionEngine {
           }
 
 
-          // Queue webhook alert if critical or high, but only for CVEs that are
-          // both new to this run AND not already persisted in the DB — otherwise
-          // every re-sync re-alerts on the same CVEs (BUG-003).
-          if (this.webhookService && isTrulyNew && (cveRecord.severity === 'CRITICAL' || cveRecord.severity === 'HIGH')) {
-            pendingAlerts.push({
+          // Queue an alert only for CVEs new to this run AND not already
+          // persisted, otherwise every re-sync re-alerts (BUG-003). Every
+          // severity is queued; each webhook's min_severity decides delivery.
+          if (this.webhookService && isTrulyNew) {
+            this.pendingAlerts.push({
               vendorName: adapter.vendorName,
               advisoryId: item.advisoryId,
               advisoryTitle: item.title,
@@ -170,12 +171,6 @@ export class IngestionEngine {
             });
           }
         }
-      }
-
-      // Dispatch all queued alerts concurrently so one slow hook cannot
-      // serialise the whole ingestion (BUG-003).
-      if (this.webhookService && pendingAlerts.length > 0) {
-        await Promise.allSettled(pendingAlerts.map((alert) => this.webhookService!.notifyAll(alert)));
       }
 
       const durationMs = Date.now() - startTime;
@@ -244,6 +239,19 @@ export class IngestionEngine {
         details,
       };
     }
+  }
+
+  /**
+   * Sends the alerts queued by ingestVendor. Callers invoke this only after the
+   * run is persisted: alerting first meant a failed write re-alerted the same
+   * CVEs on the next run, because they were still unknown to the database.
+   */
+  async dispatchPendingAlerts(): Promise<void> {
+    const alerts = this.pendingAlerts;
+    this.pendingAlerts = [];
+    if (!this.webhookService || alerts.length === 0) return;
+    // Concurrent so one slow hook cannot serialise the whole batch (BUG-003).
+    await Promise.allSettled(alerts.map((alert) => this.webhookService!.notifyAll(alert)));
   }
 
   getAdvisories(): Advisory[] {
