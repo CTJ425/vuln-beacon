@@ -11,6 +11,9 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     // Tests must not depend on real credentials in the gitignored src/.env.
     env: {
+      // Date assertions render in the app's home timezone; pin it so the suite
+      // passes on UTC CI runners too.
+      TZ: 'Asia/Taipei',
       VITE_SUPABASE_URL: 'http://localhost:54321',
       VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_test',
     },
