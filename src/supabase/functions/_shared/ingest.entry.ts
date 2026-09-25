@@ -9,3 +9,4 @@ export { isVendorDue, SCHEDULE_TICK_TOLERANCE_MINUTES } from '@/services/schedul
 export { WebhookService } from '@/services/webhook';
 export { authorizeAdminRequest } from '@/lib/adminAuth';
 export { persistIngestion } from '@/engine/persistIngestion';
+export { SYNCED_VENDOR_CODES, SYNC_LEASE_NAME, SYNC_LEASE_TTL_SECONDS } from '@/config/sync';

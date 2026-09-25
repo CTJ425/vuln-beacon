@@ -2316,9 +2316,17 @@ async function persistIngestion(client, input) {
     if (error) throw error;
   }
 }
+
+// config/sync.ts
+var SYNCED_VENDOR_CODES = ["redhat", "nutanix", "ubuntu", "debian", "suse", "cisco", "vmware"];
+var SYNC_LEASE_NAME = "vendor-sync";
+var SYNC_LEASE_TTL_SECONDS = 900;
 export {
   IngestionEngine,
   SCHEDULE_TICK_TOLERANCE_MINUTES,
+  SYNCED_VENDOR_CODES,
+  SYNC_LEASE_NAME,
+  SYNC_LEASE_TTL_SECONDS,
   WebhookService,
   authorizeAdminRequest,
   getAdapterByCode,

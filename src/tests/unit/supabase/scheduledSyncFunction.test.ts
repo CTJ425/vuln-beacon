@@ -100,11 +100,10 @@ describe('scheduled-sync edge function', () => {
     expect(src).toMatch(/if\s*\(\s*ran\.includes\(vendor\.code\)\s*\)/);
   });
 
-  it('acquires and releases mutual exclusion sync lock using try_acquire_sync_lock and release_sync_lock', () => {
+  it('acquires and releases the shared sync lease', () => {
     const src = read(scheduledSyncPath);
-    expect(src).toContain('try_acquire_sync_lock');
-    expect(src).toContain('release_sync_lock');
-    expect(src).toContain('7425001');
+    expect(src).toContain("rpc('acquire_sync_lease'");
+    expect(src).toContain("rpc('release_sync_lease'");
   });
 
   it('records newly ingested CVEs into knownCveIds so subsequent vendors do not duplicate alerts', () => {
@@ -171,8 +170,8 @@ describe('sync-cve edge function', () => {
   it('supports trigger_manual_sync action with lock and server-side IngestionEngine (Task 11c)', () => {
     const src = read(syncCvePath);
     expect(src).toContain("action === 'trigger_manual_sync'");
-    expect(src).toContain('try_acquire_sync_lock');
-    expect(src).toContain('release_sync_lock');
+    expect(src).toContain("rpc('acquire_sync_lease'");
+    expect(src).toContain("rpc('release_sync_lease'");
     expect(src).toContain('IngestionEngine');
     expect(src).toContain('ingestVendor');
     expect(src).toContain('409');

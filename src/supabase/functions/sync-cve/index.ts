@@ -1,6 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
-import { IngestionEngine, WebhookService, authorizeAdminRequest, persistIngestion } from "../_shared/ingest.bundle.js";
+import {
+  IngestionEngine,
+  WebhookService,
+  authorizeAdminRequest,
+  persistIngestion,
+  SYNCED_VENDOR_CODES,
+  SYNC_LEASE_NAME,
+  SYNC_LEASE_TTL_SECONDS,
+} from "../_shared/ingest.bundle.js";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -167,27 +175,32 @@ serve(async (req) => {
     }
 
     if (action === 'trigger_manual_sync') {
-      // D3: Mutual Exclusion & Concurrency Protection
-      let lockAcquired = false;
+      // One sync at a time across manual and scheduled runs (see sync_leases).
+      const leaseHolder = crypto.randomUUID();
+      let leaseAcquired = false;
       try {
-        const { data: hasLock, error: lockErr } = await supabaseClient.rpc('try_acquire_sync_lock', { lock_id: 7425001 });
-        if (!lockErr && hasLock === false) {
+        const { data: hasLease, error: leaseErr } = await supabaseClient.rpc('acquire_sync_lease', {
+          p_name: SYNC_LEASE_NAME,
+          p_holder: leaseHolder,
+          p_ttl_seconds: SYNC_LEASE_TTL_SECONDS,
+        });
+        if (!leaseErr && hasLease === false) {
           return new Response(
             JSON.stringify({ success: false, error: 'A threat feed synchronization is already in progress' }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 409 }
           );
         }
-        if (!lockErr && hasLock === true) {
-          lockAcquired = true;
+        if (!leaseErr && hasLease === true) {
+          leaseAcquired = true;
         }
       } catch {
-        // Fall back gracefully if lock RPC does not exist
+        // Fall back gracefully if the lease RPC does not exist yet
       }
 
       try {
         const targetVendors: string[] = Array.isArray(body.vendorCodes) && body.vendorCodes.length > 0
           ? body.vendorCodes
-          : ['redhat', 'nutanix', 'ubuntu', 'debian', 'suse'];
+          : [...SYNCED_VENDOR_CODES];
 
         let knownCveIds: string[] = [];
         try {
@@ -322,9 +335,9 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
       } finally {
-        if (lockAcquired) {
+        if (leaseAcquired) {
           try {
-            await supabaseClient.rpc('release_sync_lock', { lock_id: 7425001 });
+            await supabaseClient.rpc('release_sync_lease', { p_name: SYNC_LEASE_NAME, p_holder: leaseHolder });
           } catch {}
         }
       }
