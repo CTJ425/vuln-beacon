@@ -1,94 +1,56 @@
-# System Architecture and Implementation Plan
+# System Architecture
 
-## 1. Executive Summary
+## 1. Summary
 
-`cve-collector` is an automated multi-vendor CVE intelligence and vulnerability triage management platform. It periodically collects security advisories from 8 enterprise IT/infrastructure vendors, normalizes advisory data and CVE records, enriches them with CVSS ratings and exploit status, sends automated alerts via Webhooks (Discord, Telegram, Slack), and provides a React + Vite + Material UI web dashboard for visualization and operational triage.
+VulnBeacon (repo `vuln-beacon`) collects security advisories from seven vendors and normalises them into advisories, CVEs and product impacts. It stores them in Supabase, sends webhook alerts for new CVEs, and serves a React dashboard for exploring them. Functional detail is in `SPEC.md`, and per-feature designs are in `specs/`.
 
-## 2. Supported Vendors and Ingestion Strategy
-
-| Vendor | Data Source Type | Ingestion Mechanism | Key Entity IDs |
-| :--- | :--- | :--- | :--- |
-| **RedHat** | Official REST API / CSAF | Red Hat Security Data API (`hydra/rest/securitydata/cve.json`) | `RHSA-*`, `RHBA-*`, `CVE-*` |
-| **VMware** | Broadcom Portal API / RSS | Broadcom Security Advisories Feed & JSON Parser | `VMSA-*`, `CVE-*` |
-| **Nutanix** | Advisories Portal / RSS | Nutanix Support Advisories RSS & Schema Extractor | `NTNX-SA-*`, `CVE-*` |
-| **Dell** | Dell Security Advisories (DSA) | CSAF / RSS Parser | `DSA-*`, `CVE-*` |
-| **HPE** | Product Security Bulletins | Security Bulletin RSS Feed & Parser | `HPESB*`, `CVE-*` |
-| **NetApp** | Advisories JSON API | `security.netapp.com/data/advisories.json` endpoint | `NTAP-*`, `CVE-*` |
-| **Veeam** | Security KB & RSS | Veeam KB articles / RSS Parser | `KB*`, `CVE-*` |
-| **Cohesity & NetBackup** | Vendor Bulletins / RSS | Cohesity Advisories & Veritas NetBackup Security RSS | `CVE-*`, `VTS*` |
-
-## 3. System Architecture
+## 2. Components
 
 ```mermaid
 flowchart TD
-    subgraph Schedulers["Scheduling & Triggers"]
-        Cron["Supabase pg_cron<br/>(08:00 / 12:30 / 18:30 Asia/Taipei)"]
-        Manual["Web Dashboard Manual Trigger"]
+    subgraph Triggers
+        Cron["pg_cron every 5 min<br/>tick_scheduled_syncs()"]
+        Admin["Admin Console<br/>(admin JWT)"]
     end
 
-    subgraph Edge["Supabase Edge Functions (Deno / TypeScript)"]
-        Coord["fetch-vendor-advisories (Coordinator)"]
-        Adp["Vendor Adapters (Modular Parsing)"]
-        Enrich["NVD / CVSS Enrichment"]
-        Webhook["notify-webhook (Discord / Telegram / Slack)"]
+    subgraph Edge["Supabase Edge Functions (Deno)"]
+        Sched["scheduled-sync<br/>(service-role key only)"]
+        SyncCve["sync-cve<br/>(admin or service-role for every write)"]
+        Bundle["_shared/ingest.bundle.js<br/>adapters · IngestionEngine · persistIngestion<br/>adminAuth · scheduleWindow · WebhookService"]
     end
 
-    subgraph DB["Supabase PostgreSQL Database"]
-        T_Vendors[("vendors")]
-        T_Adv[("advisories")]
-        T_CVE[("cves")]
-        T_Map[("advisory_cve_map")]
-        T_Triage[("cve_triage")]
-        T_Logs[("vendor_sync_logs")]
-        T_Hooks[("webhook_configs")]
+    subgraph DB["Supabase Postgres + Storage"]
+        Tables[("vendors · advisories · cves<br/>advisory_cve_map · vendor_sync_logs<br/>webhook_configs · sync_leases")]
+        Bucket[("advisory-documents bucket")]
     end
 
-    subgraph Client["Frontend Application (React + Vite + MUI)"]
-        Dash["Overview Dashboard"]
-        Exp["CVE Multi-dimensional Explorer"]
-        Detail["Advisory & Triage Drawer"]
-        Health["Sync Health Monitor & Trigger"]
-        Auth["Supabase Auth (RLS Protected)"]
-    end
+    Browser["React SPA<br/>(publishable key, public reads)"]
+    Feeds["Vendor feeds<br/>Red Hat · Nutanix · Ubuntu · Debian · SUSE · Cisco · Broadcom (+ NVD)"]
+    Hooks["Discord · Slack · Telegram"]
 
-    Cron -->|HTTP POST| Coord
-    Manual -->|API Call| Coord
-    Coord --> Adp
-    Adp --> Enrich
-    Enrich --> DB
-    Coord -->|Critical/High or New CVEs| Webhook
-    Webhook --> Channels["Discord / Telegram / Slack"]
-    DB <-->|Supabase JS Client| Client
+    Cron -->|pg_net POST| Sched
+    Admin -->|functions.invoke| SyncCve
+    Sched --> Bundle
+    SyncCve --> Bundle
+    Bundle -->|fetch| Feeds
+    Bundle -->|upsert_cves · upserts · uploads| DB
+    Bundle -->|after persist| Hooks
+    Browser -->|SELECT under RLS| Tables
 ```
 
-## 4. Database Schema Structure
+## 3. Key Design Decisions
 
-* `vendors`: Master registry of supported vendors (code, name, icon, status).
-* `advisories`: Original vendor security advisory notices (vendor_id, advisory_id, title, severity, published_at, url, payload).
-* `cves`: Standard CVE records (cve_id, description, cvss_v3_score, severity, is_known_exploited).
-* `advisory_cve_map`: Many-to-many relationship linking advisories to CVEs, including affected products and fixed versions.
-* `cve_triage`: Security triage tracking per CVE (status: PENDING, IN_PROGRESS, NOT_AFFECTED, PATCH_REQUIRED, PATCHED, notes, assignees).
-* `vendor_sync_logs`: Execution history of daily runs (status, duration, items fetched, error logs).
-* `webhook_configs`: Alert destinations (Discord, Telegram, Slack webhook URLs, min severity filters).
+* **One ingestion codebase.** Adapters, the engine, persistence and the admin check live in `src/` and are bundled into `ingest.bundle.js` by `npm run build:edge`. The Edge Functions import that bundle and never carry their own copy. Rebuild and commit the bundle whenever those sources change.
+* **Browser never writes tables.** Every write goes through `sync-cve` or `scheduled-sync` with the service-role key. RLS grants the browser read access to public data only.
+* **Admin is an explicit grant.** Being signed in is not enough: the account needs `app_metadata.role = 'admin'`. The same check (`src/lib/adminAuth.ts`) runs in the browser and in `sync-cve`.
+* **CVE rows merge across vendors.** `upsert_cves()` keeps the strongest score and severity and never erases a value, so the stored CVE does not depend on sync order.
+* **Alert after persist.** The engine queues alerts; callers dispatch them only after the run is stored, so a failed write cannot cause duplicate alerts later.
+* **Single sync at a time.** Manual and scheduled runs share a `sync_leases` row with a holder id and a 15-minute expiry. An earlier session-level advisory lock leaked across PostgREST's pooled connections; the lease replaces it.
+* **Documents off-table.** Full advisory documents go to Storage to keep Postgres small. Product impacts are still stored once per advisory-CVE pair (BUG-006).
 
-## 5. Phased Roadmap
+## 4. Known Limits
 
-1. **Phase 1: Project Skeleton & Database Architecture**
-   * Scaffold React + Vite + MUI frontend project.
-   * Define and apply Supabase SQL schema with indexes and RLS policies.
-   * Seed initial vendor metadata for 8 vendors.
-2. **Phase 2: Ingestion Engine & Vendor Adapters**
-   * Implement unified Edge Function coordinator with vendor routing.
-   * Implement 8 modular vendor adapters with diffing logic.
-   * Implement NVD/CVSS enrichment module and execution logging.
-3. **Phase 3: Scheduling & Webhook Notifications**
-   * Setup `pg_cron` jobs for 3 daily shifts (08:00, 12:30, 18:30 Asia/Taipei).
-   * Implement Webhook alert formatter for Discord, Telegram, and Slack.
-4. **Phase 4: Frontend Web Application**
-   * Implement Dashboard with metrics, charts, and summary widgets.
-   * Implement CVE Explorer with multi-faceted filtering, search, and sorting.
-   * Implement Detail View and Triage management interface with Supabase Auth.
-   * Implement Sync Health Monitor and Manual Sync trigger.
-5. **Phase 5: Verification & End-to-End Testing**
-   * Validate all 8 adapters against live feeds.
-   * Test webhook notifications and triage workflow.
+* The Explorer, Dashboard and Vendor pages load every advisory and CVE with its impacts on page load. That is acceptable at current volume; see the open item in `TASK.md`.
+* Vendors seeded without adapters (`dell`, `hpe`, `netapp`, `veeam`, `cohesity`) are not synced.
+* There is no triage workflow (`cve_triage` is unused).
+* Accepted risks are tracked in `BUG_FIX.md`.

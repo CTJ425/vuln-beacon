@@ -2,6 +2,106 @@
 
 ---
 
+### BUG-022: sync-cve accepted any request carrying an apikey header — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: CRITICAL
+- **Location**: `src/supabase/functions/sync-cve/index.ts`
+- **Root Cause**: The entry check only tested that an `Authorization` or `apikey` header was present (any non-empty string passed). Only `trigger_manual_sync` called `auth.getUser`; `persist_ingestion`, `create_webhook`, `delete_webhook`, `update_vendor_schedule` and `test_webhook` ran with the service-role client for anyone, and the publishable key is public in the bundle (`verify_jwt=false`).
+- **Fix**: Every action except `health_check` now requires `authorizeAdminRequest` (admin JWT or service-role key), shared from `src/lib/adminAuth.ts` via the ingest bundle. Verified on dev and prod: `delete_webhook`, `update_vendor_schedule` and `trigger_manual_sync` with a fake bearer or no credentials return 401; `health_check` returns 200.
+- **Status**: ✅ FIXED
+
+---
+
+### BUG-023: webhook_configs readable by anonymous visitors — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: HIGH
+- **Location**: `src/supabase/migrations/20260905000000_security_and_reliability_fixes.sql`, `src/services/webhookConfigService.ts`
+- **Root Cause**: RLS granted `SELECT` on `webhook_configs` to `anon`, and any authenticated user could write it. Webhook URLs and Telegram bot tokens are credentials.
+- **Fix**: Migration `20260925000000_admin_role_access.sql` adds `public.is_admin()` and limits the table to admins. The app re-reads webhooks when an admin session appears.
+- **Status**: ✅ FIXED
+
+---
+
+### BUG-024: any signed-in account was an admin, with signup open — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: HIGH
+- **Location**: `src/App.tsx`, `src/components/admin/AdminLoginModal.tsx`, Supabase Auth settings
+- **Root Cause**: The backstage and `sync-cve` treated every authenticated user as admin, and both projects had email signup enabled (`disable_signup: false`).
+- **Fix**: Signup disabled on both projects (2026-09-25). Admin is now `app_metadata.role = 'admin'`; the login modal signs non-admins back out and the app treats a non-admin session as signed out.
+- **Status**: ✅ FIXED
+
+---
+
+### BUG-025: a vendor without CVSS data erased another vendor's score — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: HIGH
+- **Location**: `src/supabase/functions/sync-cve/index.ts`, `src/supabase/functions/scheduled-sync/index.ts`, `src/engine/ingestion.ts`
+- **Root Cause**: `cves` is shared across vendors but every write path upserted the full row. Debian never sets a score, so syncing Debian wrote NULL over Red Hat's score for shared CVEs; a missing description became the advisory title; `published_date` became the latest advisory's date.
+- **Fix**: `upsert_cves()` (migration `20260925010000_merge_cve_upsert.sql`) merges order-independently. The three write paths now share `src/engine/persistIngestion.ts`. The engine sends `description: null` plus `description_fallback`.
+- **Status**: ✅ FIXED
+
+---
+
+### BUG-026: MEDIUM and LOW webhooks never fired — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: MEDIUM
+- **Location**: `src/engine/ingestion.ts`
+- **Root Cause**: The engine queued alerts only for CRITICAL and HIGH, although the UI offers `Medium and Above` and `All Disclosures` thresholds.
+- **Fix**: Every new CVE is queued; `WebhookService.dispatch` applies each webhook's `min_severity`.
+- **Status**: ✅ FIXED
+
+---
+
+### BUG-027: alerts sent before the run was persisted — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: MEDIUM
+- **Location**: `src/engine/ingestion.ts` and all callers
+- **Root Cause**: `ingestVendor` dispatched alerts during ingestion. If the write then failed, the CVEs stayed unknown and the next run alerted them again.
+- **Fix**: The engine queues alerts; `dispatchPendingAlerts()` is called only after the run and its log row are stored (sync-cve, scheduled-sync, SyncService client paths).
+- **Status**: ✅ FIXED
+
+---
+
+### BUG-028: shared CVEs attributed to one vendor; fabricated impacts — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: MEDIUM
+- **Location**: `src/services/cveService.ts`, `src/components/explorer/CveTable.tsx`
+- **Root Cause**: A CVE took the vendor of the alphabetically first advisory id, and a CVE without impacts showed an invented `<Vendor> Ecosystem / Affected` row.
+- **Fix**: `vendor_codes` lists every vendor and the table shows each icon; no impacts means an empty list.
+- **Status**: ✅ FIXED
+
+---
+
+### BUG-029: manual sync lock leaked across pooled connections — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: MEDIUM
+- **Location**: `src/supabase/migrations/20260909000000_server_side_sync_lock.sql`, both Edge Functions
+- **Root Cause**: `pg_try_advisory_lock` is session-level but was taken over PostgREST, whose pooled connections outlive the request; the release could run on another backend and fail, leaving a stray lock.
+- **Fix**: `sync_leases` table lease with holder id and 15-minute expiry (migration `20260925020000_sync_lease_lock.sql`); old functions dropped.
+- **Status**: ✅ FIXED
+
+---
+
+### BUG-030: scheduler 401 invisible in sync logs — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: MEDIUM
+- **Location**: `public.tick_scheduled_syncs()`
+- **Root Cause**: pg_net posts asynchronously, so a 401 from `scheduled-sync` (vault key out of step with the service-role key) never reached `vendor_sync_logs`.
+- **Fix**: Each tick records its pg_net request id and logs a throttled FAILED row when the previous request returned HTTP >= 400 (migration `20260925030000_surface_scheduled_sync_http_errors.sql`). The vault secrets themselves still need resetting (TASK.md).
+- **Status**: ✅ FIXED
+
+---
+
+### BUG-031: date test failed on UTC machines; manual sync default omitted cisco/vmware — FIXED
+- **Date**: Found and fixed 2026-09-25 (1.3.0)
+- **Severity**: LOW
+- **Location**: `src/vitest.config.ts`, `src/supabase/functions/sync-cve/index.ts`
+- **Root Cause**: `SyncLogTable.test.tsx` asserted a UTC+8 rendering, failing `verify` on UTC runners; `trigger_manual_sync` defaulted to five vendors.
+- **Fix**: Vitest pins `TZ=Asia/Taipei`; the default uses `SYNCED_VENDOR_CODES` from `src/config/sync.ts`.
+- **Status**: ✅ FIXED
+
+---
+
 ### BUG-021: Production Sync Failure Due to Missing Edge Functions, Unapplied Migrations, and ON CONFLICT DO UPDATE Batch Collision — FIXED
 - **Date**: Opened 2026-09-11, fixed 2026-09-11 (1.0.0)
 - **Severity**: CRITICAL

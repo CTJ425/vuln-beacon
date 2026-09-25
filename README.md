@@ -1,16 +1,16 @@
 # VulnBeacon
 
-Enterprise CVE (Common Vulnerabilities & Exposures) collection, tracking, and triage dashboard tool supporting multi-vendor security advisories across **Red Hat (CSAF)**, **Nutanix**, **Ubuntu (USN)**, **Debian (DSA & Security Tracker)**, and **SUSE (CSAF 2.0)**. VulnBeacon ingests standardized security data, stores normalized advisories in Supabase, and exposes a filterable web explorer plus multi-channel webhook alert integrations.
+Enterprise CVE (Common Vulnerabilities & Exposures) collection, tracking, and triage dashboard tool supporting multi-vendor security advisories across **Red Hat (CSAF)**, **Nutanix**, **Ubuntu (USN)**, **Debian (DSA & Security Tracker)**, **SUSE (CSAF 2.0)**, **Cisco (CSAF)**, and **VMware / Broadcom (VMSA)**. VulnBeacon ingests standardized security data, stores normalized advisories in Supabase, and exposes a filterable web explorer plus multi-channel webhook alert integrations.
 
 ## Features
 
-- Multi-vendor threat feed ingestion (Red Hat, Nutanix, Ubuntu, Debian, SUSE) via Supabase Edge Functions
+- Multi-vendor threat feed ingestion (Red Hat, Nutanix, Ubuntu, Debian, SUSE, Cisco, VMware) via Supabase Edge Functions
 - Store full advisory documents in Supabase Storage with normalized relational metadata in PostgreSQL
 - Explore, filter, and inspect CVEs and advisories through an accessible React dashboard with product impact matrix
 - Vendor/product taxonomy navigation with authentic vendor brand logos
 - Multi-channel webhook alerts (Discord, Slack, Telegram) with severity threshold filtering
 - Unified vulnerability state classification across diverse vendor terminologies
-- Sync monitor and backstage administrative controls for authenticated operations
+- Sync monitor and backstage administrative controls, restricted to accounts granted the admin role
 
 ## Tech Stack
 
@@ -27,11 +27,11 @@ vuln-beacon/
 │   └── test/           # Test strategy and execution guides
 ├── src/
 │   ├── components/     # React UI (explorer, dashboard, settings, sync, common)
-│   ├── pages/           # Page routes (Explorer, Dashboard, Vendor, Settings, SyncMonitor)
+│   ├── pages/           # Page routes (Dashboard, Explorer, Vendor, Admin, Settings, SyncMonitor)
 │   ├── services/         # Business logic (CVE/advisory fetching, sync, webhooks, taxonomy)
-│   ├── adapters/         # Vendor data parsers (Red Hat CVE + CSAF)
-│   ├── engine/            # Ingestion pipeline (normalize, enrich, persist CVEs)
-│   ├── supabase/          # DB migrations + Deno edge functions (sync-cve)
+│   ├── adapters/         # Vendor feed parsers (Red Hat, Nutanix, Ubuntu, Debian, SUSE, Cisco, VMware)
+│   ├── engine/            # Ingestion pipeline (normalize, queue alerts, persist runs)
+│   ├── supabase/          # DB migrations + Deno edge functions (sync-cve, scheduled-sync)
 │   ├── scripts/           # One-off Node utilities (e.g. Supabase Storage backfill)
 │   ├── types/             # TypeScript type definitions
     └── tests/             # Unit / smoke / e2e test suites
@@ -41,7 +41,7 @@ vuln-beacon/
 
 ### Prerequisites
 
-- Node.js (see `src/package.json` for engine requirements)
+- Node.js 18 or later (the minimum for Vite 6 and Vitest 3)
 - A Supabase project
 
 ### Setup
@@ -73,6 +73,21 @@ SUPABASE_SECRET_KEY=
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` must be present in the
 environment when you run `npm run build`, because Vite inlines them into the
 bundle at build time. The app throws on startup if either one is missing.
+
+### Admin access
+
+The Admin Console and every write through the `sync-cve` Edge Function require
+an account whose `app_metadata.role` is `admin`. Users cannot set
+`app_metadata` themselves, so grant it once per project in the SQL editor:
+
+```sql
+update auth.users
+   set raw_app_meta_data = raw_app_meta_data || '{"role":"admin"}'
+ where email = '<admin email>';
+```
+
+Sign out and back in afterwards so the session token carries the role. Keep
+email signup disabled in Supabase Auth; accounts are created by an operator.
 
 ### Development
 

@@ -1,21 +1,42 @@
 # Changelog
 
-## 1.3.0-dev.1 - 2026-09-15
+## 1.3.0 - 2026-09-26
+### Security
+- **`sync-cve` required nothing but a header**: any request carrying an `apikey` or `Authorization` header could persist CVE data, create or delete webhooks and change schedules with the service-role client. Every action except `health_check` now needs an admin JWT or the service-role key (BUG-022).
+- **Admin is an explicit role**: `app_metadata.role = 'admin'`, checked by `src/lib/adminAuth.ts` in the browser and in `sync-cve`. Non-admin sessions are treated as signed out. Email signup disabled on both Supabase projects (BUG-024).
+- **`webhook_configs` admin-only**: anonymous visitors could read webhook URLs and bot tokens; RLS now allows admins only (BUG-023).
+
 ### Fixed
+- **Shared CVE rows no longer lose data**: `upsert_cves()` merges vendor writes (higher score/vector, highest severity, earliest date, never NULL over a value); the engine passes the advisory title only as a fallback description (BUG-025).
+- **MEDIUM/LOW webhooks now fire**: every new CVE is queued and each webhook's `min_severity` decides (BUG-026).
+- **No duplicate alerts after a failed write**: alerts are dispatched only after the run is persisted (BUG-027).
+- **Shared CVEs show every vendor**, and missing product impacts are no longer invented (BUG-028).
+- **Sync mutual exclusion**: a `sync_leases` lease replaces the session advisory lock that leaked across PostgREST's pooled connections (BUG-029).
+- **Scheduler rejections are visible**: a tick logs a FAILED row when the previous `scheduled-sync` call returned HTTP >= 400 (BUG-030).
+- Manual sync defaulted to five vendors; the test suite failed on UTC machines (BUG-031).
 - **Mobile horizontal overflow**: the `<main>` container is a flex child beside the fixed-width sidebar and lacked `minWidth: 0`, so it could not shrink below the Explorer tables' `minWidth: 700` and the whole document scrolled sideways. Added `minWidth: 0` plus responsive padding `p: { xs: 2, sm: 3.5 }`.
 - **Failed initial data load indistinguishable from empty database**: `loadData` swallowed the failure into `console.error` and the dashboard still showed the "database is initialized, sign in and run the first ingestion" prompt. Added a `loadError` state and a dedicated error page state with a Retry action.
 
 ### Added
+- `src/engine/persistIngestion.ts`: one persistence path for manual, browser-chunked and scheduled runs.
+- `src/config/sync.ts`: `SYNCED_VENDOR_CODES` and the sync lease settings, shared with the Edge Functions.
+- Migrations `20260925000000_admin_role_access`, `20260925010000_merge_cve_upsert`, `20260925020000_sync_lease_lock`, `20260925030000_surface_scheduled_sync_http_errors`.
+- `src/supabase/checks/release-1.3.0.sql`: rolled-back behaviour check for the new SQL.
 - **PageState Component (`src/components/common/PageState.tsx`)**: Presentational component unifying the loading / empty / error treatments that were previously duplicated inline in `App.tsx`.
 - **Responsive Layout E2E Test (`src/tests/e2e/responsive-layout.e2e.test.tsx`)**: 1 test verifying `<main>` container shrink behavior on mobile viewports.
 - **Page State E2E Tests (`src/tests/e2e/page-state.e2e.test.tsx`)**: 3 tests covering loading, empty, and error state rendering with Retry action verification.
 
 ### Changed
+- An unauthenticated sync no longer falls back to client-side ingestion; it returns "Admin sign-in required".
 - **Route-level code splitting**: `ExplorerPage`, `VendorPage`, `AdminPage`, `AdminLoginModal`, `CveDetailDrawer` and `AdvisoryDetailDrawer` are now `React.lazy`; `DashboardPage` stays eager. Each overlay has its own `Suspense` boundary with `fallback={null}`, and the two drawers use mount latches so they load on first open and never unmount on close (preserving the MUI close transition).
 - **Vite build optimization**: `vite.config.ts` gains `build.rollupOptions.output.manualChunks`, splitting `react-vendor` and `mui-vendor`. Largest single chunk 950.78 kB -> 361.63 kB; initial eager payload 950.78 kB -> 851.9 kB raw (271.24 kB -> ~250 kB gzip), with ~100 kB moved to on-demand chunks. The Vite 500 kB chunk warning no longer fires.
 - **AdminLoginModal async loading in E2E tests**: `src/tests/e2e/vendor-logos-and-vault-guide.e2e.test.tsx` now awaits `findByLabelText` for the login modal, which is code-split and no longer enters the DOM synchronously.
 
-**Verification**: `npm test` 93 files / 664 tests passing; `npm run build` exits 0 with no chunk-size warning.
+### Operations
+- Migrations applied and `sync-cve` / `scheduled-sync` redeployed on `vuln-beacon-dev` and `vuln-beacon` (2026-09-26). Unauthenticated calls to every write action return 401 on both.
+- Pending (user): grant the admin role, reset the scheduler vault secrets, run the SQL check on dev (see `TASK.md`).
+
+**Verification**: see the release entry in `PROGRESS.md`.
 
 **Known risks** (recorded in `BUG_FIX.md`): R11 (VendorPage statically imports the lazily-split ExplorerPage), R12 (`Promise.all` in `loadData` discards partial results).
 
