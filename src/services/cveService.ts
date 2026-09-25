@@ -3,6 +3,17 @@ import { fetchAllRows } from '@/lib/fetchAllRows';
 import { CveTableRowItem } from '@/components/explorer/CveTable';
 import { ProductImpactItem } from '@/types';
 
+// Vendor for an advisory that came back without its vendors join.
+function inferVendorCode(advId: string): string {
+  if (advId.startsWith('NXSA-')) return 'nutanix';
+  if (advId.startsWith('USN-') || advId.startsWith('LSN-')) return 'ubuntu';
+  if (advId.startsWith('DSA-') || advId.startsWith('DLA-') || advId.startsWith('DEBIAN-')) return 'debian';
+  if (advId.startsWith('SUSE-') || advId.startsWith('openSUSE-')) return 'suse';
+  if (/^cisco-sa-/i.test(advId)) return 'cisco';
+  if (advId.toUpperCase().startsWith('VMSA-')) return 'vmware';
+  return 'redhat';
+}
+
 export class CveService {
   async fetchCves(): Promise<CveTableRowItem[]> {
     try {
@@ -107,25 +118,6 @@ export class CveService {
         productImpacts.length = 0;
         productImpacts.push(...dedupedImpacts);
 
-        // If still empty, fallback
-        if (productImpacts.length === 0) {
-          let compName = 'infrastructure-core';
-          if (row.description) {
-            const colonIdx = row.description.indexOf(':');
-            if (colonIdx > 0 && colonIdx < 50) {
-              compName = row.description.substring(0, colonIdx).trim();
-            }
-          }
-          productImpacts.push({
-            product_name: vendor?.name ? `${vendor.name} Ecosystem` : 'Enterprise System',
-            component: compName,
-            state: 'Affected',
-            justification: 'None',
-            errata: advisory?.advisory_id || '-',
-            release_date: '-',
-          });
-        }
-
         const affectedProducts = Array.from(
           new Set(productImpacts.map((p) => p.product_name))
         );
@@ -153,22 +145,18 @@ export class CveService {
           fixedVersions.length === 0 ||
           fixedVersions.some((v) => v.toLowerCase().includes('pending'));
 
-        const advId = advisory?.advisory_id || '';
-        const vendorCode =
-          vendor?.code ||
-          (advId.startsWith('NXSA-')
-            ? 'nutanix'
-            : advId.startsWith('USN-') || advId.startsWith('LSN-')
-            ? 'ubuntu'
-            : advId.startsWith('DSA-') || advId.startsWith('DLA-') || advId.startsWith('DEBIAN-')
-            ? 'debian'
-            : advId.startsWith('SUSE-') || advId.startsWith('openSUSE-')
-            ? 'suse'
-            : /^cisco-sa-/i.test(advId)
-            ? 'cisco'
-            : advId.toUpperCase().startsWith('VMSA-')
-            ? 'vmware'
-            : 'redhat');
+        const vendorCode = vendor?.code || inferVendorCode(advisory?.advisory_id || '');
+        // A CVE fixed by several vendors (a Debian DSA and a Red Hat RHSA for
+        // the same openssl flaw) belongs to all of them, not only to the
+        // advisory that sorts first.
+        const vendorCodes = Array.from(
+          new Set(
+            mappings.map((m: any) => {
+              const adv = resolveAdvisory(m);
+              return resolveVendor(adv)?.code || inferVendorCode(adv?.advisory_id || '');
+            })
+          )
+        ).sort();
 
         let solution = '';
         if (advisory?.summary) {
@@ -239,6 +227,7 @@ export class CveService {
           last_modified_date: row.last_modified_date,
           created_at: row.created_at,
           vendor_code: vendorCode,
+          vendor_codes: vendorCodes,
           advisory_id: advisory?.advisory_id || 'N/A',
           advisory_title: advisory?.title || row.description || row.cve_id,
           advisory_url: advisory?.url || undefined,

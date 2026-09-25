@@ -23,6 +23,8 @@ import { isAffectedState } from '@/utils/statusUtils';
 
 export interface CveTableRowItem extends CveRecord {
   vendor_code: string;
+  // Every vendor with an advisory for this CVE; vendor_code is the primary one.
+  vendor_codes?: string[];
   advisory_id: string;
   advisory_title: string;
   advisory_url?: string;
@@ -181,9 +183,9 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
                     {/* CVE ID */}
                     <TableCell sx={{ fontWeight: 800, fontFamily: 'JetBrains Mono', color: 'text.primary' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {item.vendor_code && (
-                          <VendorIcon vendorCode={item.vendor_code} size={15} hideLabel />
-                        )}
+                        {(item.vendor_codes?.length ? item.vendor_codes : item.vendor_code ? [item.vendor_code] : []).map((code) => (
+                          <VendorIcon key={code} vendorCode={code} size={15} hideLabel />
+                        ))}
                         <span>{item.cve_id}</span>
                         {item.is_known_exploited && (
                           <Tooltip title="CISA Known Exploited Vulnerability (KEV)">
