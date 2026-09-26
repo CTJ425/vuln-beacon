@@ -37,7 +37,7 @@ Describes the system as built (1.3.0). Feature-level designs live in `docs/agent
 * Alert content: vendor, advisory id and title, CVE id, CVSS score, severity, affected products, fixed versions and advisory URL. Destinations must be public HTTPS URLs (SSRF guard).
 
 ### 1.4 Web Dashboard
-* Stack: React 18, Vite 6, MUI 6, TypeScript. Routes other than the Dashboard are code-split.
+* Stack: React 18, Vite 6, MUI 6, TypeScript. Routes other than the Dashboard are code-split. Hosted on Cloudflare, deployed from `main`.
 * **Dashboard**: tracked, critical and impacted-component counts, per-vendor advisory cards, recent critical and high advisories.
 * **Explorer**: advisory and CVE views; filter by product family, severity and impact state; keyword search over CVE, advisory, component, product, errata and description. A CVE lists every vendor that published an advisory for it.
 * **Vendor pages**: product taxonomy navigation per vendor.

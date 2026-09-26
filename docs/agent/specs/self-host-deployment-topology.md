@@ -1,6 +1,6 @@
 # Spec: Self-Hosted Supabase + Non-Public Network Deployment Topology
 
-Status: SPEC (decision recorded, not implemented)
+Status: SUPERSEDED (2026-09-26) — not adopted. The frontend is hosted on Cloudflare and the backend on Supabase Cloud; there is no Caddy, tunnel or self-hosted Supabase. Kept for history only.
 Created: 2026-08-30 Asia/Taipei
 Lane: 2 (deployment topology, external ingress, Edge Function runtime, secrets)
 

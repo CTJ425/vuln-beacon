@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  // Served from the domain root when self-hosted; change this to serve from a subpath.
+  // Served from the domain root; change this to serve from a subpath.
   base: '/',
   plugins: [react()],
   resolve: {

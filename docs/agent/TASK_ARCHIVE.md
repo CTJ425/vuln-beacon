@@ -2,6 +2,14 @@
 
 Completed tasks moved out of `TASK.md` on 2026-09-26 (AGENTS.md size discipline). Content is unchanged; sections keep their original order.
 
+## Dropped 2026-09-26 (self-hosting assumption was wrong)
+
+The frontend is hosted on Cloudflare and deployed from `main`; there is no Caddy, tunnel, self-hosted Supabase or preview host. These items no longer apply:
+
+- [~] **Deploy the 1.3.x frontend build** to the self-hosted static host (location not recorded in the repo). Until then the old build runs against the new backend: public pages work; the admin login works for the admin account.
+- [~] **Task 11a: Network Layer Only — No Code Change** — Implement Cloudflare Tunnel + Caddy reverse proxy with path prefix (`/supabase`). Ref: `docs/agent/specs/self-host-deployment-topology.md` (design points D1–D4).
+- [~] **Open Item: Live Preview Verification Pending** — Acceptance criterion not yet met: live verification against the preview instance at `http://10.8.22.99:3002/` (per `.agents/ORIGINAL_REQUEST.md` R5) has not been performed. Port unreachable (connection refused) from development container; awaiting network access or deployment confirmation.
+
 ## Release 1.3.0 follow-ups (done 2026-09-26)
 
 - [x] **Grant the admin role** on `vuln-beacon` and `vuln-beacon-dev`. Since 1.3.0 the backstage and every `sync-cve` write require `app_metadata.role = 'admin'`; until this runs nobody can sign in to the Admin Console. SQL is in `src/supabase/migrations/20260925000000_admin_role_access.sql` (header). Sign out and in afterwards to refresh the JWT. Review `auth.users` for accounts created while signup was open (disabled 2026-09-25).

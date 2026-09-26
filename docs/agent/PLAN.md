@@ -24,7 +24,7 @@ flowchart TD
         Bucket[("advisory-documents bucket")]
     end
 
-    Browser["React SPA<br/>(publishable key, public reads)"]
+    Browser["React SPA on Cloudflare<br/>(publishable key, public reads)"]
     Feeds["Vendor feeds<br/>Red Hat · Nutanix · Ubuntu · Debian · SUSE · Cisco · Broadcom (+ NVD)"]
     Hooks["Discord · Slack · Telegram"]
 
@@ -37,6 +37,8 @@ flowchart TD
     Bundle -->|after persist| Hooks
     Browser -->|SELECT under RLS| Tables
 ```
+
+Hosting: the frontend is on Cloudflare (deployed from `main`), and the backend is on two Supabase Cloud projects (`vuln-beacon`, `vuln-beacon-dev`).
 
 ## 3. Key Design Decisions
 

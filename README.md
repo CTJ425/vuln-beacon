@@ -129,54 +129,31 @@ Use `git push --no-verify` to bypass the gate.
 
 ## Deployment
 
-The app is a static bundle, self-hosted. Build it with `VITE_SUPABASE_URL` and
-`VITE_SUPABASE_PUBLISHABLE_KEY` present in the environment, then serve `src/dist/`
-from any static web server:
+**Frontend** — hosted on Cloudflare and deployed from `main`. The build
+settings and the `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`
+variables live in the Cloudflare project, not in this repository. The build
+assumes the site is served from the domain root (`base` in
+`src/vite.config.ts`).
+
+**Backend** — Supabase Cloud, two projects: `vuln-beacon` (production) and
+`vuln-beacon-dev`. Deploy to dev first:
 
 ```bash
-npm --prefix src run build   # outputs to src/dist/
+cd src
+npm run build:edge                       # rebuild supabase/functions/_shared/ingest.bundle.js
+supabase db push --project-ref <ref>     # apply pending migrations
+supabase functions deploy sync-cve scheduled-sync --project-ref <ref> --use-api --no-verify-jwt
 ```
 
-The build assumes it is served from the domain root (`/`). To serve it from a
-subpath instead, set `base` in `src/vite.config.ts`.
+`--no-verify-jwt` is intentional: both functions authenticate callers
+themselves. Commit the rebuilt bundle whenever adapters, the engine or
+anything else it exports changes.
 
-### Self-Hosted Edge Functions Deployment
-
-When running self-hosted Supabase with Docker and `edge-runtime`:
-
-1. **Build shared edge bundle**:
-   Whenever vendor adapters, parsers, or engine code changes, compile the bundle:
-   ```bash
-   npm --prefix src run build:edge
-   ```
-   This outputs the bundled ingestion logic to `src/supabase/functions/_shared/ingest.bundle.js`.
-
-2. **Deploy function files to edge-runtime volume**:
-   Copy the `src/supabase/functions` directory directly into the mounted volume of your `edge-runtime` container (e.g. `/root/volumes/edge-runtime/functions`).
-
-3. **Configure container environment**:
-   Unlike Supabase Cloud, self-hosted `edge-runtime` containers do not automatically inject platform credentials. You must explicitly configure environment variables in `docker-compose.yml`:
-   ```yaml
-   edge-runtime:
-     environment:
-       - SUPABASE_URL=http://kong:8000
-       - SUPABASE_SERVICE_ROLE_KEY=<YOUR_SERVICE_ROLE_KEY>
-   ```
-
-4. **Restart edge-runtime service**:
-   ```bash
-   docker compose restart edge-runtime
-   ```
-
-### Network Topology & Ingress
-
-For non-public self-hosted deployments (e.g., accessed via Cloudflare Tunnel or Tailscale), use a single-origin reverse proxy (such as Caddy) with a `/supabase` path prefix:
-- Front-end SPA served at `/`
-- Supabase Kong gateway routed via `handle_path /supabase/* { reverse_proxy kong:8000 }`
-- Point `VITE_SUPABASE_URL` to `https://your-domain.example.com/supabase`
-
-See `docs/agent/specs/self-host-deployment-topology.md` for complete architecture diagrams and Caddyfile/Cloudflare Tunnel templates.
-
+**Scheduler** — pg_cron calls `scheduled-sync` every 5 minutes with
+`SCHEDULED_SYNC_SECRET`. The same value must be set as a function secret and
+in Vault (`select public.set_scheduled_sync_vault_secrets('<function url>',
+'<secret>')`). A mismatch shows up in `vendor_sync_logs` as
+`Scheduled sync request rejected: ... HTTP 401`.
 
 ## Documentation
 

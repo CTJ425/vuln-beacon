@@ -5,7 +5,7 @@
 - **Admin**: each project has one account (`zrchen0425@gmail.com`); it was granted `app_metadata.role = 'admin'` on both. No accounts were created while signup was open.
 - **Scheduler**: writing the legacy `service_role` key into Vault did not help, and ticks still got 401 (evidence in BUG-032). `scheduled-sync` now accepts `SCHEDULED_SYNC_SECRET`, set in both the function secrets and Vault. The 00:35 UTC tick returned 200 on both projects. No vendor was due in that window, so no data sync has run yet; the next windows are the enabled vendors' 12:30 / 18:30 Asia/Taipei times.
 - **Verification**: `npm --prefix src run verify` → 104 files / 731 tests passed, build clean.
-- **Open**: deploy the frontend build (host not recorded in the repo).
+- **Docs correction**: deployment docs assumed a self-hosted frontend behind Caddy. In fact the frontend is on Cloudflare (deployed from `main`) and the backend on Supabase Cloud. README, `.env.example`, SPEC and PLAN were corrected; the self-host spec is marked superseded; three self-host tasks were dropped (see `TASK_ARCHIVE.md`).
 
 ## 2026-09-26 01:01:39 Asia/Taipei - Codebase Review Remediation & Release 1.3.0
 - **Scope**: every finding from the 2026-09-25 codebase review (security, data correctness, sync reliability, tests, docs), merged with `origin/dev` (`62c384a`, code splitting and page states) and released as `1.3.0`. Fixed items are BUG-022 to BUG-031 in `FIXED_BUG.md`.
