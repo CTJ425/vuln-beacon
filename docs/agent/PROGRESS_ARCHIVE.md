@@ -2,6 +2,16 @@
 
 Older progress entries, prepended from `PROGRESS.md`.
 
+## 2026-09-26 01:01:39 Asia/Taipei - Codebase Review Remediation & Release 1.3.0
+- **Scope**: every finding from the 2026-09-25 codebase review (security, data correctness, sync reliability, tests, docs), merged with `origin/dev` (`62c384a`, code splitting and page states) and released as `1.3.0`. Fixed items are BUG-022 to BUG-031 in `FIXED_BUG.md`.
+- **Security**: `sync-cve` now requires an admin JWT or the service-role key for every action except `health_check`. Before this, any header value was accepted. Admin means `app_metadata.role = 'admin'` (`src/lib/adminAuth.ts`), and `webhook_configs` is readable and writable by admins only. Email signup disabled on both projects via the Management API (`disable_signup: true`).
+- **Data**: `upsert_cves()` merges shared CVE rows. All three server write paths use `src/engine/persistIngestion.ts`. Alerts are sent only after a run is persisted, and at every severity (`min_severity` filters). CVEs list every vendor. `sync_leases` replaces the pooled advisory lock. Scheduler HTTP errors are logged by the tick.
+- **Deploy**: 4 migrations (`20260925000000`–`20260925030000`) pushed and both functions deployed to `vuln-beacon-dev` (egofadbvftmbwodjneoy) and `vuln-beacon` (baizoisgkgwqccqjwnxg), `--use-api --no-verify-jwt`. Probes on both: `health_check` 200; `delete_webhook`, `update_vendor_schedule` and `trigger_manual_sync` with a fake bearer or no credentials → 401.
+- **Verification**: `npm --prefix src run verify` → 104 files / 730 tests passed, build clean (no chunk-size warning). Suite also passes under `TZ=UTC`.
+- **Not verified**: runtime behaviour of the new SQL (`upsert_cves` merge rules, lease, RLS, tick logging). The agent was not permitted to run the rolled-back check; the script is at `src/supabase/checks/release-1.3.0.sql`. The migrations applied without error on both projects.
+- **Open (user action, see `TASK.md`)**: grant the admin role on both projects, because nobody can use the Admin Console until then. Reset the scheduler vault secrets, since no scheduled sync has run since 2026-09-11. Run the SQL check on dev. Explorer full-load (#10) is deferred with measurements in `TASK.md`.
+- **Docs**: README (vendors, admin access, Node), SPEC and PLAN rewritten to match the code, TASK split into open-only `TASK.md` plus `TASK_ARCHIVE.md`, older progress moved to the archive.
+
 ## 2026-09-22 14:43:12 Asia/Taipei - Cisco / VMware Frontend UI Coverage
 - **Cisco / VMware UI wiring (Lane 1 — COMPLETED)**:
   - Problem: Cisco and VMware adapters ingested data (1.2.0), but the frontend had no vendor-specific UI. Cisco rendered the generic fallback logo; advisories/CVEs without a vendor join were inferred as `redhat` (Red Hat `dnf/yum` solution text); the CVE detail drawer linked Cisco/VMware CVEs to `access.redhat.com`; System Health Monitor listed no Cisco/VMware feeds.

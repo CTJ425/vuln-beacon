@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -6,6 +6,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   Paper,
   Box,
   Typography,
@@ -41,7 +42,18 @@ interface CveTableProps {
   viewMode?: 'cve' | 'advisory';
 }
 
+// Rendering every row made each keystroke in the Explorer search re-render the
+// whole list (thousands of rows on production); one page keeps it constant.
+export const CVE_TABLE_PAGE_SIZE = 50;
+
 export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode = 'cve' }) => {
+  const [page, setPage] = useState(0);
+  // A new filter result starts again from its first page.
+  useEffect(() => {
+    setPage(0);
+  }, [items]);
+  const pageItems = items.slice(page * CVE_TABLE_PAGE_SIZE, (page + 1) * CVE_TABLE_PAGE_SIZE);
+
   if (items.length === 0) {
     return (
       <Paper sx={{ p: 6, textAlign: 'center', bgcolor: 'background.paper', borderRadius: 2, border: 1, borderColor: 'divider' }}>
@@ -82,7 +94,7 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
           </TableRow>
         </TableHead>
         <TableBody>
-          {items.map((item) => {
+          {pageItems.map((item) => {
             const isRedHat = item.vendor_code?.toLowerCase() === 'redhat';
             const isAdvisoryFormat = (a: string) => {
               if (!a || typeof a !== 'string') return false;
@@ -281,6 +293,16 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
           })}
         </TableBody>
       </Table>
+      {items.length > CVE_TABLE_PAGE_SIZE && (
+        <TablePagination
+          component="div"
+          count={items.length}
+          page={page}
+          onPageChange={(_, next) => setPage(next)}
+          rowsPerPage={CVE_TABLE_PAGE_SIZE}
+          rowsPerPageOptions={[CVE_TABLE_PAGE_SIZE]}
+        />
+      )}
     </TableContainer>
   );
 };

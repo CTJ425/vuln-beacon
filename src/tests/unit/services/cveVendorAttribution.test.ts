@@ -1,56 +1,43 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockFrom = vi.fn();
+const mockRpc = vi.fn();
 
 vi.mock('@/lib/supabase', () => ({
-  supabase: { from: (...args: any[]) => mockFrom(...args) },
+  supabase: { rpc: (...args: any[]) => mockRpc(...args) },
 }));
 
 import { CveService } from '@/services/cveService';
+import { dataset, dsAdvisory, dsCve, dsMapping } from '../../helpers/explorerDataset';
 
-const respondWith = (rows: any[]) => {
-  const orderChain: any = {
-    order: () => orderChain,
-    range: () => Promise.resolve({ data: rows, error: null }),
-  };
-  mockFrom.mockReturnValue({ select: () => orderChain });
-};
-
-const mapping = (advisoryId: string, code: string, name: string, affected: any[] = []) => ({
-  affected_products: affected,
-  fixed_versions: [],
-  advisories: { advisory_id: advisoryId, title: advisoryId, url: null, summary: null, vendors: { code, name } },
-});
-
-const cveRow = (mappings: any[]) => ({
-  id: 'c1',
-  cve_id: 'CVE-2026-4001',
-  description: 'openssl: flaw',
-  cvss_v3_score: 7.5,
-  severity: 'HIGH',
-  is_known_exploited: false,
-  published_date: '2026-08-02T00:00:00Z',
-  created_at: '2026-08-02T00:00:00Z',
-  advisory_cve_map: mappings,
-});
+const respondWith = (ds: any) => mockRpc.mockResolvedValue({ data: ds, error: null });
 
 describe('CVE vendor attribution', () => {
-  beforeEach(() => mockFrom.mockReset());
+  beforeEach(() => mockRpc.mockReset());
 
   it('lists every vendor that published an advisory for the CVE', async () => {
-    respondWith([
-      cveRow([
-        mapping('RHSA-2026:1', 'redhat', 'Red Hat'),
-        mapping('DSA-5001-1', 'debian', 'Debian'),
-        mapping('USN-7001-1', 'ubuntu', 'Ubuntu'),
-      ]),
-    ]);
+    respondWith(
+      dataset({
+        advisories: [
+          dsAdvisory({ id: 'a1', advisory_id: 'RHSA-2026:1' }),
+          dsAdvisory({ id: 'a2', advisory_id: 'DSA-5001-1', vendor_code: 'debian', vendor_name: 'Debian' }),
+          dsAdvisory({ id: 'a3', advisory_id: 'USN-7001-1', vendor_code: 'ubuntu', vendor_name: 'Ubuntu' }),
+        ],
+        cves: [dsCve({ id: 'c1', cve_id: 'CVE-2026-4001' })],
+        mappings: [dsMapping('a1', 'c1'), dsMapping('a2', 'c1'), dsMapping('a3', 'c1')],
+      })
+    );
     const [cve] = await new CveService().fetchCves();
     expect(cve.vendor_codes).toEqual(['debian', 'redhat', 'ubuntu']);
   });
 
   it('does not invent a product impact when no vendor supplied one', async () => {
-    respondWith([cveRow([mapping('DSA-5001-1', 'debian', 'Debian')])]);
+    respondWith(
+      dataset({
+        advisories: [dsAdvisory({ id: 'a1', advisory_id: 'DSA-5001-1', vendor_code: 'debian', vendor_name: 'Debian' })],
+        cves: [dsCve({ id: 'c1', cve_id: 'CVE-2026-4001' })],
+        mappings: [dsMapping('a1', 'c1')],
+      })
+    );
     const [cve] = await new CveService().fetchCves();
     expect(cve.product_impacts).toEqual([]);
     expect(cve.affected_products).toEqual([]);

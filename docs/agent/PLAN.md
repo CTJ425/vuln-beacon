@@ -52,7 +52,7 @@ Hosting: the frontend is on Cloudflare (deployed from `main`), and the backend i
 
 ## 4. Known Limits
 
-* The Explorer, Dashboard and Vendor pages load every advisory and CVE with its impacts on page load. That is acceptable at current volume; see the open item in `TASK.md`.
+* The Explorer, Dashboard and Vendor pages still load the full dataset on page load, through one compact RPC (production 2026-09-26: 0.89 MB gzip). Move to server-side filtering if it grows by another order of magnitude.
 * Vendors seeded without adapters (`dell`, `hpe`, `netapp`, `veeam`, `cohesity`) are not synced.
 * There is no triage workflow (`cve_triage` is unused).
 * Accepted risks are tracked in `BUG_FIX.md`.

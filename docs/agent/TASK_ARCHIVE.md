@@ -2,6 +2,10 @@
 
 Completed tasks moved out of `TASK.md` on 2026-09-26 (AGENTS.md size discipline). Content is unchanged; sections keep their original order.
 
+## Explorer performance (done 2026-09-26, 1.4.0)
+
+- [x] **Explorer loads every CVE and advisory with full product impacts on page load** (`src/services/cveService.ts`, `src/services/advisoryService.ts`). Current volume is small (dev 2026-09-26: 188 CVEs, 51 advisories, 335 mappings, 318 kB of mapping JSON), so this is deferred. The fix is server-side pagination and search for Explorer, Dashboard and Vendor pages together with BUG-006 (advisory-level product impacts); revisit when the list query becomes measurable. **Done**: the earlier 318 kB figure was compressed storage (`pg_column_size`); the real read was 38.6 MB of JSON on production. Replaced by the `explorer_dataset()` RPC and table pagination (BUG-033).
+
 ## Dropped 2026-09-26 (self-hosting assumption was wrong)
 
 The frontend is hosted on Cloudflare and deployed from `main`; there is no Caddy, tunnel, self-hosted Supabase or preview host. These items no longer apply:

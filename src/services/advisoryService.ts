@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabase';
-import { fetchAllRows } from '@/lib/fetchAllRows';
+import { fetchExplorerDataset, toAdvisoryRows } from '@/lib/explorerDataset';
 import { ProductImpactItem, SeverityLevel } from '@/types';
 
 export interface AdvisoryRowItem {
@@ -28,25 +27,12 @@ export interface AdvisoryRowItem {
 export class AdvisoryService {
   async fetchAdvisories(): Promise<AdvisoryRowItem[]> {
     try {
-      const { data, error } = await fetchAllRows((from, to) =>
-        supabase
-          .from('advisories')
-          .select(`
-            id, advisory_id, title, severity, published_at, url, summary, vendor_id,
-            vendors ( code, name ),
-            advisory_cve_map (
-              affected_products,
-              fixed_versions,
-              cves ( cve_id, description, cvss_v3_score, cvss_v3_vector, severity, is_known_exploited, published_date )
-            )
-          `)
-          .order('published_at', { ascending: false })
-          .order('id', { ascending: true })
-          .range(from, to)
-      );
-
-      if (error) {
-        console.warn('Error fetching advisories from Supabase:', error.message);
+      let data: any[];
+      try {
+        // One shared RPC for advisories and CVEs (see lib/explorerDataset.ts).
+        data = toAdvisoryRows(await fetchExplorerDataset());
+      } catch (error: any) {
+        console.warn('Error fetching advisories from Supabase:', error?.message);
         return [];
       }
 

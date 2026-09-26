@@ -2,6 +2,17 @@
 
 ---
 
+### BUG-033: Explorer read 38.6 MB of JSON and rendered every row on each keystroke — FIXED
+- **Date**: Found and fixed 2026-09-26 (1.4.0)
+- **Severity**: HIGH (performance)
+- **Location**: `src/services/advisoryService.ts`, `src/services/cveService.ts`, `src/components/explorer/CveTable.tsx`
+- **Root Cause**: both services paged through their tables separately (5 requests on production). Each request embedded every `advisory_cve_map` row with its full product-impact list, so the same impacts were sent once per CVE and twice overall: 65,356 impact objects, of which 2,556 are distinct per advisory. The CVE table then rendered every filtered row (3,368 on production); jsdom measured 15 s for that versus 0.4 s for 50 rows.
+- **Fix**: the `explorer_dataset()` RPC (SECURITY INVOKER) returns each distinct impact once per advisory, and each mapping carries the indexes of its impacts. Red Hat impacts differ per CVE for 66 of 578 mappings, so a plain per-advisory merge would have been wrong. `lib/explorerDataset.ts` rebuilds the previous row shapes, so the transforms are unchanged, and both services share one in-flight request. The CVE table shows 50 rows per page. A second migration replaced correlated subqueries with a hash join: DB time went from about 1.7 s to 0.6 s with md5-identical output.
+- **Verification (production, anon over REST)**: 5 requests / 3.73 MB gzip / 38.6 MB JSON / 8.1 s went down to 1 request / 0.89 MB / 4.3 MB / 3.1 s. `JSON.parse` fell from about 220 ms to 16 ms, plus 12 ms to rebuild rows. Every one of the 5,022 mappings rebuilds identically (0 impact or fixed-version mismatches).
+- **Status**: ✅ FIXED
+
+---
+
 ### BUG-032: Scheduled sync rejected with 401 even after resetting the Vault key — FIXED
 - **Date**: Found and fixed 2026-09-26 (1.3.1)
 - **Severity**: HIGH

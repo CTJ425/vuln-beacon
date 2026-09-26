@@ -1,76 +1,50 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockFrom = vi.fn();
+const mockRpc = vi.fn();
 
 vi.mock('@/lib/supabase', () => ({
-  supabase: { from: (...args: any[]) => mockFrom(...args) },
+  supabase: { rpc: (...args: any[]) => mockRpc(...args) },
 }));
 
 import { AdvisoryService } from '@/services/advisoryService';
 import { CveService } from '@/services/cveService';
+import { dataset, dsAdvisory, dsCve, dsMapping } from '../../helpers/explorerDataset';
 
-/** Build the `.select().order().order().range()` chain the services use. */
-const resolveWith = (rows: any[]) => {
-  const result = { data: rows, error: null };
-  const chain: any = {
-    order: () => chain,
-    range: () => Promise.resolve(result),
-    then: (...args: any[]) => Promise.resolve(result).then(...args),
-  };
-  return { select: () => chain };
-};
+const respondWith = (ds: any) => mockRpc.mockResolvedValue({ data: ds, error: null });
 
 describe('AdvisoryService — one RHSA lists every CVE it fixes', () => {
-  beforeEach(() => mockFrom.mockReset());
+  beforeEach(() => mockRpc.mockReset());
 
   it('returns an advisory carrying all of its mapped CVEs', async () => {
-    mockFrom.mockReturnValue(
-      resolveWith([
-        {
-          id: 'a1',
-          advisory_id: 'RHSA-2026:2000',
-          title: 'Important: kernel security update',
-          severity: 'CRITICAL',
-          published_at: '2026-08-02T00:00:00Z',
-          url: 'https://access.redhat.com/errata/RHSA-2026:2000',
-          summary: 'kernel security update',
-          vendor_id: 'redhat',
-          vendors: { code: 'redhat', name: 'Red Hat' },
-          advisory_cve_map: [
-            {
-              affected_products: [
-                { product_name: 'Red Hat Enterprise Linux 9', component: 'kernel', state: 'Fixed', errata: 'RHSA-2026:2000' },
-              ],
-              fixed_versions: ['Released in RHSA-2026:2000'],
-              cves: {
-                cve_id: 'CVE-2026-2001',
-                description: 'kernel: flaw one',
-                cvss_v3_score: 9.1,
-                severity: 'CRITICAL',
-                is_known_exploited: false,
-              },
-            },
-            {
-              affected_products: [
-                { product_name: 'Red Hat Enterprise Linux 8', component: 'kernel', state: 'Fixed', errata: 'RHSA-2026:2000' },
-              ],
-              fixed_versions: ['Released in RHSA-2026:2000'],
-              cves: {
-                cve_id: 'CVE-2026-2002',
-                description: 'kernel: flaw two',
-                cvss_v3_score: 9.0,
-                severity: 'CRITICAL',
-                is_known_exploited: false,
-              },
-            },
-          ],
-        },
-      ])
+    respondWith(
+      dataset({
+        advisories: [
+          dsAdvisory({
+            id: 'a1',
+            advisory_id: 'RHSA-2026:2000',
+            severity: 'CRITICAL',
+            url: 'https://access.redhat.com/errata/RHSA-2026:2000',
+            summary: 'kernel security update',
+            impacts: [
+              { product_name: 'Red Hat Enterprise Linux 9', component: 'kernel', state: 'Fixed', errata: 'RHSA-2026:2000' },
+              { product_name: 'Red Hat Enterprise Linux 8', component: 'kernel', state: 'Fixed', errata: 'RHSA-2026:2000' },
+            ],
+          }),
+        ],
+        cves: [
+          dsCve({ id: 'c1', cve_id: 'CVE-2026-2001', cvss_v3_score: 9.1, severity: 'CRITICAL' }),
+          dsCve({ id: 'c2', cve_id: 'CVE-2026-2002', cvss_v3_score: 9.0, severity: 'CRITICAL' }),
+        ],
+        mappings: [
+          dsMapping('a1', 'c1', [0], ['Released in RHSA-2026:2000']),
+          dsMapping('a1', 'c2', [1], ['Released in RHSA-2026:2000']),
+        ],
+      })
     );
 
     const advisories = await new AdvisoryService().fetchAdvisories();
 
-    expect(mockFrom).toHaveBeenCalledWith('advisories');
+    expect(mockRpc).toHaveBeenCalledWith('explorer_dataset');
     expect(advisories).toHaveLength(1);
 
     const adv = advisories[0];
@@ -88,57 +62,39 @@ describe('AdvisoryService — one RHSA lists every CVE it fixes', () => {
   });
 
   it('returns an empty list instead of throwing when the query errors', async () => {
-    mockFrom.mockReturnValue({
-      select: () => ({ order: () => Promise.resolve({ data: null, error: { message: 'boom' } }) }),
-    });
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } });
 
     await expect(new AdvisoryService().fetchAdvisories()).resolves.toEqual([]);
+  });
+
+  it('resolves legacy string impacts through the mapping indexes', async () => {
+    respondWith(
+      dataset({
+        advisories: [dsAdvisory({ id: 'a1', impacts: ['RHEL 9'] })],
+        cves: [dsCve({ id: 'c1', cve_id: 'CVE-2026-9999' })],
+        mappings: [dsMapping('a1', 'c1', [0], ['RHSA-2026:9999'])],
+      })
+    );
+
+    const [adv] = await new AdvisoryService().fetchAdvisories();
+    expect(adv.cves.map((c) => c.cve_id)).toEqual(['CVE-2026-9999']);
+    expect(adv.product_impacts.map((p) => p.component)).toEqual(['RHEL 9']);
   });
 });
 
 describe('CveService — one CVE lists every RHSA that fixes it', () => {
-  beforeEach(() => mockFrom.mockReset());
+  beforeEach(() => mockRpc.mockReset());
 
   it('collects all mapped advisories, not just the first', async () => {
-    mockFrom.mockReturnValue(
-      resolveWith([
-        {
-          id: 'c1',
-          cve_id: 'CVE-2026-1000',
-          description: 'openssl: example flaw',
-          cvss_v3_score: 8.1,
-          severity: 'HIGH',
-          is_known_exploited: false,
-          published_date: '2026-08-01T00:00:00Z',
-          created_at: '2026-08-01T00:00:00Z',
-          advisory_cve_map: [
-            {
-              affected_products: [
-                { product_name: 'RHEL 9', component: 'openssl', state: 'Fixed', errata: 'RHSA-2026:1001' },
-              ],
-              fixed_versions: ['Released in RHSA-2026:1001'],
-              advisories: {
-                advisory_id: 'RHSA-2026:1001',
-                title: 'openssl update for RHEL 9',
-                url: 'https://access.redhat.com/errata/RHSA-2026:1001',
-                vendors: { code: 'redhat', name: 'Red Hat' },
-              },
-            },
-            {
-              affected_products: [
-                { product_name: 'RHEL 8', component: 'openssl', state: 'Fixed', errata: 'RHSA-2026:1002' },
-              ],
-              fixed_versions: ['Released in RHSA-2026:1002'],
-              advisories: {
-                advisory_id: 'RHSA-2026:1002',
-                title: 'openssl update for RHEL 8',
-                url: 'https://access.redhat.com/errata/RHSA-2026:1002',
-                vendors: { code: 'redhat', name: 'Red Hat' },
-              },
-            },
-          ],
-        },
-      ])
+    respondWith(
+      dataset({
+        advisories: [
+          dsAdvisory({ id: 'a1', advisory_id: 'RHSA-2026:1001', impacts: [{ product_name: 'RHEL 9', component: 'openssl', state: 'Fixed' }] }),
+          dsAdvisory({ id: 'a2', advisory_id: 'RHSA-2026:1002', impacts: [{ product_name: 'RHEL 8', component: 'openssl', state: 'Fixed' }] }),
+        ],
+        cves: [dsCve({ id: 'c1', cve_id: 'CVE-2026-1000' })],
+        mappings: [dsMapping('a1', 'c1', [0]), dsMapping('a2', 'c1', [0])],
+      })
     );
 
     const cves = await new CveService().fetchCves();
@@ -154,41 +110,25 @@ describe('CveService — one CVE lists every RHSA that fixes it', () => {
     expect(cve.product_impacts.map((p) => p.product_name).sort()).toEqual(['RHEL 8', 'RHEL 9']);
   });
 
-  it('handles PostgREST joined cves returned as single-element array', async () => {
-    mockFrom.mockReturnValue(
-      resolveWith([
-        {
-          id: 'adv-array-test',
-          advisory_id: 'RHSA-2026:9999',
-          title: 'Advisory with array-shaped joined cves',
-          severity: 'HIGH',
-          published_at: '2026-09-01T00:00:00Z',
-          url: 'https://access.redhat.com/errata/RHSA-2026:9999',
-          summary: 'array shape test',
-          vendor_id: 'redhat',
-          vendors: [{ code: 'redhat', name: 'Red Hat' }],
-          advisory_cve_map: [
-            {
-              affected_products: ['RHEL 9'],
-              fixed_versions: ['RHSA-2026:9999'],
-              cves: [
-                {
-                  cve_id: 'CVE-2026-9999',
-                  description: 'Array shape test CVE',
-                  cvss_v3_score: 8.5,
-                  severity: 'HIGH',
-                  is_known_exploited: false,
-                },
-              ],
-            },
-          ],
-        },
-      ])
+  it('keeps per-CVE impacts when one advisory fixes several CVEs', async () => {
+    respondWith(
+      dataset({
+        advisories: [
+          dsAdvisory({
+            id: 'a1',
+            impacts: [
+              { product_name: 'RHEL 9', component: 'kernel', state: 'Fixed' },
+              { product_name: 'RHEL 8', component: 'kernel', state: 'Affected' },
+            ],
+          }),
+        ],
+        cves: [dsCve({ id: 'c1', cve_id: 'CVE-2026-0001' }), dsCve({ id: 'c2', cve_id: 'CVE-2026-0002' })],
+        mappings: [dsMapping('a1', 'c1', [0]), dsMapping('a1', 'c2', [1])],
+      })
     );
 
-    const advisories = await new AdvisoryService().fetchAdvisories();
-    expect(advisories).toHaveLength(1);
-    expect(advisories[0].cves).toHaveLength(1);
-    expect(advisories[0].cves[0].cve_id).toBe('CVE-2026-9999');
+    const cves = await new CveService().fetchCves();
+    const byId = Object.fromEntries(cves.map((c) => [c.cve_id, c.product_impacts.map((p) => p.product_name)]));
+    expect(byId).toEqual({ 'CVE-2026-0001': ['RHEL 9'], 'CVE-2026-0002': ['RHEL 8'] });
   });
 });

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0 - 2026-09-26
+### Changed
+- **One compact read for the dashboard pages**: the new `explorer_dataset()` RPC replaces five paginated advisory and CVE queries. Each distinct product impact is sent once per advisory, with per-mapping indexes, so per-CVE impacts are preserved. On production, per page load: 3.73 MB → 0.89 MB transferred, 38.6 MB → 4.3 MB JSON, 8.1 s → 3.1 s (BUG-033).
+- **Paged CVE and advisory table**: 50 rows per page, returning to page 1 when filters change, instead of rendering every row on each keystroke.
+
+### Added
+- Migrations `20260926000000_explorer_dataset` and `20260926010000_explorer_dataset_hash_join` (same output, about 2.6× faster in the DB).
+- `src/lib/explorerDataset.ts` plus test builders in `src/tests/helpers/explorerDataset.ts`.
+
+### Operations
+- Both migrations applied to `vuln-beacon-dev` and `vuln-beacon`. On production data, all 5,022 mappings rebuild identically; anon can call the RPC.
+
 ## 1.3.1 - 2026-09-26
 ### Fixed
 - **Scheduled sync authentication**: the pg_cron call now authenticates with `SCHEDULED_SYNC_SECRET`, stored in Vault and in the function secrets. Before this it relied on Vault holding the runtime service-role key, a value that does not match the Management API key, so every tick got 401 (BUG-032).

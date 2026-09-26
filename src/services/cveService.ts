@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabase';
-import { fetchAllRows } from '@/lib/fetchAllRows';
+import { fetchExplorerDataset, toCveRows } from '@/lib/explorerDataset';
 import { CveTableRowItem } from '@/components/explorer/CveTable';
 import { ProductImpactItem } from '@/types';
 
@@ -17,49 +16,19 @@ function inferVendorCode(advId: string): string {
 export class CveService {
   async fetchCves(): Promise<CveTableRowItem[]> {
     try {
-      const { data, error } = await fetchAllRows((from, to) =>
-        supabase
-          .from('cves')
-          .select(`
-            id,
-            cve_id,
-            description,
-            cvss_v3_score,
-            cvss_v3_vector,
-            severity,
-            is_known_exploited,
-            published_date,
-            last_modified_date,
-            created_at,
-            advisory_cve_map (
-              affected_products,
-              fixed_versions,
-              advisories (
-                advisory_id,
-                title,
-                url,
-                summary,
-                vendors (
-                  code,
-                  name
-                )
-              )
-            )
-          `)
-          .order('published_date', { ascending: false })
-          .order('id', { ascending: true })
-          .range(from, to)
-      );
-
-      if (error) {
-        console.warn('Error fetching CVEs from Supabase:', error.message);
+      let data: any[];
+      try {
+        // One shared RPC for advisories and CVEs (see lib/explorerDataset.ts).
+        data = toCveRows(await fetchExplorerDataset());
+      } catch (error: any) {
+        console.warn('Error fetching CVEs from Supabase:', error?.message);
         return [];
       }
 
       if (!data) return [];
 
       return data.map((row: any): CveTableRowItem => {
-        // Supabase does not order embedded resources, so sort mappings by
+        // Mapping order from the dataset is arbitrary (row id), so sort mappings by
         // advisory_id ascending here to make the canonical advisory (mappings[0])
         // deterministic across identical fetches.
         const mappings: any[] = Array.isArray(row.advisory_cve_map) ? row.advisory_cve_map : [];
