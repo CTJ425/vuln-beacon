@@ -25,7 +25,7 @@ Describes the system as built (1.3.0). Feature-level designs live in `docs/agent
 
 ### 1.2 Scheduling and Manual Sync
 * Each vendor has its own schedule: `schedule_enabled`, `schedule_times` (default `08:00`, `12:30`, `18:30`) and `schedule_timezone` (default `Asia/Taipei`).
-* pg_cron runs `tick_scheduled_syncs()` every 5 minutes. It posts to the `scheduled-sync` Edge Function with the service-role key from Vault. The function syncs the vendors whose window is due (`src/services/scheduleWindow.ts`) and stamps `last_scheduled_run_at` on success.
+* pg_cron runs `tick_scheduled_syncs()` every 5 minutes. It posts to the `scheduled-sync` Edge Function with `SCHEDULED_SYNC_SECRET`. That value is stored both in Vault (`scheduled_sync_key`) and in the function secrets. The function syncs the vendors whose window is due (`src/services/scheduleWindow.ts`) and stamps `last_scheduled_run_at` on success.
 * A tick that finds the Vault secrets missing, or whose previous request came back with HTTP ≥ 400, writes a throttled `FAILED` row to `vendor_sync_logs`.
 * Admins trigger a manual sync from the Admin Console (`sync-cve`, `trigger_manual_sync`), for all vendors or a subset.
 * Only one sync runs at a time across manual and scheduled runs (`sync_leases`, 15-minute lease).
@@ -63,5 +63,5 @@ Describes the system as built (1.3.0). Feature-level designs live in `docs/agent
 * `webhook_configs` is readable and writable by admins only, because webhook URLs and bot tokens are credentials.
 * All writes go through Edge Functions using the service-role key:
   * `sync-cve` requires an admin JWT or the service-role key for every action except `health_check`.
-  * `scheduled-sync` requires the service-role key.
+  * `scheduled-sync` requires `SCHEDULED_SYNC_SECRET` or the service-role key.
 * `upsert_cves`, `acquire_sync_lease`, `release_sync_lease`, `tick_scheduled_syncs` and `set_scheduled_sync_vault_secrets` are executable by `service_role` only.

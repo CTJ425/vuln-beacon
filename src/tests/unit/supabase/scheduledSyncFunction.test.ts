@@ -63,6 +63,13 @@ describe('scheduled-sync edge function', () => {
     expect(engineAt).toBeGreaterThan(loopAt);
   });
 
+  it('accepts a dedicated SCHEDULED_SYNC_SECRET so the cron caller does not depend on the platform key value', () => {
+    const src = read(scheduledSyncPath);
+    expect(src).toContain("Deno.env.get('SCHEDULED_SYNC_SECRET')");
+    // Unset secrets must be dropped before comparing, never matched as 'Bearer '.
+    expect(src).toMatch(/\.filter\(Boolean\)/);
+  });
+
   it('refuses to run when the service role key is unset, instead of comparing to an empty token', () => {
     const src = read(scheduledSyncPath);
     // An empty env var must not collapse the check into `authHeader !== 'Bearer '`.

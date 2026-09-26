@@ -14,7 +14,7 @@ flowchart TD
     end
 
     subgraph Edge["Supabase Edge Functions (Deno)"]
-        Sched["scheduled-sync<br/>(service-role key only)"]
+        Sched["scheduled-sync<br/>(SCHEDULED_SYNC_SECRET or service-role)"]
         SyncCve["sync-cve<br/>(admin or service-role for every write)"]
         Bundle["_shared/ingest.bundle.js<br/>adapters · IngestionEngine · persistIngestion<br/>adminAuth · scheduleWindow · WebhookService"]
     end

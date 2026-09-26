@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.1 - 2026-09-26
+### Fixed
+- **Scheduled sync authentication**: the pg_cron call now authenticates with `SCHEDULED_SYNC_SECRET`, stored in Vault and in the function secrets. Before this it relied on Vault holding the runtime service-role key, a value that does not match the Management API key, so every tick got 401 (BUG-032).
+
+### Operations
+- `scheduled-sync` redeployed on both projects, `SCHEDULED_SYNC_SECRET` set, Vault updated; ticks return HTTP 200.
+- Admin role granted to the admin account on both projects; the release 1.3.0 SQL check passed on dev (`ALL_OK`).
+
 ## 1.3.0 - 2026-09-26
 ### Security
 - **`sync-cve` required nothing but a header**: any request carrying an `apikey` or `Authorization` header could persist CVE data, create or delete webhooks and change schedules with the service-role client. Every action except `health_check` now needs an admin JWT or the service-role key (BUG-022).

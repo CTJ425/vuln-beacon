@@ -2,6 +2,14 @@
 
 Completed tasks moved out of `TASK.md` on 2026-09-26 (AGENTS.md size discipline). Content is unchanged; sections keep their original order.
 
+## Release 1.3.0 follow-ups (done 2026-09-26)
+
+- [x] **Grant the admin role** on `vuln-beacon` and `vuln-beacon-dev`. Since 1.3.0 the backstage and every `sync-cve` write require `app_metadata.role = 'admin'`; until this runs nobody can sign in to the Admin Console. SQL is in `src/supabase/migrations/20260925000000_admin_role_access.sql` (header). Sign out and in afterwards to refresh the JWT. Review `auth.users` for accounts created while signup was open (disabled 2026-09-25).
+- [x] **Reset the scheduler vault secrets** on both projects with `select public.set_scheduled_sync_vault_secrets('<https://<ref>.supabase.co/functions/v1/scheduled-sync>', '<service-role key>')`. Prod returns 401 (key mismatch) and dev has no secrets, so no scheduled sync has run since 2026-09-11. After the next tick, a mismatch now shows up in `vendor_sync_logs` as `Scheduled sync request rejected: ... HTTP 401`.
+- [x] **Run the database behaviour check** for the 1.3.0 SQL (`upsert_cves` merge rules, sync lease, `webhook_configs` RLS, tick HTTP-error logging) on `vuln-beacon-dev`; the agent was not permitted to execute it. The block rolls back and ends with `ALL_OK` when every assertion holds. Script: `src/supabase/checks/release-1.3.0.sql`.
+
+  - Done: admin role granted to the only account on each project (`zrchen0425@gmail.com`; no other accounts existed). The rolled-back SQL check on dev returned `ALL_OK`. The scheduler returns HTTP 200 after moving to `SCHEDULED_SYNC_SECRET` (BUG-032).
+
 ## Current Work Stream: Ingestion Engine & Frontend Triage Dashboard
 
 - [x] **Task 1: Core Project Scaffolding, Testing Framework & Database Setup**

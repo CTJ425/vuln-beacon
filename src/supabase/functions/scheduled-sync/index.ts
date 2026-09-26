@@ -68,7 +68,15 @@ serve(async (req) => {
 
   // This endpoint must only be callable by the pg_cron tick (or another
   // holder of the service-role key), never by the browser publishable key.
-  if (authHeader !== `Bearer ${serviceRoleKey}`) {
+  // The tick sends SCHEDULED_SYNC_SECRET, a value we set in both Vault and the
+  // function secrets: the platform-injected service-role key is not
+  // guaranteed to equal the service_role key the Management API reports, so
+  // a Vault copy of it went stale and every tick got 401.
+  const scheduledSyncSecret = Deno.env.get('SCHEDULED_SYNC_SECRET') ?? '';
+  const accepted = [scheduledSyncSecret, serviceRoleKey]
+    .filter(Boolean)
+    .some((key) => authHeader === `Bearer ${key}`);
+  if (!accepted) {
     return new Response(
       JSON.stringify({ success: false, error: 'Unauthorized' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }

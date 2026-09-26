@@ -2,6 +2,16 @@
 
 ---
 
+### BUG-032: Scheduled sync rejected with 401 even after resetting the Vault key — FIXED
+- **Date**: Found and fixed 2026-09-26 (1.3.1)
+- **Severity**: HIGH
+- **Location**: `src/supabase/functions/scheduled-sync/index.ts`, Vault `scheduled_sync_key`
+- **Root Cause**: `scheduled-sync` authenticated the pg_cron call by comparing the bearer token with the platform-injected `SUPABASE_SERVICE_ROLE_KEY`. It relied on Vault holding a copy of that exact value. The legacy `service_role` key from the Management API does not equal the runtime value on either project: after it was written to Vault (00:20 UTC), the 00:25 and 00:30 ticks still returned 401, which the 1.3.0 tick logging now shows. No scheduled sync had run since 2026-09-11.
+- **Fix**: `scheduled-sync` also accepts `SCHEDULED_SYNC_SECRET`, a random value we set in both the function secrets and Vault (one per project, never printed). Unset values are filtered out before comparing. The first tick afterwards (00:35 UTC) returned HTTP 200 on both projects.
+- **Status**: ✅ FIXED
+
+---
+
 ### BUG-022: sync-cve accepted any request carrying an apikey header — FIXED
 - **Date**: Found and fixed 2026-09-25 (1.3.0)
 - **Severity**: CRITICAL
