@@ -1,4 +1,4 @@
-import { fetchExplorerDataset, toAdvisoryRows } from '@/lib/explorerDataset';
+import { ExplorerDataset, fetchExplorerDataset, toAdvisoryRows } from '@/lib/explorerDataset';
 import { ProductImpactItem, SeverityLevel } from '@/types';
 
 export interface AdvisoryRowItem {
@@ -25,178 +25,168 @@ export interface AdvisoryRowItem {
 }
 
 export class AdvisoryService {
+  // One shared RPC for advisories and CVEs (see lib/explorerDataset.ts). A
+  // failure propagates so the caller can keep the rows it already shows.
   async fetchAdvisories(): Promise<AdvisoryRowItem[]> {
-    try {
-      let data: any[];
-      try {
-        // One shared RPC for advisories and CVEs (see lib/explorerDataset.ts).
-        data = toAdvisoryRows(await fetchExplorerDataset());
-      } catch (error: any) {
-        console.warn('Error fetching advisories from Supabase:', error?.message);
-        return [];
+    return this.fromDataset(await fetchExplorerDataset());
+  }
+
+  fromDataset(dataset: ExplorerDataset): AdvisoryRowItem[] {
+    return toAdvisoryRows(dataset).map((row: any): AdvisoryRowItem => {
+      const vendor = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
+      const mappings = Array.isArray(row.advisory_cve_map) ? row.advisory_cve_map : [];
+
+      // cves: one entry per mapping with a joined cve record, deduplicated by cve_id.
+      const cves: AdvisoryRowItem['cves'] = [];
+      const seenCveIds = new Set<string>();
+      for (const map of mappings) {
+        const cve = Array.isArray(map.cves) ? map.cves[0] : map.cves;
+        if (!cve) continue;
+        if (seenCveIds.has(cve.cve_id)) continue;
+        seenCveIds.add(cve.cve_id);
+        cves.push({
+          cve_id: cve.cve_id,
+          description: cve.description,
+          severity: cve.severity || 'UNKNOWN',
+          cvss_v3_score: cve.cvss_v3_score ? Number(cve.cvss_v3_score) : undefined,
+          is_known_exploited: Boolean(cve.is_known_exploited),
+        });
       }
 
-      if (!data) return [];
-
-      return data.map((row: any): AdvisoryRowItem => {
-        const vendor = Array.isArray(row.vendors) ? row.vendors[0] : row.vendors;
-        const mappings = Array.isArray(row.advisory_cve_map) ? row.advisory_cve_map : [];
-
-        // cves: one entry per mapping with a joined cve record, deduplicated by cve_id.
-        const cves: AdvisoryRowItem['cves'] = [];
-        const seenCveIds = new Set<string>();
-        for (const map of mappings) {
-          const cve = Array.isArray(map.cves) ? map.cves[0] : map.cves;
-          if (!cve) continue;
-          if (seenCveIds.has(cve.cve_id)) continue;
-          seenCveIds.add(cve.cve_id);
-          cves.push({
-            cve_id: cve.cve_id,
-            description: cve.description,
-            severity: cve.severity || 'UNKNOWN',
-            cvss_v3_score: cve.cvss_v3_score ? Number(cve.cvss_v3_score) : undefined,
-            is_known_exploited: Boolean(cve.is_known_exploited),
-          });
-        }
-
-        // product_impacts: parse affected_products from every mapping (same
-        // normalisation as cveService.fetchCves()), concatenate, dedupe.
-        const productImpacts: ProductImpactItem[] = [];
-        for (const map of mappings) {
-          const rawImpacts = map.affected_products;
-          if (!Array.isArray(rawImpacts)) continue;
-          for (const item of rawImpacts) {
-            if (typeof item === 'object' && item !== null && (item.product_name || item.component)) {
-              productImpacts.push({
-                product_name: item.product_name || 'Enterprise Product',
-                component: item.component || item.package_name || 'core-component',
-                state: item.state || item.fix_state || 'Affected',
-                justification: item.justification || 'None',
-                errata: item.errata || item.advisory || '-',
-                release_date: item.release_date || '-',
-                cpe: item.cpe,
-              });
-            } else if (typeof item === 'string') {
-              productImpacts.push({
-                product_name: vendor?.name || 'Enterprise System',
-                component: item,
-                state: 'Affected',
-                justification: 'None',
-                errata: row.advisory_id || '-',
-                release_date: '-',
-              });
-            }
+      // product_impacts: parse affected_products from every mapping (same
+      // normalisation as cveService.fetchCves()), concatenate, dedupe.
+      const productImpacts: ProductImpactItem[] = [];
+      for (const map of mappings) {
+        const rawImpacts = map.affected_products;
+        if (!Array.isArray(rawImpacts)) continue;
+        for (const item of rawImpacts) {
+          if (typeof item === 'object' && item !== null && (item.product_name || item.component)) {
+            productImpacts.push({
+              product_name: item.product_name || 'Enterprise Product',
+              component: item.component || item.package_name || 'core-component',
+              state: item.state || item.fix_state || 'Affected',
+              justification: item.justification || 'None',
+              errata: item.errata || item.advisory || '-',
+              release_date: item.release_date || '-',
+              cpe: item.cpe,
+            });
+          } else if (typeof item === 'string') {
+            productImpacts.push({
+              product_name: vendor?.name || 'Enterprise System',
+              component: item,
+              state: 'Affected',
+              justification: 'None',
+              errata: row.advisory_id || '-',
+              release_date: '-',
+            });
           }
         }
+      }
 
-        const dedupedImpacts: ProductImpactItem[] = [];
-        const seenImpactKeys = new Set<string>();
-        for (const impact of productImpacts) {
-          const key = `${impact.product_name}|${impact.component}|${impact.state}`;
-          if (seenImpactKeys.has(key)) continue;
-          seenImpactKeys.add(key);
-          dedupedImpacts.push(impact);
-        }
+      const dedupedImpacts: ProductImpactItem[] = [];
+      const seenImpactKeys = new Set<string>();
+      for (const impact of productImpacts) {
+        const key = `${impact.product_name}|${impact.component}|${impact.state}`;
+        if (seenImpactKeys.has(key)) continue;
+        seenImpactKeys.add(key);
+        dedupedImpacts.push(impact);
+      }
 
-        const affectedProducts = Array.from(
-          new Set(dedupedImpacts.map((p) => p.product_name))
-        );
+      const affectedProducts = Array.from(
+        new Set(dedupedImpacts.map((p) => p.product_name))
+      );
 
-        // fixed_versions: union across all mappings, deduplicated.
-        const fixedVersions: string[] = Array.from(
-          new Set<string>(
-            mappings.flatMap((map: any) =>
-              Array.isArray(map.fixed_versions) ? (map.fixed_versions as string[]) : []
-            )
+      // fixed_versions: union across all mappings, deduplicated.
+      const fixedVersions: string[] = Array.from(
+        new Set<string>(
+          mappings.flatMap((map: any) =>
+            Array.isArray(map.fixed_versions) ? (map.fixed_versions as string[]) : []
           )
-        );
+        )
+      );
 
-        const isFixPending =
-          fixedVersions.length === 0 ||
-          fixedVersions.some((v: string) => v.toLowerCase().includes('pending'));
+      const isFixPending =
+        fixedVersions.length === 0 ||
+        fixedVersions.some((v: string) => v.toLowerCase().includes('pending'));
 
-        const advId = row.advisory_id || '';
-        const vendorCode =
-          vendor?.code ||
-          (advId.startsWith('NXSA-')
-            ? 'nutanix'
-            : advId.startsWith('USN-') || advId.startsWith('LSN-')
-            ? 'ubuntu'
-            : advId.startsWith('DSA-') || advId.startsWith('DLA-') || advId.startsWith('DEBIAN-')
-            ? 'debian'
-            : advId.startsWith('SUSE-') || advId.startsWith('openSUSE-')
-            ? 'suse'
-            : /^cisco-sa-/i.test(advId)
-            ? 'cisco'
-            : advId.toUpperCase().startsWith('VMSA-')
-            ? 'vmware'
-            : 'redhat');
+      const advId = row.advisory_id || '';
+      const vendorCode =
+        vendor?.code ||
+        (advId.startsWith('NXSA-')
+          ? 'nutanix'
+          : advId.startsWith('USN-') || advId.startsWith('LSN-')
+          ? 'ubuntu'
+          : advId.startsWith('DSA-') || advId.startsWith('DLA-') || advId.startsWith('DEBIAN-')
+          ? 'debian'
+          : advId.startsWith('SUSE-') || advId.startsWith('openSUSE-')
+          ? 'suse'
+          : /^cisco-sa-/i.test(advId)
+          ? 'cisco'
+          : advId.toUpperCase().startsWith('VMSA-')
+          ? 'vmware'
+          : 'redhat');
 
-        let solution = '';
-        if (row.summary) {
-          solution = row.summary;
-        } else if (vendorCode === 'nutanix') {
-          if (!isFixPending) {
-            solution = `請依據 Nutanix 官方公告 (${row.advisory_id}) 與修復版本 (${fixedVersions.join(', ') || '最新修復版'}) 執行系統升級。詳情請參閱官方公告指引。`;
-          } else {
-            solution = `官方目前針對該漏洞分析處置中，請參閱 Nutanix 公告 ${row.advisory_id} 密切關注後續更新。`;
-          }
-        } else if (vendorCode === 'ubuntu') {
-          if (!isFixPending) {
-            solution = `請透過 APT 工具執行更新：sudo apt-get update && sudo apt-get --only-upgrade install -y <package>`;
-          } else {
-            solution = `Ubuntu 原廠目前正在分析處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新。`;
-          }
-        } else if (vendorCode === 'debian') {
-          if (!isFixPending) {
-            solution = `請透過 APT 工具執行更新：sudo apt-get update && sudo apt-get --only-upgrade install -y <package>`;
-          } else {
-            solution = `Debian 資安團隊目前正在處理該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新。`;
-          }
-        } else if (vendorCode === 'suse') {
-          if (!isFixPending) {
-            solution = `請使用 Zypper 執行更新：sudo zypper update -y <package>`;
-          } else {
-            solution = `SUSE 官方目前正在處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新。`;
-          }
-        } else if (vendorCode === 'cisco') {
-          if (!isFixPending) {
-            solution = `請依據 Cisco 官方公告 (${row.advisory_id}) 升級至修復版本 (${fixedVersions.join(', ')})。詳情請參閱 Cisco Security Advisory。`;
-          } else {
-            solution = `Cisco 官方目前正在處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新，並依公告採取緩解措施。`;
-          }
-        } else if (vendorCode === 'vmware') {
-          if (!isFixPending) {
-            solution = `請依據 Broadcom VMware 官方公告 (${row.advisory_id}) 升級至修復版本 (${fixedVersions.join(', ')})。詳情請參閱 VMware Security Advisory。`;
-          } else {
-            solution = `Broadcom VMware 官方目前正在處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新，並依公告採取緩解措施。`;
-          }
-        } else if (!isFixPending) {
-          solution = `請依據官方發佈之資安更新公告 (${fixedVersions.join(', ')}) 執行升級更新 (例如 dnf/yum update)。詳情請參閱官方指引：https://access.redhat.com/articles/11258`;
+      let solution = '';
+      if (row.summary) {
+        solution = row.summary;
+      } else if (vendorCode === 'nutanix') {
+        if (!isFixPending) {
+          solution = `請依據 Nutanix 官方公告 (${row.advisory_id}) 與修復版本 (${fixedVersions.join(', ') || '最新修復版'}) 執行系統升級。詳情請參閱官方公告指引。`;
         } else {
-          solution = `官方目前針對該漏洞分析處置中，請參閱公告 ${row.advisory_id} 密切關注後續 Errata 更新，並依資安指引採取適當網路隔離或緩解措施。`;
+          solution = `官方目前針對該漏洞分析處置中，請參閱 Nutanix 公告 ${row.advisory_id} 密切關注後續更新。`;
         }
+      } else if (vendorCode === 'ubuntu') {
+        if (!isFixPending) {
+          solution = `請透過 APT 工具執行更新：sudo apt-get update && sudo apt-get --only-upgrade install -y <package>`;
+        } else {
+          solution = `Ubuntu 原廠目前正在分析處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新。`;
+        }
+      } else if (vendorCode === 'debian') {
+        if (!isFixPending) {
+          solution = `請透過 APT 工具執行更新：sudo apt-get update && sudo apt-get --only-upgrade install -y <package>`;
+        } else {
+          solution = `Debian 資安團隊目前正在處理該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新。`;
+        }
+      } else if (vendorCode === 'suse') {
+        if (!isFixPending) {
+          solution = `請使用 Zypper 執行更新：sudo zypper update -y <package>`;
+        } else {
+          solution = `SUSE 官方目前正在處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新。`;
+        }
+      } else if (vendorCode === 'cisco') {
+        if (!isFixPending) {
+          solution = `請依據 Cisco 官方公告 (${row.advisory_id}) 升級至修復版本 (${fixedVersions.join(', ')})。詳情請參閱 Cisco Security Advisory。`;
+        } else {
+          solution = `Cisco 官方目前正在處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新，並依公告採取緩解措施。`;
+        }
+      } else if (vendorCode === 'vmware') {
+        if (!isFixPending) {
+          solution = `請依據 Broadcom VMware 官方公告 (${row.advisory_id}) 升級至修復版本 (${fixedVersions.join(', ')})。詳情請參閱 VMware Security Advisory。`;
+        } else {
+          solution = `Broadcom VMware 官方目前正在處置該漏洞，請參閱公告 ${row.advisory_id} 密切關注後續更新，並依公告採取緩解措施。`;
+        }
+      } else if (!isFixPending) {
+        solution = `請依據官方發佈之資安更新公告 (${fixedVersions.join(', ')}) 執行升級更新 (例如 dnf/yum update)。詳情請參閱官方指引：https://access.redhat.com/articles/11258`;
+      } else {
+        solution = `官方目前針對該漏洞分析處置中，請參閱公告 ${row.advisory_id} 密切關注後續 Errata 更新，並依資安指引採取適當網路隔離或緩解措施。`;
+      }
 
-        return {
-          id: row.id,
-          advisory_id: row.advisory_id,
-          title: row.title,
-          severity: row.severity || 'UNKNOWN',
-          published_at: row.published_at,
-          url: row.url || undefined,
-          summary: row.summary || undefined,
-          vendor_code: vendorCode,
-          vendor_name: vendor?.name,
-          cves,
-          product_impacts: dedupedImpacts,
-          affected_products: affectedProducts,
-          fixed_versions: fixedVersions,
-          solution,
-        };
-      });
-    } catch (err) {
-      console.error('Failed to fetch advisories:', err);
-      return [];
-    }
+      return {
+        id: row.id,
+        advisory_id: row.advisory_id,
+        title: row.title,
+        severity: row.severity || 'UNKNOWN',
+        published_at: row.published_at,
+        url: row.url || undefined,
+        summary: row.summary || undefined,
+        vendor_code: vendorCode,
+        vendor_name: vendor?.name,
+        cves,
+        product_impacts: dedupedImpacts,
+        affected_products: affectedProducts,
+        fixed_versions: fixedVersions,
+        solution,
+      };
+    });
   }
 }

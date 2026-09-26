@@ -7,7 +7,7 @@ const file = readdirSync(dir).find((f) => f.endsWith('_explorer_dataset.sql'));
 const sql = file ? readFileSync(resolve(dir, file), 'utf8') : '';
 // Every migration that (re)defines the function must keep the same guarantees.
 const definitions = readdirSync(dir)
-  .filter((f) => readFileSync(resolve(dir, f), 'utf8').includes('FUNCTION public.explorer_dataset()'))
+  .filter((f) => /CREATE OR REPLACE FUNCTION public\.explorer_dataset\(/.test(readFileSync(resolve(dir, f), 'utf8')))
   .map((f) => [f, readFileSync(resolve(dir, f), 'utf8')] as const);
 
 describe('explorer_dataset migration', () => {
@@ -15,7 +15,7 @@ describe('explorer_dataset migration', () => {
     expect(body).toMatch(/SECURITY INVOKER/i);
     expect(body).not.toMatch(/SECURITY DEFINER/i);
     expect(body).not.toMatch(/raw_payload/);
-    expect(body).toMatch(/GRANT EXECUTE ON FUNCTION public\.explorer_dataset\(\) TO anon, authenticated/i);
+    expect(body).toMatch(/GRANT EXECUTE ON FUNCTION public\.explorer_dataset\((boolean)?\) TO anon, authenticated/i);
   });
 
   it('is redefined without per-row correlated index lookups', () => {
@@ -45,5 +45,11 @@ describe('explorer_dataset migration', () => {
 
   it('is callable by the public site', () => {
     expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION public\.explorer_dataset\(\) TO anon, authenticated/i);
+  });
+
+  it('offers a compact format behind a parameter that defaults to the old one', () => {
+    const latest = definitions[definitions.length - 1][1];
+    expect(latest).toMatch(/explorer_dataset\(p_compact boolean DEFAULT false\)/i);
+    expect(latest).toMatch(/when p_compact and mi\.in_order and mi\.n = ai\.n then null/i);
   });
 });

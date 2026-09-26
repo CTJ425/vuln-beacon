@@ -52,7 +52,7 @@ Hosting: the frontend is on Cloudflare (deployed from `main`), and the backend i
 
 ## 4. Known Limits
 
-* The Explorer, Dashboard and Vendor pages still load the full dataset on page load, through one compact RPC (production 2026-09-26: 0.89 MB gzip). Move to server-side filtering if it grows by another order of magnitude.
+* The Explorer, Dashboard and Vendor pages still load the full dataset on page load, through one compact RPC (production 2026-09-26: 0.87 MB gzip). Repeat visits render from the IndexedDB copy first. Move to server-side filtering if it grows by another order of magnitude.
 * Vendors seeded without adapters (`dell`, `hpe`, `netapp`, `veeam`, `cohesity`) are not synced.
 * There is no triage workflow (`cve_triage` is unused).
 * Accepted risks are tracked in `BUG_FIX.md`.

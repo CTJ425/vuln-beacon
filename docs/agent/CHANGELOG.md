@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.5.0 - 2026-09-26
+### Added
+- **Instant repeat visits**: the last dataset is kept in the browser (IndexedDB). On the next visit it is shown at once while a fresh copy loads, and replaced when that copy arrives. A late cache read never overwrites live data. The cache is ignored after a format change and degrades to "no cache" when storage is unavailable.
+- **Compact dataset format**: `explorer_dataset(p_compact := true)` sends `"i": null` for a mapping that carries every impact of its advisory in order. Production: 4,843 of 5,022 mappings; JSON 4.30 → 4.10 MB, gzip 893 → 865 kB. Without the argument the output is unchanged (same md5), so the 1.4.0 frontend keeps working during the rollout.
+
+### Changed
+- `fetchCves` / `fetchAdvisories` now reject on a load failure instead of returning `[]`, so the app keeps the rows it shows and reports the error rather than showing an empty database. A failed reload after a successful sync now reads "Sync complete, but reloading the data failed" instead of "Sync failed".
+
+### Operations
+- Migration `20260926020000_explorer_dataset_compact` applied to `vuln-beacon-dev` and `vuln-beacon`. Old and compact REST calls both return 200 on both; all mappings rebuild identically (dev 335, prod 5,022).
+
 ## 1.4.0 - 2026-09-26
 ### Changed
 - **One compact read for the dashboard pages**: the new `explorer_dataset()` RPC replaces five paginated advisory and CVE queries. Each distinct product impact is sent once per advisory, with per-mapping indexes, so per-CVE impacts are preserved. On production, per page load: 3.73 MB → 0.89 MB transferred, 38.6 MB → 4.3 MB JSON, 8.1 s → 3.1 s (BUG-033).

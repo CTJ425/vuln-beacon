@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
 import { Box, CircularProgress, Typography, Alert, Button } from '@mui/material';
 import { ThemeProvider } from '@/theme/ThemeContext';
 import { Header } from '@/components/common/Header';
@@ -15,6 +15,7 @@ import { AdvisoryService, AdvisoryRowItem } from '@/services/advisoryService';
 import { deriveTaxonomy } from '@/services/productTaxonomy';
 import { supabase } from '@/lib/supabase';
 import { isAdminUser } from '@/lib/adminAuth';
+import { readCachedDataset } from '@/lib/explorerDataset';
 import { RefreshCw } from 'lucide-react';
 
 const ExplorerPage = lazy(() => import('@/pages/ExplorerPage').then((m) => ({ default: m.ExplorerPage })));
@@ -99,6 +100,9 @@ export const AppContent: React.FC = () => {
   const webhookConfigService = useMemo(() => new WebhookConfigService(), []);
   const advisoryService = useMemo(() => new AdvisoryService(), []);
 
+  // Set once live data has arrived, so a slower cache read can never replace it.
+  const liveDataLoaded = useRef(false);
+
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -110,6 +114,7 @@ export const AppContent: React.FC = () => {
         advisoryService.fetchAdvisories(),
       ]);
 
+      liveDataLoaded.current = true;
       setCves(fetchedCves);
       setSyncLogs(fetchedLogs);
       setWebhooks(fetchedWebhooks);
@@ -137,6 +142,20 @@ export const AppContent: React.FC = () => {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Show the dataset cached by the previous visit while the live load runs.
+  useEffect(() => {
+    let cancelled = false;
+    readCachedDataset().then((dataset) => {
+      if (!dataset || cancelled || liveDataLoaded.current) return;
+      setCves(cveService.fromDataset(dataset));
+      setAdvisories(advisoryService.fromDataset(dataset));
+      setIsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cveService, advisoryService]);
 
   useEffect(() => {
     // If user is viewing the admin section but the session expires/is revoked,
@@ -269,15 +288,22 @@ export const AppContent: React.FC = () => {
             : 'Sync failed: one or more vendor feeds could not be ingested.'
         );
       }
-      // Refresh live records from Supabase
-      const [updatedCves, updatedLogs, updatedAdvisories] = await Promise.all([
-        cveService.fetchCves(),
-        syncService.fetchSyncLogs(),
-        advisoryService.fetchAdvisories(),
-      ]);
-      setCves(updatedCves);
-      setSyncLogs(updatedLogs);
-      setAdvisories(updatedAdvisories);
+      // Refresh live records from Supabase. A failed reload keeps the rows on
+      // screen; after a successful sync it must not read as a sync failure.
+      try {
+        const [updatedCves, updatedLogs, updatedAdvisories] = await Promise.all([
+          cveService.fetchCves(),
+          syncService.fetchSyncLogs(),
+          advisoryService.fetchAdvisories(),
+        ]);
+        setCves(updatedCves);
+        setSyncLogs(updatedLogs);
+        setAdvisories(updatedAdvisories);
+      } catch (reloadErr: any) {
+        if (result.success) {
+          setSyncMessage(`Sync complete, but reloading the data failed: ${reloadErr?.message || 'Unknown error'}`);
+        }
+      }
     } catch (err: any) {
       setSyncMessage(`Sync failed: ${err.message || 'Unknown error'}`);
     } finally {

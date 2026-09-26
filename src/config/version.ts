@@ -2,9 +2,9 @@ import packageJson from '../package.json';
 
 /**
  * Current application version sourced directly from src/package.json.
- * Fallback to '1.4.0' if version is not resolved.
+ * Fallback to '1.5.0' if version is not resolved.
  */
-export const APP_VERSION: string = packageJson.version || '1.4.0';
+export const APP_VERSION: string = packageJson.version || '1.5.0';
 
 /**
  * Current application package name.

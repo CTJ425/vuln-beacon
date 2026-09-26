@@ -25,11 +25,11 @@ describe('explorer dataset', () => {
     mockFrom.mockReset();
   });
 
-  it('loads everything with one explorer_dataset RPC and no table queries', async () => {
+  it('loads everything with one compact explorer_dataset RPC and no table queries', async () => {
     mockRpc.mockResolvedValue({ data: sample(), error: null });
     await fetchExplorerDataset();
     expect(mockRpc).toHaveBeenCalledTimes(1);
-    expect(mockRpc).toHaveBeenCalledWith('explorer_dataset');
+    expect(mockRpc).toHaveBeenCalledWith('explorer_dataset', { p_compact: true });
     expect(mockFrom).not.toHaveBeenCalled();
   });
 
@@ -66,5 +66,12 @@ describe('explorer dataset', () => {
   it('keeps the server order of advisories and cves', () => {
     expect(toAdvisoryRows(sample()).map((r: any) => r.id)).toEqual(['a1', 'a2']);
     expect(toCveRows(sample()).map((r: any) => r.id)).toEqual(['c1', 'c2']);
+  });
+
+  it('treats a null index list as every impact of the advisory, in order', () => {
+    const ds = sample();
+    ds.mappings[0] = { ...ds.mappings[0], i: null };
+    expect(toAdvisoryRows(ds)[0].advisory_cve_map[0].affected_products).toEqual([impA, impB]);
+    expect(toCveRows(ds)[0].advisory_cve_map.find((m: any) => m.advisories.advisory_id === 'RHSA-2026:1000').affected_products).toEqual([impA, impB]);
   });
 });

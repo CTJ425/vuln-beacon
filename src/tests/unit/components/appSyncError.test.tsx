@@ -153,3 +153,29 @@ describe('App surfaces a failure reason that could not be persisted', () => {
     );
   });
 });
+
+/**
+ * fetchCves/fetchAdvisories now reject on a load failure instead of returning
+ * []. A successful sync followed by a failed reload must say exactly that,
+ * not "Sync failed", and must not blank the rows already on screen.
+ */
+describe('App reports a failed reload after a successful sync', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(CveService.prototype, 'fetchCves').mockResolvedValue([]);
+    vi.spyOn(WebhookConfigService.prototype, 'fetchWebhooks').mockResolvedValue([]);
+    vi.spyOn(SyncService.prototype, 'fetchSyncLogs').mockResolvedValue([]);
+  });
+
+  it('says the sync completed and the reload failed', async () => {
+    vi.spyOn(AdvisoryService.prototype, 'fetchAdvisories')
+      .mockResolvedValueOnce([])
+      .mockRejectedValue(new Error('network down'));
+    vi.spyOn(SyncService.prototype, 'syncVendors').mockResolvedValue({ success: true, newLogs: [] });
+    await triggerSync();
+    await waitFor(() =>
+      expect(screen.getByText(/Sync complete, but reloading the data failed: network down/)).toBeTruthy()
+    );
+    expect(screen.queryByText(/^Sync failed/)).toBeNull();
+  });
+});

@@ -44,7 +44,7 @@ describe('AdvisoryService — one RHSA lists every CVE it fixes', () => {
 
     const advisories = await new AdvisoryService().fetchAdvisories();
 
-    expect(mockRpc).toHaveBeenCalledWith('explorer_dataset');
+    expect(mockRpc).toHaveBeenCalledWith('explorer_dataset', { p_compact: true });
     expect(advisories).toHaveLength(1);
 
     const adv = advisories[0];
@@ -61,10 +61,23 @@ describe('AdvisoryService — one RHSA lists every CVE it fixes', () => {
     expect(adv.vendor_name).toBe('Red Hat');
   });
 
-  it('returns an empty list instead of throwing when the query errors', async () => {
+  it('propagates a load failure so the caller can keep what it already shows', async () => {
     mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await expect(new AdvisoryService().fetchAdvisories()).resolves.toEqual([]);
+    await expect(new AdvisoryService().fetchAdvisories()).rejects.toMatchObject({ message: 'boom' });
+    await expect(new CveService().fetchCves()).rejects.toMatchObject({ message: 'boom' });
+  });
+
+  it('builds the same rows from a dataset it is handed, without a request', () => {
+    const ds = dataset({
+      advisories: [dsAdvisory({ id: 'a1' })],
+      cves: [dsCve({ id: 'c1' })],
+      mappings: [dsMapping('a1', 'c1')],
+    });
+    expect(new AdvisoryService().fromDataset(ds).map((a) => a.advisory_id)).toEqual(['RHSA-2026:1000']);
+    expect(new CveService().fromDataset(ds).map((c) => c.cve_id)).toEqual(['CVE-2026-1000']);
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it('resolves legacy string impacts through the mapping indexes', async () => {

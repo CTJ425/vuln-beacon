@@ -8,6 +8,8 @@ import { VendorSyncLog, Vendor } from '@/types';
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: vi.fn(),
+    // CveService reads the shared dataset; this suite only exercises advisories.
+    rpc: vi.fn().mockResolvedValue({ data: { advisories: [], cves: [], mappings: [] }, error: null }),
     auth: {
       getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
       signInWithPassword: vi.fn().mockResolvedValue({
