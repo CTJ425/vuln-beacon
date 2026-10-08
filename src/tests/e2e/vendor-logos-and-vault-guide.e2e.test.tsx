@@ -131,7 +131,7 @@ describe('E2E: Authentic Vendor Logos & Vault Secrets Diagnostics Flow', () => {
     render(<App />);
 
     // Open Admin Console
-    const adminNavBtn = await screen.findByRole('button', { name: 'Admin Console' });
+    const adminNavBtn = await screen.findByRole('link', { name: 'Admin Console' });
     await userEvent.click(adminNavBtn);
 
     // Sign in through modal
@@ -166,7 +166,7 @@ describe('E2E: Authentic Vendor Logos & Vault Secrets Diagnostics Flow', () => {
     render(<App />);
 
     // Open Admin Console
-    const adminNavBtn = await screen.findByRole('button', { name: 'Admin Console' });
+    const adminNavBtn = await screen.findByRole('link', { name: 'Admin Console' });
     await userEvent.click(adminNavBtn);
 
     // AdminLoginModal is code-split, so it enters the DOM a tick after the click.

@@ -394,8 +394,8 @@ describe('E2E: Cross-Feature Interactions & Real-World Scenarios (Tiers 3 & 4)',
       expect(screen.getByText(new RegExp(APP_VERSION, 'i'))).toBeInTheDocument();
 
       // 4. Confirms absence of Sync Monitor / Webhooks / Public Sync button
-      expect(screen.queryByRole('button', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /Webhooks & Config/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /Webhooks & Config/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /^Sync All Feeds$/i })).not.toBeInTheDocument();
 
       // 5. Navigates to CVE Explorer, applies search and views details
@@ -496,7 +496,8 @@ describe('E2E: Cross-Feature Interactions & Real-World Scenarios (Tiers 3 & 4)',
         || document.querySelector('button svg.lucide-x')?.parentElement;
       if (closeBtn) fireEvent.click(closeBtn);
 
-      const resetBtn = screen.getByRole('button', { name: /重設|Reset/i });
+      // Closing the drawer is a history step back, which settles asynchronously.
+      const resetBtn = await screen.findByRole('button', { name: /重設|Reset/i });
       fireEvent.click(resetBtn);
     });
 

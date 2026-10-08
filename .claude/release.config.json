@@ -1,0 +1,45 @@
+{
+  "repo": {
+    "tagPrefix": "",
+    "releaseBranch": "main",
+    "devBranch": "dev",
+    "changelog": "docs/agent/CHANGELOG.md",
+    "changelogLang": "en",
+    "appDir": "src"
+  },
+  "version": {
+    "syncFiles": [
+      {
+        "path": "src/package.json",
+        "type": "npm"
+      },
+      {
+        "path": "src/config/version.ts",
+        "type": "regex",
+        "pattern": "'<version>'"
+      }
+    ],
+    "release": {
+      "enabled": true,
+      "publishedBy": "skill",
+      "draft": false,
+      "latest": true
+    }
+  },
+  "ship": {
+    "gates": [
+      {
+        "name": "verify (tests + build)",
+        "cmd": "npm run verify"
+      }
+    ],
+    "flow": {
+      "devFirst": true,
+      "askBeforeRelease": false,
+      "_askBeforeRelease_note": "Set false 2026-10-09 by the user for the UI/UX redesign: 'everything is authorized; I only want the result pushed to main'."
+    },
+    "frontend": {
+      "_note": "Cloudflare Pages project 'vuln-beacon' builds every pushed branch. dev -> https://dev.vuln-beacon.pages.dev, main -> https://vuln-beacon.pages.dev. Unknown paths are served index.html (SPA fallback verified 2026-10-09). Verify by content, not by asset hashes."
+    }
+  }
+}

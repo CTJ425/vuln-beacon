@@ -167,7 +167,7 @@ describe('E2E: Server-Side Manual Threat Feed Sync (Task 11c)', () => {
 
     render(<App />);
 
-    const adminNavBtn = await screen.findByRole('button', { name: /Admin Console/i });
+    const adminNavBtn = await screen.findByRole('link', { name: /Admin Console/i });
     fireEvent.click(adminNavBtn);
 
     expect(await screen.findByText(/後台系統身分驗證/i)).toBeInTheDocument();

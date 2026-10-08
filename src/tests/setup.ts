@@ -60,3 +60,11 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     })),
   });
 }
+
+// The app routes on the real URL; start every test at the root so one test's
+// navigation never leaks into the next.
+afterEach(() => {
+  if (typeof window !== 'undefined') {
+    window.history.replaceState(null, '', '/');
+  }
+});

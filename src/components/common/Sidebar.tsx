@@ -21,6 +21,9 @@ import {
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { VendorNode } from '@/services/productTaxonomy';
 import { APP_VERSION } from '@/config/version';
+import { pathForNav } from '@/lib/routes';
+import { useI18n } from '@/i18n/I18nContext';
+import type { MessageKey } from '@/i18n/messages/en';
 
 /**
  * Navigation state union for sidebar and page routing.
@@ -32,7 +35,8 @@ export type NavState =
   | { section: 'vendor'; vendorCode: string };
 
 export interface SidebarProps {
-  currentNav: NavState;
+  /** null when the URL matches no page, so no item reads as current. */
+  currentNav: NavState | null;
   onSelectNav: (nav: NavState) => void;
   taxonomy: VendorNode[];
   version?: string;
@@ -67,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   collapsed,
   onToggleCollapse,
 }) => {
+  const { t } = useI18n();
   const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
   const isControlled = typeof isCollapsed === 'boolean' || typeof collapsed === 'boolean';
   const effectiveCollapsed = isControlled ? Boolean(isCollapsed ?? collapsed) : internalCollapsed;
@@ -80,26 +85,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const allStaticItems: { id: 'explorer' | 'sync' | 'settings' | 'admin'; label: string; icon: React.ReactNode }[] = [
-    { id: 'explorer', label: 'CVE Explorer', icon: <Shield size={20} /> },
-    { id: 'sync', label: 'Sync Monitor', icon: <Activity size={20} /> },
-    { id: 'settings', label: 'Webhooks & Config', icon: <Settings size={20} /> },
-    { id: 'admin', label: 'Admin Console', icon: <Lock size={20} /> },
+  const allStaticItems: { id: 'explorer' | 'sync' | 'settings' | 'admin'; labelKey: MessageKey; icon: React.ReactNode }[] = [
+    { id: 'explorer', labelKey: 'nav.explorer', icon: <Shield size={18} /> },
+    { id: 'sync', labelKey: 'nav.sync', icon: <Activity size={18} /> },
+    { id: 'settings', labelKey: 'nav.settings', icon: <Settings size={18} /> },
+    { id: 'admin', labelKey: 'nav.admin', icon: <Lock size={18} /> },
   ];
-  const staticItems = allStaticItems.filter((item) => staticNavIds.includes(item.id));
+  const staticItems = allStaticItems
+    .filter((item) => staticNavIds.includes(item.id))
+    .map((item) => ({ ...item, label: t(item.labelKey) }));
+  const overviewLabel = t('nav.overview');
+  const collapseLabel = effectiveCollapsed ? t('sidebar.expand') : t('sidebar.collapse');
+
+  // Items are real links (copy, middle-click, open in new tab); a plain click
+  // stays in the app through onSelectNav, which may still gate on sign-in.
+  const linkProps = (nav: NavState) => ({
+    component: 'a' as const,
+    href: pathForNav(nav),
+    onClick: (event: React.MouseEvent<HTMLAnchorElement>) => {
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      onSelectNav(nav);
+    },
+  });
 
   const rowSx = (isSelected: boolean) => ({
-    borderRadius: 2,
-    py: 1.25,
-    px: effectiveCollapsed ? 1 : 1.5,
+    borderRadius: 1,
+    py: 0.75,
+    px: effectiveCollapsed ? 1 : 1.25,
     justifyContent: effectiveCollapsed ? 'center' : 'flex-start',
-    minHeight: 44,
+    minHeight: 36,
     bgcolor: isSelected ? 'action.selected' : 'transparent',
-    color: isSelected ? 'primary.main' : 'text.secondary',
+    color: isSelected ? 'text.primary' : 'text.secondary',
     '&:hover': {
       bgcolor: isSelected ? 'action.selected' : 'action.hover',
-      color: isSelected ? 'primary.main' : 'text.primary',
+      color: 'text.primary',
     },
+    '&.Mui-selected, &.Mui-selected:hover': { bgcolor: 'action.selected' },
   });
 
   const displayVersion = version.startsWith('v') ? version : `v${version}`;
@@ -143,27 +165,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }}
       >
         <List sx={{ px: effectiveCollapsed ? 1 : 1.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-          <Tooltip title={effectiveCollapsed ? 'Overview' : ''} placement="right">
+          <Tooltip title={effectiveCollapsed ? overviewLabel : ''} placement="right">
             <ListItemButton
-              onClick={() => onSelectNav({ section: 'dashboard' })}
-              selected={currentNav.section === 'dashboard'}
-              aria-label="Overview"
-              sx={rowSx(currentNav.section === 'dashboard')}
+              {...linkProps({ section: 'dashboard' })}
+              selected={currentNav?.section === 'dashboard'}
+              aria-label={overviewLabel}
+              sx={rowSx(currentNav?.section === 'dashboard')}
             >
-              <ListItemIcon sx={{ color: 'inherit', minWidth: effectiveCollapsed ? 0 : 36, justifyContent: 'center' }}>
-                <LayoutDashboard size={20} />
+              <ListItemIcon sx={{ color: 'inherit', minWidth: effectiveCollapsed ? 0 : 32, justifyContent: 'center' }}>
+                <LayoutDashboard size={18} />
               </ListItemIcon>
               {!effectiveCollapsed && (
                 <ListItemText
-                  primary="Overview"
-                  primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: currentNav.section === 'dashboard' ? 700 : 500 }}
+                  primary={overviewLabel}
+                  primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: currentNav?.section === 'dashboard' ? 600 : 500 }}
                 />
               )}
             </ListItemButton>
           </Tooltip>
 
           {taxonomy.map((vendor) => {
-            const isSelected = currentNav.section === 'vendor' && currentNav.vendorCode === vendor.vendorCode;
+            const isSelected = currentNav?.section === 'vendor' && currentNav.vendorCode === vendor.vendorCode;
             return (
               <Tooltip
                 key={vendor.vendorCode}
@@ -171,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 placement="right"
               >
                 <ListItemButton
-                  onClick={() => onSelectNav({ section: 'vendor', vendorCode: vendor.vendorCode })}
+                  {...linkProps({ section: 'vendor', vendorCode: vendor.vendorCode })}
                   selected={isSelected}
                   aria-label={vendor.vendorName}
                   sx={rowSx(isSelected)}
@@ -188,22 +210,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
 
           {staticItems.map((item) => {
-            const isSelected = currentNav.section === item.id;
+            const isSelected = currentNav?.section === item.id;
             return (
               <Tooltip key={item.id} title={effectiveCollapsed ? item.label : ''} placement="right">
                 <ListItemButton
-                  onClick={() => onSelectNav({ section: item.id })}
+                  {...linkProps({ section: item.id })}
                   selected={isSelected}
                   aria-label={item.label}
                   sx={rowSx(isSelected)}
                 >
-                  <ListItemIcon sx={{ color: 'inherit', minWidth: effectiveCollapsed ? 0 : 36, justifyContent: 'center' }}>
+                  <ListItemIcon sx={{ color: 'inherit', minWidth: effectiveCollapsed ? 0 : 32, justifyContent: 'center' }}>
                     {item.icon}
                   </ListItemIcon>
                   {!effectiveCollapsed && (
                     <ListItemText
                       primary={item.label}
-                      primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: isSelected ? 700 : 500 }}
+                      primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: isSelected ? 600 : 500 }}
                     />
                   )}
                 </ListItemButton>
@@ -245,12 +267,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </Typography>
 
         <Tooltip
-          title={effectiveCollapsed ? '展開側邊欄' : '收起側邊欄'}
+          title={collapseLabel}
           placement={effectiveCollapsed ? 'right' : 'top'}
         >
           <IconButton
             onClick={handleToggleCollapse}
-            aria-label={effectiveCollapsed ? '展開側邊欄' : '收起側邊欄'}
+            aria-label={collapseLabel}
             data-testid="sidebar-collapse-button"
             size="small"
             sx={{

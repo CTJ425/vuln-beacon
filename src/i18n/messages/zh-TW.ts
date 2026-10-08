@@ -1,0 +1,25 @@
+import type { Messages } from './en';
+
+export const zhTW: Messages = {
+  'nav.overview': '總覽',
+  'nav.explorer': 'CVE 檢索',
+  'nav.sync': '同步監控',
+  'nav.settings': 'Webhook 與設定',
+  'nav.admin': '管理後台',
+  'nav.primary': '主要導覽',
+  'sidebar.collapse': '收起側邊欄',
+  'sidebar.expand': '展開側邊欄',
+  'header.github': 'GitHub 原始碼儲存庫',
+  'theme.toLight': '切換為淺色模式',
+  'theme.toDark': '切換為深色模式',
+  'language.label': '語言',
+  'state.loading': '正在載入資安資料…',
+  'state.loadError': '無法從 Supabase 載入資安資料，請確認連線後重試。',
+  'state.retry': '重試',
+  'state.empty': '資料庫已連線，但還沒有任何公告。請登入管理後台執行第一次同步。',
+  'state.goToAdmin': '前往管理後台',
+  'state.notFoundTitle': '找不到頁面',
+  'state.notFoundBody': '這個網址沒有對應的頁面。',
+  'detail.advisoryMissing': '找不到公告 {id}。',
+  'detail.cveMissing': '找不到 CVE {id}。',
+};

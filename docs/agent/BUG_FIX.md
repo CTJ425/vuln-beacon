@@ -1,5 +1,11 @@
 # Open Bugs
 
+## BUG-034: Adapter version data mislabeled or lost (found in version-model research)
+- **Status**: OPEN (2026-10-09, not reproduced against live data; from code reading, see `docs/agent/VERSION_MODEL_RESEARCH.md`)
+- **Severity**: MEDIUM (wrong fix information can reach the UI and alerts)
+- **Items**: Cisco `fixed_versions` holds affected versions (`src/adapters/cisco.ts:242-248`); Debian `<not-affected>`/`<no-dsa>` lines would be parsed as versions and marked Fixed (`src/adapters/debian.ts:177,248-254`); Debian tracker uses `repositories[rel]` as the fixed version (`debian.ts:365`); Ubuntu `fixed_versions` loses the release each version belongs to (`src/adapters/ubuntu.ts:153`); SUSE `componentFromPackageName` turns `java-11-openjdk-…` into `java` (`src/adapters/suse.ts:30-35`).
+- **Recommendation**: fix with phase 2 of the redesign, test-first against fixtures.
+
 ## BUG-006: product_impacts duplicated across advisory_cve_map rows
 - **Status**: OPEN (2026-08-28, discovered during BUG-003 sync-payload oversize fix)
 - **Severity**: LOW (high payload waste; deferred for schema impact; now also bounds BUG-003 (fixed) chunk size floor)

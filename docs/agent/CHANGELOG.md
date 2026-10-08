@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.6.0-dev.1 - 2026-10-09
+### Added
+- **Shareable URLs**: every page has its own address (`/`, `/explorer`, `/vendors/:code`, `/admin/webhooks|sync|logs|health`), and every advisory and CVE has a deep link (`/advisories/:id`, `/cves/:id`). Opening an item from a list puts its URL in the address bar; a deep link opens the item over the overview; Back and Forward work. Sidebar items are real links. A signed-out visit to an admin URL asks for sign-in.
+- **English and Traditional Chinese interface**: EN / 中 switch in the header; the choice is remembered, and the first visit follows the browser language. The navigation and app-level messages are translated so far; vendor advisory text is never translated.
+- **Design tokens** for the dark (primary) and light themes: surfaces, text, one accent, a four-step severity scale and seven vulnerability-state tones, each checked by tests for at least 4.5:1 text contrast. Severity, status and state badges take their colors from the theme.
+
+### Changed
+- Header and sidebar restyled on the new tokens (no translucent blur, denser navigation).
+- Admin Console tabs are part of the URL.
+
+### Fixed
+- Live Nutanix smoke test asked for only the two newest advisories, whose detail pages the portal currently answers with HTTP 500, so it returned nothing (BUG-035).
+
 ## 1.5.0 - 2026-09-26
 ### Added
 - **Instant repeat visits**: the last dataset is kept in the browser (IndexedDB). On the next visit it is shown at once while a fresh copy loads, and replaced when that copy arrives. A late cache read never overwrites live data. The cache is ignored after a format change and degrades to "no cache" when storage is unavailable.

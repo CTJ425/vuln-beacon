@@ -236,9 +236,9 @@ describe('Sidebar Component (TDD)', () => {
         />
       );
 
-      const overviewBtn = screen.getByRole('button', { name: 'Overview' });
-      const vendorBtn = screen.getByRole('button', { name: 'Red Hat' });
-      const explorerBtn = screen.getByRole('button', { name: 'CVE Explorer' });
+      const overviewBtn = screen.getByRole('link', { name: 'Overview' });
+      const vendorBtn = screen.getByRole('link', { name: 'Red Hat' });
+      const explorerBtn = screen.getByRole('link', { name: 'CVE Explorer' });
 
       expect(overviewBtn).toBeInTheDocument();
       expect(vendorBtn).toBeInTheDocument();

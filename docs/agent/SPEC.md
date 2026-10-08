@@ -37,7 +37,9 @@ Describes the system as built (1.3.0). Feature-level designs live in `docs/agent
 * Alert content: vendor, advisory id and title, CVE id, CVSS score, severity, affected products, fixed versions and advisory URL. Destinations must be public HTTPS URLs (SSRF guard).
 
 ### 1.4 Web Dashboard
-* Stack: React 18, Vite 6, MUI 6, TypeScript. Routes other than the Dashboard are code-split. Hosted on Cloudflare, deployed from `main`.
+* Stack: React 18, Vite 6, MUI 6, TypeScript, React Router 7. Routes other than the Dashboard are code-split. Hosted on Cloudflare, deployed from `main`.
+* **URLs**: `/`, `/explorer`, `/vendors/:code`, `/admin[/webhooks|sync|logs|health]`, `/advisories/:advisoryId`, `/cves/:cveId` (`src/lib/routes.ts`). Detail URLs are shareable deep links.
+* **Languages**: English and Traditional Chinese UI (`src/i18n/`), chosen by the visitor and remembered; vendor content is not translated.
 * **Dashboard**: tracked, critical and impacted-component counts, per-vendor advisory cards, recent critical and high advisories.
 * **Data load**: one `explorer_dataset(p_compact := true)` RPC feeds the Dashboard, Explorer and Vendor pages. It returns each distinct product impact once per advisory, with per-mapping indexes (`null` = all). The last result is cached in IndexedDB and shown on the next visit while fresh data loads.
 * **Explorer**: advisory and CVE views, 50 rows per page; filter by product family, severity and impact state; keyword search over CVE, advisory, component, product, errata and description. A CVE lists every vendor that published an advisory for it.

@@ -33,7 +33,10 @@ describe('Adapters Registry Smoke Test', () => {
     const adapter = getAdapterByCode('nutanix');
     expect(adapter).toBeDefined();
 
-    const items = await adapter!.fetchAdvisories(2);
+    // The portal's detail endpoint can answer 500 for its newest advisories for
+    // a while (seen 2026-10-09); the adapter skips those, so ask for enough
+    // entries that a few broken details cannot empty the result.
+    const items = await adapter!.fetchAdvisories(10);
     expect(Array.isArray(items)).toBe(true);
     expect(items.length).toBeGreaterThan(0);
 
@@ -47,7 +50,10 @@ describe('Adapters Registry Smoke Test', () => {
     const adapter = getAdapterByCode('ubuntu');
     expect(adapter).toBeDefined();
 
-    const items = await adapter!.fetchAdvisories(2);
+    // The portal's detail endpoint can answer 500 for its newest advisories for
+    // a while (seen 2026-10-09); the adapter skips those, so ask for enough
+    // entries that a few broken details cannot empty the result.
+    const items = await adapter!.fetchAdvisories(10);
     expect(Array.isArray(items)).toBe(true);
     expect(items.length).toBeGreaterThan(0);
 
@@ -61,7 +67,10 @@ describe('Adapters Registry Smoke Test', () => {
     const adapter = getAdapterByCode('debian');
     expect(adapter).toBeDefined();
 
-    const items = await adapter!.fetchAdvisories(2);
+    // The portal's detail endpoint can answer 500 for its newest advisories for
+    // a while (seen 2026-10-09); the adapter skips those, so ask for enough
+    // entries that a few broken details cannot empty the result.
+    const items = await adapter!.fetchAdvisories(10);
     expect(Array.isArray(items)).toBe(true);
     expect(items.length).toBeGreaterThan(0);
 
@@ -75,7 +84,10 @@ describe('Adapters Registry Smoke Test', () => {
     const adapter = getAdapterByCode('suse');
     expect(adapter).toBeDefined();
 
-    const items = await adapter!.fetchAdvisories(2);
+    // The portal's detail endpoint can answer 500 for its newest advisories for
+    // a while (seen 2026-10-09); the adapter skips those, so ask for enough
+    // entries that a few broken details cannot empty the result.
+    const items = await adapter!.fetchAdvisories(10);
     expect(Array.isArray(items)).toBe(true);
     expect(items.length).toBeGreaterThan(0);
 
@@ -88,7 +100,10 @@ describe('Adapters Registry Smoke Test', () => {
     const adapter = getAdapterByCode('cisco');
     expect(adapter).toBeDefined();
 
-    const items = await adapter!.fetchAdvisories(2);
+    // The portal's detail endpoint can answer 500 for its newest advisories for
+    // a while (seen 2026-10-09); the adapter skips those, so ask for enough
+    // entries that a few broken details cannot empty the result.
+    const items = await adapter!.fetchAdvisories(10);
     expect(Array.isArray(items)).toBe(true);
     expect(items.length).toBeGreaterThan(0);
 
@@ -101,7 +116,10 @@ describe('Adapters Registry Smoke Test', () => {
     const adapter = getAdapterByCode('vmware');
     expect(adapter).toBeDefined();
 
-    const items = await adapter!.fetchAdvisories(2);
+    // The portal's detail endpoint can answer 500 for its newest advisories for
+    // a while (seen 2026-10-09); the adapter skips those, so ask for enough
+    // entries that a few broken details cannot empty the result.
+    const items = await adapter!.fetchAdvisories(10);
     expect(Array.isArray(items)).toBe(true);
     expect(items.length).toBeGreaterThan(0);
 

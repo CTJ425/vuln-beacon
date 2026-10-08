@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
+import { BrowserRouter, useLocation, useNavigate } from 'react-router';
 import { Box, CircularProgress, Typography, Alert, Button } from '@mui/material';
 import { ThemeProvider } from '@/theme/ThemeContext';
+import { I18nProvider, useI18n } from '@/i18n/I18nContext';
+import type { MessageKey } from '@/i18n/messages/en';
 import { Header } from '@/components/common/Header';
 import { Sidebar, NavState } from '@/components/common/Sidebar';
 import { PageState } from '@/components/common/PageState';
@@ -16,6 +19,7 @@ import { deriveTaxonomy } from '@/services/productTaxonomy';
 import { supabase } from '@/lib/supabase';
 import { isAdminUser } from '@/lib/adminAuth';
 import { readCachedDataset } from '@/lib/explorerDataset';
+import { ADMIN_TABS, AdminTab, AppRoute, parsePath, pathFor, pathForNav } from '@/lib/routes';
 import { RefreshCw } from 'lucide-react';
 
 const ExplorerPage = lazy(() => import('@/pages/ExplorerPage').then((m) => ({ default: m.ExplorerPage })));
@@ -35,24 +39,61 @@ const LazyFallback: React.FC = () => (
 // account without the admin role is treated exactly like a signed-out one.
 const adminOrNull = (user: any) => (isAdminUser(user) ? user : null);
 
+// A detail URL (/advisories/:id, /cves/:id) opens over the page it was opened
+// from, carried in history state; a deep link opens over the overview.
+interface DetailLocationState {
+  background?: string;
+}
+
+const navForRoute = (route: AppRoute): NavState | null => {
+  switch (route.page) {
+    case 'dashboard':
+    case 'explorer':
+      return { section: route.page };
+    case 'vendor':
+      return { section: 'vendor', vendorCode: route.vendorCode };
+    case 'admin':
+      return { section: 'admin' };
+    default:
+      return null;
+  }
+};
+
 export const AppContent: React.FC = () => {
-  const [currentNav, setCurrentNav] = useState<NavState>({ section: 'dashboard' });
+  const { t } = useI18n();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const route = useMemo(() => parsePath(location.pathname), [location.pathname]);
+  const isDetailRoute = route.page === 'advisory' || route.page === 'cve';
+  const background = (location.state as DetailLocationState | null)?.background;
+  const backgroundPath = isDetailRoute ? background ?? '/' : location.pathname;
+  const pageRoute = useMemo(
+    () => (isDetailRoute ? parsePath(backgroundPath) : route),
+    [isDetailRoute, backgroundPath, route]
+  );
+  const currentNav = navForRoute(pageRoute);
+  const adminTab = pageRoute.page === 'admin' ? ADMIN_TABS.indexOf(pageRoute.tab) : 0;
+
   const [currentUser, setCurrentUser] = useState<any>(null);
+  // False until the first session check settles, so a deep link to /admin is
+  // not treated as signed out while the session is still being read.
+  const [authChecked, setAuthChecked] = useState(false);
   const [showAdminLogin, setShowAdminLogin] = useState<boolean>(false);
-  const [adminTab, setAdminTab] = useState<number>(0);
-  const [pendingAdminTab, setPendingAdminTab] = useState<number | null>(null);
+  const [pendingAdminTab, setPendingAdminTab] = useState<AdminTab | null>(null);
+  const adminDeepLinkPending = useRef(route.page === 'admin');
   const [cves, setCves] = useState<CveTableRowItem[]>([]);
   const [advisories, setAdvisories] = useState<AdvisoryRowItem[]>([]);
   const [syncLogs, setSyncLogs] = useState<VendorSyncLog[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
-  const [selectedCve, setSelectedCve] = useState<CveTableRowItem | null>(null);
-  const [selectedAdvisory, setSelectedAdvisory] = useState<AdvisoryRowItem | null>(null);
+  const [hasLiveData, setHasLiveData] = useState(false);
   const [hasOpenedCveDrawer, setHasOpenedCveDrawer] = useState(false);
   const [hasOpenedAdvisoryDrawer, setHasOpenedAdvisoryDrawer] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // Holds a message key, so switching language re-renders the message without
+  // making loadData (and the fetch effect that depends on it) change identity.
+  const [loadError, setLoadError] = useState<MessageKey | null>(null);
   const [isRefreshingLogs, setIsRefreshingLogs] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
@@ -75,6 +116,52 @@ export const AppContent: React.FC = () => {
       // Ignore localStorage write errors
     }
   }, [isSidebarCollapsed]);
+
+  const selectedAdvisory = useMemo(
+    () => (route.page === 'advisory' ? advisories.find((a) => a.advisory_id === route.advisoryId) ?? null : null),
+    [route, advisories]
+  );
+  const selectedCve = useMemo(
+    () => (route.page === 'cve' ? cves.find((c) => c.cve_id === route.cveId) ?? null : null),
+    [route, cves]
+  );
+  // Only claim a deep-linked item is missing once live data is in: the cached
+  // dataset from an earlier visit may simply predate it.
+  const missingDetailId =
+    hasLiveData && !selectedAdvisory && !selectedCve
+      ? route.page === 'advisory'
+        ? route.advisoryId
+        : route.page === 'cve'
+          ? route.cveId
+          : null
+      : null;
+
+  const openDetail = useCallback(
+    (detail: AppRoute) => {
+      navigate(pathFor(detail), { state: { background: backgroundPath } satisfies DetailLocationState });
+    },
+    [navigate, backgroundPath]
+  );
+  const setSelectedAdvisory = useCallback(
+    (item: AdvisoryRowItem | null) => {
+      if (item) openDetail({ page: 'advisory', advisoryId: item.advisory_id });
+    },
+    [openDetail]
+  );
+  const setSelectedCve = useCallback(
+    (item: CveTableRowItem | null) => {
+      if (item) openDetail({ page: 'cve', cveId: item.cve_id });
+    },
+    [openDetail]
+  );
+  const closeDetail = useCallback(() => {
+    // Opened in-app: step back so Back/Forward stay symmetric. Deep link: there
+    // is no in-app entry to return to, so replace with the overview.
+    if (background) navigate(-1);
+    else navigate('/', { replace: true });
+  }, [background, navigate]);
+
+  const setCurrentNav = useCallback((nav: NavState) => navigate(pathForNav(nav)), [navigate]);
 
   useEffect(() => {
     if (selectedCve && !hasOpenedCveDrawer) {
@@ -115,13 +202,14 @@ export const AppContent: React.FC = () => {
       ]);
 
       liveDataLoaded.current = true;
+      setHasLiveData(true);
       setCves(fetchedCves);
       setSyncLogs(fetchedLogs);
       setWebhooks(fetchedWebhooks);
       setAdvisories(fetchedAdvisories);
     } catch (err) {
       console.error('Error loading Supabase live data:', err);
-      setLoadError('Unable to load security data from Supabase. Check the connection and try again.');
+      setLoadError('state.loadError');
     } finally {
       setIsLoading(false);
     }
@@ -158,24 +246,22 @@ export const AppContent: React.FC = () => {
   }, [cveService, advisoryService]);
 
   useEffect(() => {
-    // If user is viewing the admin section but the session expires/is revoked,
-    // immediately return to dashboard to protect backstage access.
-    if (currentNav.section === 'admin' && !currentUser && !isLoading) {
-      setCurrentNav({ section: 'dashboard' });
+    // The backstage needs an admin. A deep link asks the visitor to sign in;
+    // a session that expires or is revoked returns to the overview at once.
+    if (pageRoute.page !== 'admin' || !authChecked || currentUser) return;
+    if (adminDeepLinkPending.current) {
+      setPendingAdminTab(pageRoute.tab);
+      setShowAdminLogin(true);
     }
-  }, [currentNav.section, currentUser, isLoading]);
+    adminDeepLinkPending.current = false;
+    navigate('/', { replace: true });
+  }, [pageRoute, authChecked, currentUser, navigate]);
 
   useEffect(() => {
     // A slow or unreachable vendors query must never delay or block the rest
     // of the dashboard: load it independently of the main isLoading gate.
     vendorService.fetchVendors().then(setVendors);
   }, [vendorService]);
-
-  useEffect(() => {
-    // A drawer opened from one page must not persist over an unrelated page.
-    setSelectedCve(null);
-    setSelectedAdvisory(null);
-  }, [currentNav]);
 
   useEffect(() => {
     if (!syncMessage) return;
@@ -191,7 +277,9 @@ export const AppContent: React.FC = () => {
         if (data?.session?.user) {
           setCurrentUser(adminOrNull(data.session.user));
         }
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => setAuthChecked(true));
+    } else {
+      setAuthChecked(true);
     }
 
     if (supabase?.auth?.onAuthStateChange) {
@@ -215,26 +303,18 @@ export const AppContent: React.FC = () => {
   }, [currentUser, webhookConfigService]);
 
   const handleSelectNav = (nav: NavState) => {
-    if (nav.section === 'sync' || nav.section === 'settings') {
-      const targetTab = nav.section === 'sync' ? 1 : 0;
-      if (!currentUser) {
-        setPendingAdminTab(targetTab);
-        setShowAdminLogin(true);
-        return;
-      }
-      setAdminTab(targetTab);
-      setCurrentNav({ section: 'admin' });
-      return;
-    }
-    if (nav.section === 'admin' && !currentUser) {
-      setPendingAdminTab(0);
+    const isBackstage = nav.section === 'admin' || nav.section === 'sync' || nav.section === 'settings';
+    if (isBackstage && !currentUser) {
+      const target = parsePath(pathForNav(nav));
+      setPendingAdminTab(target.page === 'admin' ? target.tab : ADMIN_TABS[0]);
       setShowAdminLogin(true);
       return;
     }
-    if (nav.section === 'admin') {
-      setAdminTab(0);
-    }
     setCurrentNav(nav);
+  };
+
+  const handleAdminTabChange = (index: number) => {
+    navigate(pathFor({ page: 'admin', tab: ADMIN_TABS[index] ?? ADMIN_TABS[0] }));
   };
 
   const handleAdminLoginSuccess = (user?: any) => {
@@ -248,11 +328,8 @@ export const AppContent: React.FC = () => {
         }
       }).catch(() => {});
     }
-    if (pendingAdminTab !== null) {
-      setAdminTab(pendingAdminTab);
-      setPendingAdminTab(null);
-    }
-    setCurrentNav({ section: 'admin' });
+    navigate(pathFor({ page: 'admin', tab: pendingAdminTab ?? ADMIN_TABS[0] }));
+    setPendingAdminTab(null);
   };
 
   const handleSignOut = async () => {
@@ -363,7 +440,7 @@ export const AppContent: React.FC = () => {
         <Sidebar
           currentNav={currentNav}
           onSelectNav={handleSelectNav}
-          taxonomy={currentNav.section === 'admin' ? [] : taxonomy}
+          taxonomy={pageRoute.page === 'admin' ? [] : taxonomy}
           staticNavIds={['explorer', 'admin']}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={handleToggleSidebar}
@@ -393,25 +470,31 @@ export const AppContent: React.FC = () => {
           )}
 
           {isLoading ? (
-            <PageState variant="loading" message="Connecting to live Supabase database..." />
+            <PageState variant="loading" message={t('state.loading')} />
           ) : (
             <>
               {loadError && (
                 <PageState
                   variant="error"
-                  message={loadError}
+                  message={t(loadError)}
                   action={
                     <Button color="inherit" size="small" onClick={loadData}>
-                      Retry
+                      {t('state.retry')}
                     </Button>
                   }
                 />
               )}
 
-              {!loadError && cves.length === 0 && advisories.length === 0 && currentNav.section === 'dashboard' && (
+              {missingDetailId && (
+                <Alert severity="warning" sx={{ mb: 3 }} onClose={closeDetail}>
+                  {t(route.page === 'cve' ? 'detail.cveMissing' : 'detail.advisoryMissing', { id: missingDetailId })}
+                </Alert>
+              )}
+
+              {!loadError && cves.length === 0 && advisories.length === 0 && pageRoute.page === 'dashboard' && (
                 <PageState
                   variant="empty"
-                  message="Connected to Supabase live project. Database is initialized. Sign in to the Admin Console to start the first multi-vendor security disclosure ingestion."
+                  message={t('state.empty')}
                   action={
                     <Button
                       color="inherit"
@@ -424,13 +507,13 @@ export const AppContent: React.FC = () => {
                         handleSelectNav({ section: 'admin' });
                       }}
                     >
-                      Go to Admin Console
+                      {t('state.goToAdmin')}
                     </Button>
                   }
                 />
               )}
 
-              {currentNav.section === 'dashboard' && (
+              {pageRoute.page === 'dashboard' && (
                 <DashboardPage
                   advisories={advisories}
                   cves={cves}
@@ -444,7 +527,7 @@ export const AppContent: React.FC = () => {
               {/* Suspense scoped to the lazy pages only, so a pending chunk never
                   unmounts the sidebar, header, or this <main> element. */}
               <Suspense fallback={<LazyFallback />}>
-                {currentNav.section === 'explorer' && (
+                {pageRoute.page === 'explorer' && (
                   <ExplorerPage
                     cves={cves}
                     advisories={advisories}
@@ -456,9 +539,9 @@ export const AppContent: React.FC = () => {
                   />
                 )}
 
-                {currentNav.section === 'vendor' && (
+                {pageRoute.page === 'vendor' && (
                   <VendorPage
-                    vendorCode={currentNav.vendorCode}
+                    vendorCode={pageRoute.vendorCode}
                     advisories={advisories}
                     cves={cves}
                     taxonomy={taxonomy}
@@ -469,7 +552,7 @@ export const AppContent: React.FC = () => {
                   />
                 )}
 
-                {currentNav.section === 'admin' && (
+                {pageRoute.page === 'admin' && currentUser && (
                   <AdminPage
                     userEmail={currentUser?.email}
                     webhooks={webhooks}
@@ -485,18 +568,18 @@ export const AppContent: React.FC = () => {
                     isSyncing={isSyncing}
                     onSaveSchedule={handleSaveSchedule}
                     activeTab={adminTab}
-                    onTabChange={setAdminTab}
+                    onTabChange={handleAdminTabChange}
                   />
                 )}
               </Suspense>
 
-              {!['dashboard', 'explorer', 'vendor', 'admin'].includes(currentNav.section) && (
+              {pageRoute.page === 'notFound' && (
                 <Box sx={{ p: 4, textAlign: 'center' }} data-testid="nav-fallback-container">
                   <Typography variant="h6" color="text.secondary" gutterBottom>
-                    Page Not Found
+                    {t('state.notFoundTitle')}
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    The requested section is not recognized or has moved to the Admin Console.
+                    {t('state.notFoundBody')}
                   </Typography>
                 </Box>
               )}
@@ -510,7 +593,7 @@ export const AppContent: React.FC = () => {
           <CveDetailDrawer
             open={Boolean(selectedCve)}
             item={selectedCve}
-            onClose={() => setSelectedCve(null)}
+            onClose={closeDetail}
           />
         </Suspense>
       )}
@@ -520,7 +603,7 @@ export const AppContent: React.FC = () => {
           <AdvisoryDetailDrawer
             open={Boolean(selectedAdvisory)}
             item={selectedAdvisory}
-            onClose={() => setSelectedAdvisory(null)}
+            onClose={closeDetail}
           />
         </Suspense>
       )}
@@ -541,7 +624,11 @@ export const AppContent: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <ThemeProvider>
-      <AppContent />
+      <I18nProvider>
+        <BrowserRouter>
+          <AppContent />
+        </BrowserRouter>
+      </I18nProvider>
     </ThemeProvider>
   );
 };

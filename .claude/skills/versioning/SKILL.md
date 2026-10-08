@@ -54,7 +54,7 @@ Examples: target `<x.y.z>` → first change `<x.y.z>-dev.1`, second `<x.y.z>-dev
 ## Release Checklist
 
 1. Confirm the target official number (minor for new adapters/features, patch for fixes).
-2. Set every file in `version.config.json` → `syncFiles` to that number (no `-dev`).
+2. Set every file in `.claude/release.config.json` → `version.syncFiles` to that number (no `-dev`).
 3. Finalize `docs/agent/CHANGELOG.md` with sections: `Added`, `Changed`, `Fixed`.
 4. Update `docs/agent/PROGRESS.md` and `docs/agent/TASK.md`.
 5. Run verification suite (`npm --prefix src run verify`).

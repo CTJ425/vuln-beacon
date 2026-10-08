@@ -123,7 +123,7 @@ describe('E2E: Collapsible Sidebar Feature', () => {
     fireEvent.click(screen.getByTestId('sidebar-collapse-button'));
 
     // Accessibility contract: Navigation items are discoverable by role and name even when collapsed
-    const explorerBtn = screen.getByRole('button', { name: 'CVE Explorer' });
+    const explorerBtn = screen.getByRole('link', { name: 'CVE Explorer' });
     expect(explorerBtn).toBeInTheDocument();
     fireEvent.click(explorerBtn);
 

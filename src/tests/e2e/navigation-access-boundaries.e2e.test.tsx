@@ -118,7 +118,7 @@ describe('E2E: Navigation & Access Boundaries (R1, R2)', () => {
       await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
       // In R1, Sync Monitor is removed from public sidebar
-      const syncNavButton = screen.queryByRole('button', { name: /^Sync Monitor$/i });
+      const syncNavButton = screen.queryByRole('link', { name: /^Sync Monitor$/i });
       expect(syncNavButton).not.toBeInTheDocument();
     });
 
@@ -127,7 +127,7 @@ describe('E2E: Navigation & Access Boundaries (R1, R2)', () => {
       await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
       // In R1, Webhooks & Config is removed from public sidebar
-      const webhooksNavButton = screen.queryByRole('button', { name: /Webhooks & Config/i });
+      const webhooksNavButton = screen.queryByRole('link', { name: /Webhooks & Config/i });
       expect(webhooksNavButton).not.toBeInTheDocument();
     });
 
@@ -436,7 +436,7 @@ describe('E2E: Navigation & Access Boundaries (R1, R2)', () => {
       vi.spyOn(CveService.prototype, 'fetchCves').mockResolvedValue([]);
 
       render(<App />);
-      await screen.findByText(/Connecting to live Supabase database/i, {}, { timeout: 4000 });
+      await screen.findByText(/Loading security data/i, {}, { timeout: 4000 });
 
       // If empty alert button is clicked while unauthenticated, it must require admin login
       const emptyAlertSyncBtn = screen.queryByRole('button', { name: /Sync All Feeds Now/i });

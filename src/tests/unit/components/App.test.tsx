@@ -103,8 +103,8 @@ describe('App Root Component', () => {
     // R1: Sync Monitor and Webhooks & Config are no longer public sidebar tabs.
     // They live inside the authenticated Admin Console, covered by
     // tests/e2e/admin-backstage-flow.e2e.test.tsx.
-    expect(screen.queryByRole('button', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Webhooks & Config$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Webhooks & Config$/i })).not.toBeInTheDocument();
   });
 
   it('should render a vendor group in the sidebar derived from advisory data, with the static nav items unchanged', async () => {
@@ -119,15 +119,15 @@ describe('App Root Component', () => {
     // R1: only the public static nav items remain; sync/webhooks moved behind auth
     expect(screen.getByText('CVE Explorer')).toBeInTheDocument();
     expect(screen.getByText('Admin Console')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Webhooks & Config$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Sync Monitor$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Webhooks & Config$/i })).not.toBeInTheDocument();
   });
 
   it('prompts admin login when selecting Admin Console or legacy admin sections without an active session', async () => {
     render(<App />);
     await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
-    const adminNavBtn = await screen.findByRole('button', { name: /Admin Console/i });
+    const adminNavBtn = await screen.findByRole('link', { name: /Admin Console/i });
     fireEvent.click(adminNavBtn);
 
     expect(await screen.findByText(/後台系統身分驗證/i)).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe('App Root Component', () => {
     render(<App />);
     await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
-    const adminNavBtn = await screen.findByRole('button', { name: /Admin Console/i });
+    const adminNavBtn = await screen.findByRole('link', { name: /Admin Console/i });
     fireEvent.click(adminNavBtn);
 
     // Click Sync Monitor tab inside Admin Console
@@ -157,7 +157,7 @@ describe('App Root Component', () => {
     await screen.findByText(/Security Intelligence Overview/i, {}, { timeout: 4000 });
 
     // Directly click Overview to confirm standard page renders
-    const overviewBtn = screen.getByRole('button', { name: /Overview/i });
+    const overviewBtn = screen.getByRole('link', { name: /Overview/i });
     expect(overviewBtn).toBeInTheDocument();
 
     // The container should not be visible for valid routes

@@ -2,6 +2,16 @@
 
 ---
 
+### BUG-035: Live Nutanix smoke test returned no advisories — FIXED
+- **Date**: Found and fixed 2026-10-09 (1.6.0)
+- **Severity**: LOW (test only)
+- **Location**: `src/tests/smoke/adapters.smoke.test.ts`
+- **Root Cause**: the portal list API works, but `GET /api/v1/advisory?id=` answered 500 for the newest advisories (2026-10-09: NXSA-AHV-11.2.0.4, NXSA-AOS-7.3.1.18, NXSA-PC/AOS-7.6.0.8; older ones 200). The test fetched only the 2 newest; the adapter correctly skips failed details, so the result was empty.
+- **Fix**: the smoke test fetches 10 entries. Adapter unchanged: a skipped advisory is picked up by a later sync once the portal serves its detail.
+- **Status**: ✅ FIXED
+
+---
+
 ### BUG-033: Explorer read 38.6 MB of JSON and rendered every row on each keystroke — FIXED
 - **Date**: Found and fixed 2026-09-26 (1.4.0)
 - **Severity**: HIGH (performance)

@@ -103,7 +103,7 @@ describe('E2E: Admin Backstage System & Auth Flow', () => {
     expect(screen.queryByText(/後台系統身分驗證/i)).not.toBeInTheDocument();
 
     // Public sidebar does not offer unauthenticated Sync Monitor
-    const publicSyncButton = screen.queryByRole('button', { name: /^Sync Monitor$/i });
+    const publicSyncButton = screen.queryByRole('link', { name: /^Sync Monitor$/i });
     expect(publicSyncButton).not.toBeInTheDocument();
 
     // Access Admin Console to reach Sync Monitor

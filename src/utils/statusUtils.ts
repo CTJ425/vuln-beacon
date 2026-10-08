@@ -2,83 +2,39 @@
  * Utility functions and configurations for product impact states across all vendors.
  */
 
+import type { VulnStateTone } from '@/theme/tokens';
+
 export interface StateBadgeConfig {
   label: string;
-  color: string;
-  bg: string;
-  border?: string;
+  /** Theme tone; StateBadge reads its colors from palette.vulnState[tone]. */
+  tone: VulnStateTone;
 }
 
 export function getStateBadgeConfig(state?: string | null): StateBadgeConfig {
   const s = (state || '').toLowerCase().trim();
 
   if (s === 'affected' || s === 'open' || s === 'needed') {
-    return {
-      label: '🔴 受影響 (Affected)',
-      color: '#ef4444',
-      bg: 'rgba(239, 68, 68, 0.15)',
-      border: '1px solid rgba(239, 68, 68, 0.3)',
-    };
+    return { label: '🔴 受影響 (Affected)', tone: 'affected' };
   }
-
   if (s === 'will not fix' || s === 'wontfix') {
-    return {
-      label: '🔴 不予修復 (Will not fix)',
-      color: '#f87171',
-      bg: 'rgba(239, 68, 68, 0.12)',
-      border: '1px solid rgba(239, 68, 68, 0.25)',
-    };
+    return { label: '🔴 不予修復 (Will not fix)', tone: 'wontfix' };
   }
-
   if (s.includes('not affected') || s === 'not_affected') {
-    return {
-      label: '🟢 不受影響 (Not affected)',
-      color: '#22c55e',
-      bg: 'rgba(34, 197, 94, 0.15)',
-      border: '1px solid rgba(34, 197, 94, 0.3)',
-    };
+    return { label: '🟢 不受影響 (Not affected)', tone: 'notAffected' };
   }
-
   if (s === 'fixed' || s === 'resolved' || s === 'released') {
-    return {
-      label: '🟢 已修復 (Fixed)',
-      color: '#22c55e',
-      bg: 'rgba(34, 197, 94, 0.15)',
-      border: '1px solid rgba(34, 197, 94, 0.3)',
-    };
+    return { label: '🟢 已修復 (Fixed)', tone: 'fixed' };
   }
-
   if (s === 'fix deferred' || s === 'fix_deferred') {
-    return {
-      label: '🟠 延後修復 (Fix deferred)',
-      color: '#f59e0b',
-      bg: 'rgba(245, 158, 11, 0.15)',
-      border: '1px solid rgba(245, 158, 11, 0.3)',
-    };
+    return { label: '🟠 延後修復 (Fix deferred)', tone: 'deferred' };
   }
-
   if (s === 'under investigation') {
-    return {
-      label: '🟡 調查中 (Under investigation)',
-      color: '#eab308',
-      bg: 'rgba(234, 179, 8, 0.15)',
-      border: '1px solid rgba(234, 179, 8, 0.3)',
-    };
+    return { label: '🟡 調查中 (Under investigation)', tone: 'investigating' };
   }
-
   if (!s || s === '-' || s === 'unknown') {
-    return {
-      label: '未指定 (Unknown)',
-      color: 'text.secondary',
-      bg: 'action.hover',
-    };
+    return { label: '未指定 (Unknown)', tone: 'unknown' };
   }
-
-  return {
-    label: state || '',
-    color: 'text.secondary',
-    bg: 'action.hover',
-  };
+  return { label: state || '', tone: 'unknown' };
 }
 
 export function matchesImpactState(impState: string | undefined | null, selectedStatus: string): boolean {

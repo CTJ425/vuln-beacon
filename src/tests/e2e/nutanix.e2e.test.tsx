@@ -244,7 +244,7 @@ describe('E2E: Comprehensive Nutanix Integration Lifecycle', () => {
     expect(screen.getAllByLabelText('Nutanix logo').length).toBeGreaterThan(0);
 
     // Click on Nutanix sidebar navigation
-    const nutanixNavBtn = await screen.findByRole('button', { name: 'Nutanix' });
+    const nutanixNavBtn = await screen.findByRole('link', { name: 'Nutanix' });
     fireEvent.click(nutanixNavBtn);
 
     // Verify Nutanix Vendor Page header
@@ -293,7 +293,7 @@ describe('E2E: Comprehensive Nutanix Integration Lifecycle', () => {
     await screen.findByText('Security Intelligence Overview');
 
     // Navigate to Admin Console
-    const adminNav = await screen.findByRole('button', { name: /Admin Console/i });
+    const adminNav = await screen.findByRole('link', { name: /Admin Console/i });
     fireEvent.click(adminNav);
 
     await screen.findByText('後台管理系統');
@@ -340,7 +340,7 @@ describe('E2E: Comprehensive Nutanix Integration Lifecycle', () => {
     await screen.findByText('Security Intelligence Overview');
 
     // Navigate to Admin Console
-    const adminNav = await screen.findByRole('button', { name: /Admin Console/i });
+    const adminNav = await screen.findByRole('link', { name: /Admin Console/i });
     fireEvent.click(adminNav);
 
     await screen.findByText('後台管理系統');
@@ -369,7 +369,7 @@ describe('E2E: Comprehensive Nutanix Integration Lifecycle', () => {
     await screen.findByText('Security Intelligence Overview');
 
     // Navigate to CVE Explorer page
-    const explorerNav = await screen.findByRole('button', { name: /CVE Explorer/i });
+    const explorerNav = await screen.findByRole('link', { name: /CVE Explorer/i });
     fireEvent.click(explorerNav);
 
     // Switch to CVE view mode in filter bar

@@ -63,6 +63,18 @@ describe('statusUtils', () => {
   });
 
   describe('getStateBadgeConfig', () => {
+    it('maps each state to a theme tone', () => {
+      expect(getStateBadgeConfig('Affected').tone).toBe('affected');
+      expect(getStateBadgeConfig('needed').tone).toBe('affected');
+      expect(getStateBadgeConfig('Will not fix').tone).toBe('wontfix');
+      expect(getStateBadgeConfig('Not affected').tone).toBe('notAffected');
+      expect(getStateBadgeConfig('resolved').tone).toBe('fixed');
+      expect(getStateBadgeConfig('Fix deferred').tone).toBe('deferred');
+      expect(getStateBadgeConfig('under investigation').tone).toBe('investigating');
+      expect(getStateBadgeConfig(null).tone).toBe('unknown');
+      expect(getStateBadgeConfig('something vendor-specific').tone).toBe('unknown');
+    });
+
     it('provides distinct colors and labels for each state', () => {
       expect(getStateBadgeConfig('Affected').label).toBe('🔴 受影響 (Affected)');
       expect(getStateBadgeConfig('Not affected').label).toBe('🟢 不受影響 (Not affected)');
