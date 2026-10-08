@@ -1,7 +1,7 @@
 # Open Bugs
 
 ## BUG-036: Production data load fails on the anon statement timeout
-- **Status**: FIX WRITTEN, NOT DEPLOYED (2026-10-09). Migration `20261009000000_explorer_dataset_dedupe_arrays.sql` must be applied to `vuln-beacon-dev` then `vuln-beacon`.
+- **Status**: DEPLOYED, PRODUCTION NOT YET VERIFIED (2026-10-09). Migration `20261009000000_explorer_dataset_dedupe_arrays.sql` applied with `supabase db push` to `vuln-beacon-dev` (verified: anon RPC 200, upstream 1,610 ms for 4,674 mappings; dev site loads) and to `vuln-beacon` (push succeeded; the follow-up check was blocked by the agent's permission policy). Before the push, production failed 6 of 6 anon calls (upstream 3,118–3,460 ms → 500). Close after an anon call to production returns 200.
 - **Severity**: HIGH (public site intermittently shows "Unable to load security data")
 - **Location**: `public.explorer_dataset(boolean)`
 - **Root Cause**: production `EXPLAIN ANALYZE select explorer_dataset(true)` = 3,209 ms; anon `statement_timeout=3s` (authenticated 8s). Mappings grew 5,022 → 9,479 since 1.5.0; the function expanded every mapping's `affected_products` (137,987 elements, 31 MB of jsonb) to find 11,826 distinct impacts. A direct REST call returned `57014 canceling statement due to statement timeout` (3.9 s) and, on retry, 200 in 5.5 s with an 8.0 MB body. Not caused by the 1.6.0 frontend.
