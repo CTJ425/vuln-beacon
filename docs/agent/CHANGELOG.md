@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.6.0-dev.1 - 2026-10-09
+## 1.6.0 - 2026-10-09
 ### Added
 - **Shareable URLs**: every page has its own address (`/`, `/explorer`, `/vendors/:code`, `/admin/webhooks|sync|logs|health`), and every advisory and CVE has a deep link (`/advisories/:id`, `/cves/:id`). Opening an item from a list puts its URL in the address bar; a deep link opens the item over the overview; Back and Forward work. Sidebar items are real links. A signed-out visit to an admin URL asks for sign-in.
 - **English and Traditional Chinese interface**: EN / 中 switch in the header; the choice is remembered, and the first visit follows the browser language. The navigation and app-level messages are translated so far; vendor advisory text is never translated.
