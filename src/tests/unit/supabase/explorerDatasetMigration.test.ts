@@ -24,6 +24,20 @@ describe('explorer_dataset migration', () => {
     expect(latest).toMatch(/join impact_idx x on x\.advisory_id = e\.advisory_id and x\.item = e\.item/);
   });
 
+  // BUG-036: mappings of one advisory mostly repeat the same impact array
+  // (production 2026-10-09: 138k expanded elements for 11.8k distinct impacts),
+  // which pushed the anon call past its 3 s statement timeout.
+  it('expands each distinct impact array once instead of once per mapping', () => {
+    const latest = definitions[definitions.length - 1][1];
+    expect(latest).toMatch(/partition by m\.advisory_id, m\.affected_products/i);
+    expect(latest).toMatch(/from arrays a,\s*jsonb_array_elements/i);
+  });
+
+  it('runs with its own statement timeout above the anon role default', () => {
+    const latest = definitions[definitions.length - 1][1];
+    expect(latest).toMatch(/SET statement_timeout = '\d+s'/i);
+  });
+
   it('exists and defines explorer_dataset() returning jsonb', () => {
     expect(file).toBeDefined();
     expect(sql).toMatch(/FUNCTION public\.explorer_dataset\(\)\s*RETURNS jsonb/i);

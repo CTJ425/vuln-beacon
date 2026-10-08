@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.1-dev.1 - 2026-10-09
+### Fixed
+- **Site often failed to load its data (BUG-036)**: on production `explorer_dataset(true)` needed 3.2 s of database time for 9,479 mappings, past the anon role's 3 s statement timeout; the browser reported it as a CORS error. The function now expands each distinct impact array once per advisory instead of once per mapping (production: 137,987 expanded elements for 11,826 distinct impacts). Output is byte-identical to 1.5.0's (md5 equal for both formats, checked on production-sized synthetic data with `supabase/checks/explorer-dataset-equivalence.mjs`); about 2.4x faster there. The function also carries its own 15 s statement timeout.
+
 ## 1.6.0 - 2026-10-09
 ### Added
 - **Shareable URLs**: every page has its own address (`/`, `/explorer`, `/vendors/:code`, `/admin/webhooks|sync|logs|health`), and every advisory and CVE has a deep link (`/advisories/:id`, `/cves/:id`). Opening an item from a list puts its URL in the address bar; a deep link opens the item over the overview; Back and Forward work. Sidebar items are real links. A signed-out visit to an admin URL asks for sign-in.
