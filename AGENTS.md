@@ -30,7 +30,7 @@ Persist important state here so the next agent does not need chat history.
 ## Project Structure & TDD Quality Standards
 
 - **Project Location**: All source code, configs (`package.json`, `tsconfig.json`, `vite.config.ts`), and tests are encapsulated entirely inside `src/`. Root directory is strictly kept clean (`AGENTS.md`, `README.md`, `docs/`, `src/`).
-- **Mandatory TDD**: All code development MUST follow Test-Driven Development (Red -> Green -> Refactor).
+- **TDD**: All code development follows Test-Driven Development (Red -> Green -> Refactor); the rules are in `docs/test/TDD_GUIDELINES.md`.
 - **Test Commands** (run in `src/` or with `--prefix src`):
   - Unit: `npm --prefix src run test:unit` (or `cd src && npm run test:unit`)
   - Smoke: `npm --prefix src run test:smoke`
