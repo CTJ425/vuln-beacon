@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -13,6 +13,7 @@ import {
   Chip,
   Tooltip,
   IconButton,
+  TableSortLabel,
 } from '@mui/material';
 import { ChevronRight, Flame } from 'lucide-react';
 
@@ -21,6 +22,7 @@ import { SeverityBadge } from '@/components/common/SeverityBadge';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
 import { isAffectedState } from '@/utils/statusUtils';
+import { SortDirection, SortState, SortValue, ariaSort, dateSortValue, nextSort, sortRows } from '@/utils/tableSort';
 
 export interface CveTableRowItem extends CveRecord {
   vendor_code: string;
@@ -46,13 +48,38 @@ interface CveTableProps {
 // whole list (thousands of rows on production); one page keeps it constant.
 export const CVE_TABLE_PAGE_SIZE = 50;
 
+type CveSortKey = 'cve' | 'products' | 'date';
+
+const SORT_COLUMNS: Record<CveSortKey, { value: (item: CveTableRowItem) => SortValue; firstDirection: SortDirection }> = {
+  cve: { value: (item) => item.cve_id, firstDirection: 'asc' },
+  products: { value: (item) => item.affected_products?.[0], firstDirection: 'asc' },
+  date: { value: (item) => dateSortValue(item.published_date), firstDirection: 'desc' },
+};
+
 export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode = 'cve' }) => {
   const [page, setPage] = useState(0);
-  // A new filter result starts again from its first page.
+  const [sort, setSort] = useState<SortState<CveSortKey> | null>(null);
+  // A new filter result or sort order starts again from its first page.
   useEffect(() => {
     setPage(0);
-  }, [items]);
-  const pageItems = items.slice(page * CVE_TABLE_PAGE_SIZE, (page + 1) * CVE_TABLE_PAGE_SIZE);
+  }, [items, sort]);
+  const sortedItems = useMemo(
+    () => (sort ? sortRows(items, SORT_COLUMNS[sort.key].value, sort.direction) : items),
+    [items, sort]
+  );
+  const pageItems = sortedItems.slice(page * CVE_TABLE_PAGE_SIZE, (page + 1) * CVE_TABLE_PAGE_SIZE);
+
+  const sortableHeader = (key: CveSortKey, label: string, width: string) => (
+    <TableCell sx={{ fontWeight: 800, color: 'text.primary', width }} aria-sort={ariaSort(sort, key)}>
+      <TableSortLabel
+        active={sort?.key === key}
+        direction={sort?.key === key ? sort.direction : SORT_COLUMNS[key].firstDirection}
+        onClick={() => setSort((current) => nextSort(current, key, SORT_COLUMNS[key].firstDirection))}
+      >
+        {label}
+      </TableSortLabel>
+    </TableCell>
+  );
 
   if (items.length === 0) {
     return (
@@ -75,19 +102,19 @@ export const CveTable: React.FC<CveTableProps> = ({ items, onSelectRow, viewMode
             {viewMode === 'advisory' ? (
               <>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '22%' }}>公告編號 (Advisory ID)</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '18%' }}>對應 CVE 弱點 (Target CVEs)</TableCell>
+                {sortableHeader('cve', '對應 CVE 弱點 (Target CVEs)', '18%')}
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>嚴重等級</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '28%' }}>公告主旨 (Synopsis)</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>發布日期</TableCell>
+                {sortableHeader('date', '發布日期', '12%')}
                 <TableCell sx={{ width: 40 }} />
               </>
             ) : (
               <>
-                <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '22%' }}>CVE 漏洞編號</TableCell>
+                {sortableHeader('cve', 'CVE 漏洞編號', '22%')}
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '20%' }}>關聯安全公告 (Advisory)</TableCell>
                 <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>嚴重等級</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '26%' }}>受影響產品與元件</TableCell>
-                <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>發布日期</TableCell>
+                {sortableHeader('products', '受影響產品與元件', '26%')}
+                {sortableHeader('date', '發布日期', '12%')}
                 <TableCell sx={{ width: 40 }} />
               </>
             )}

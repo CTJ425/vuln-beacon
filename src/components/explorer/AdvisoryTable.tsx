@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -12,6 +12,7 @@ import {
   Chip,
   Tooltip,
   IconButton,
+  TableSortLabel,
 } from '@mui/material';
 import { ChevronRight } from 'lucide-react';
 
@@ -19,13 +20,44 @@ import { AdvisoryRowItem } from '@/services/advisoryService';
 import { SeverityBadge } from '@/components/common/SeverityBadge';
 import { VendorIcon } from '@/components/common/VendorIcon';
 import { formatDate } from '@/utils/date';
+import { SortDirection, SortState, SortValue, ariaSort, dateSortValue, nextSort, sortRows } from '@/utils/tableSort';
 
 interface AdvisoryTableProps {
   items: AdvisoryRowItem[];
   onSelectRow: (item: AdvisoryRowItem) => void;
 }
 
+const cveIdsOf = (item: AdvisoryRowItem): string[] =>
+  (item.cves || []).map((c) => (typeof c === 'string' ? c : c?.cve_id || '')).filter(Boolean);
+
+type AdvisorySortKey = 'cves' | 'products' | 'date';
+
+// The CVE and product columns sort by the first entry, the one the row shows.
+const SORT_COLUMNS: Record<AdvisorySortKey, { value: (item: AdvisoryRowItem) => SortValue; firstDirection: SortDirection }> = {
+  cves: { value: (item) => cveIdsOf(item)[0], firstDirection: 'asc' },
+  products: { value: (item) => item.affected_products?.[0], firstDirection: 'asc' },
+  date: { value: (item) => dateSortValue(item.published_at), firstDirection: 'desc' },
+};
+
 export const AdvisoryTable: React.FC<AdvisoryTableProps> = ({ items, onSelectRow }) => {
+  const [sort, setSort] = useState<SortState<AdvisorySortKey> | null>(null);
+  const sortedItems = useMemo(
+    () => (sort ? sortRows(items, SORT_COLUMNS[sort.key].value, sort.direction) : items),
+    [items, sort]
+  );
+
+  const sortableHeader = (key: AdvisorySortKey, label: string, width: string) => (
+    <TableCell sx={{ fontWeight: 800, color: 'text.primary', width }} aria-sort={ariaSort(sort, key)}>
+      <TableSortLabel
+        active={sort?.key === key}
+        direction={sort?.key === key ? sort.direction : SORT_COLUMNS[key].firstDirection}
+        onClick={() => setSort((current) => nextSort(current, key, SORT_COLUMNS[key].firstDirection))}
+      >
+        {label}
+      </TableSortLabel>
+    </TableCell>
+  );
+
   if (items.length === 0) {
     return (
       <Paper sx={{ p: 6, textAlign: 'center', bgcolor: 'background.paper', borderRadius: 2, border: 1, borderColor: 'divider' }}>
@@ -45,20 +77,17 @@ export const AdvisoryTable: React.FC<AdvisoryTableProps> = ({ items, onSelectRow
         <TableHead>
           <TableRow sx={{ bgcolor: 'action.hover' }}>
             <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '18%' }}>Advisory ID</TableCell>
-            <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '18%' }}>修補的 CVE (Fixed CVEs)</TableCell>
+            {sortableHeader('cves', '修補的 CVE (Fixed CVEs)', '18%')}
             <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>嚴重等級</TableCell>
             <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '24%' }}>公告主旨 (Synopsis)</TableCell>
-            <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '16%' }}>受影響產品</TableCell>
-            <TableCell sx={{ fontWeight: 800, color: 'text.primary', width: '12%' }}>發布日期</TableCell>
+            {sortableHeader('products', '受影響產品', '16%')}
+            {sortableHeader('date', '發布日期', '12%')}
             <TableCell sx={{ width: 40 }} />
           </TableRow>
         </TableHead>
         <TableBody>
-          {items.map((item) => {
-            const cveList = item.cves || [];
-            const cveIds = cveList
-              .map((c) => (typeof c === 'string' ? c : c?.cve_id || ''))
-              .filter(Boolean);
+          {sortedItems.map((item) => {
+            const cveIds = cveIdsOf(item);
             const visibleCveIds = cveIds.slice(0, 2);
             const extraCveCount = cveIds.length - visibleCveIds.length;
 
