@@ -1,12 +1,14 @@
 # Changelog
 
-## 1.7.0-dev.1 - 2026-10-11
+## 1.7.0 - 2026-10-11
 ### Added
 - **Sortable table columns**: in the Explorer (both views) and the overview's advisory table, click CVE, affected products or published date to sort; click again to reverse. Dates start newest first, CVE ids sort by number (`CVE-2026-9999` before `CVE-2026-10000`), rows without a value stay last, and a column with several values sorts by the one the row shows. The CVE list returns to page 1 when the order changes.
 
-## 1.6.1-dev.1 - 2026-10-09
 ### Fixed
 - **Site often failed to load its data (BUG-036)**: on production `explorer_dataset(true)` needed 3.2 s of database time for 9,479 mappings, past the anon role's 3 s statement timeout; the browser reported it as a CORS error. The function now expands each distinct impact array once per advisory instead of once per mapping (production: 137,987 expanded elements for 11,826 distinct impacts). Output is byte-identical to 1.5.0's (md5 equal for both formats, checked on production-sized synthetic data with `supabase/checks/explorer-dataset-equivalence.mjs`); about 2.4x faster there. The function also carries its own 15 s statement timeout.
+
+### Operations
+- Migration `20261009000000_explorer_dataset_dedupe_arrays` applied to `vuln-beacon-dev` and `vuln-beacon` on 2026-10-09.
 
 ## 1.6.0 - 2026-10-09
 ### Added
